@@ -1,0 +1,362 @@
+openapi: 3.1.0
+info:
+  title: SEDERG_PAY API
+  version: 0.1.0
+  description: |
+    API inicial para clientes reales y operaciones de negocio de SEDERG_PAY.
+    Los depósitos, payouts y proveedores permanecen simulados hasta completar
+    los gates legales, contractuales, regulatorios y de seguridad.
+servers:
+  - url: https://api.example.invalid
+    description: Placeholder; no es un endpoint operativo.
+security:
+  - oidc: [openid]
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      operationId: health
+      summary: Comprobar disponibilidad de API y base de datos
+      security: []
+      responses:
+        '200':
+          description: Servicio disponible
+  /api/v1/registrations:
+    post:
+      operationId: registerClient
+      summary: Registrar cliente y consentimientos
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistrationInput'
+      responses:
+        '201':
+          description: Cliente registrado, pendiente de verificación
+        '409':
+          description: Idempotencia o contacto ya registrado
+        '422':
+          description: Datos o consentimientos inválidos
+  /api/v1/beneficiaries:
+    post:
+      operationId: createBeneficiary
+      summary: Crear beneficiario propio
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BeneficiaryInput'
+      responses:
+        '201':
+          description: Beneficiario creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Beneficiary'
+        '409':
+          description: Clave de idempotencia reutilizada con otra petición
+    get:
+      operationId: listBeneficiaries
+      summary: Listar beneficiarios propios
+      responses:
+        '200':
+          description: Beneficiarios activos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Beneficiary'
+  /api/v1/beneficiaries/{public_id}:
+    get:
+      operationId: getBeneficiary
+      summary: Consultar un beneficiario propio
+      parameters:
+        - name: public_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Beneficiario
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Beneficiary'
+        '404':
+          description: Beneficiario no encontrado
+  /api/v1/quotes:
+    post:
+      operationId: createQuote
+      summary: Crear cotización vigente
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuoteInput'
+      responses:
+        '201':
+          description: Cotización creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quote'
+        '422':
+          description: Datos o límites inválidos
+  /api/v1/quotes/{public_id}:
+    get:
+      operationId: getQuote
+      summary: Consultar una cotización propia
+      parameters:
+        - name: public_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Cotización
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quote'
+        '404':
+          description: Cotización no encontrada
+  /api/v1/remittances:
+    post:
+      operationId: createRemittance
+      summary: Crear solicitud de remesa
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RemittanceInput'
+      responses:
+        '201':
+          description: Solicitud creada
+        '409':
+          description: Solicitud duplicada
+        '422':
+          description: Cotización expirada o datos incompatibles
+    get:
+      operationId: listRemittances
+      summary: Listar solicitudes propias o autorizadas
+      responses:
+        '200':
+          description: Solicitudes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Remittance'
+  /api/v1/remittances/{public_id}:
+    get:
+      operationId: getRemittance
+      summary: Consultar una remesa propia
+      parameters:
+        - name: public_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Remesa
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Remittance'
+        '404':
+          description: Remesa no encontrada
+  /api/v1/remittances/{public_id}/deposit:
+    post:
+      operationId: createSimulatedDeposit
+      summary: Crear instrucciones de depósito sandbox
+      parameters:
+        - name: public_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: Instrucciones de depósito simuladas
+        '422':
+          description: Remesa no disponible para pago
+  /api/v1/deposits/{public_id}/simulate-confirmation:
+    post:
+      operationId: simulateDepositConfirmation
+      summary: Confirmar depósito en sandbox
+      parameters:
+        - name: public_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Depósito confirmado y remesa enviada a cumplimiento
+  /api/v1/remittances/{public_id}/compliance-review:
+    post:
+      operationId: reviewRemittanceCompliance
+      summary: Resolver revisión de cumplimiento sandbox
+      parameters:
+        - name: public_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision, reason]
+              properties:
+                decision: { type: string, enum: [approved, rejected] }
+                reason: { type: string, minLength: 1, maxLength: 500 }
+      responses:
+        '200':
+          description: Revisión registrada
+        '422':
+          description: Remesa no disponible para revisión
+  /api/v1/remittances/{public_id}/reconcile:
+    post:
+      operationId: reconcileRemittance
+      summary: Conciliar remesa sandbox
+      parameters:
+        - name: public_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notes: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: Remesa completada y conciliada
+        '422':
+          description: Remesa no disponible para conciliación
+components:
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 100
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    oidc:
+      type: openIdConnect
+      openIdConnectUrl: https://identity.example.invalid/.well-known/openid-configuration
+  schemas:
+    RegistrationInput:
+      type: object
+      required: [email, password, first_name, last_name, residence_country_code, consent_policy_version, accept_terms, accept_privacy]
+      properties:
+        email: { type: string, format: email, maxLength: 190 }
+        password: { type: string, minLength: 12, maxLength: 255, writeOnly: true }
+        phone_e164: { type: string, pattern: '^\+[1-9]\d{7,14}$' }
+        first_name: { type: string, minLength: 1, maxLength: 100 }
+        last_name: { type: string, minLength: 1, maxLength: 100 }
+        residence_country_code: { type: string, enum: [RU, CU] }
+        preferred_language: { type: string, maxLength: 10 }
+        consent_policy_version: { type: string, maxLength: 30 }
+        accept_terms: { type: boolean, const: true }
+        accept_privacy: { type: boolean, const: true }
+    BeneficiaryInput:
+      type: object
+      required: [first_name, last_name, country_code, payout_method_code]
+      properties:
+        first_name: { type: string, minLength: 1, maxLength: 100 }
+        last_name: { type: string, minLength: 1, maxLength: 100 }
+        country_code: { type: string, pattern: '^[A-Z]{2}$' }
+        payout_method_code: { type: string, maxLength: 30 }
+        phone_e164: { type: string, maxLength: 20 }
+        email: { type: string, format: email }
+        payout_account_token: { type: string, writeOnly: true }
+        payout_account_last4: { type: string, pattern: '^\d{4}$' }
+        payout_provider: { type: string, maxLength: 80 }
+    Beneficiary:
+      type: object
+      required: [public_id, country_code, first_name, last_name, payout_method_code, status]
+      properties:
+        public_id: { type: string, format: uuid }
+        country_code: { type: string, pattern: '^[A-Z]{2}$' }
+        first_name: { type: string }
+        last_name: { type: string }
+        phone_e164: { type: string }
+        email: { type: string, format: email }
+        payout_method_code: { type: string }
+        payout_provider: { type: string }
+        payout_account_last4: { type: string }
+        status: { type: string, enum: [active, inactive] }
+    QuoteInput:
+      type: object
+      required: [source_country_code, destination_country_code, send_amount, send_currency, receive_currency, payout_method_code]
+      properties:
+        source_country_code: { type: string, enum: [RU, CU] }
+        destination_country_code: { type: string, enum: [RU, CU] }
+        send_amount: { type: string, pattern: '^\d+(?:\.\d{1,2})?$' }
+        send_currency: { type: string, enum: [RUB, CUP, USD, EUR] }
+        receive_currency: { type: string, enum: [RUB, CUP, USD, EUR] }
+        payout_method_code: { type: string, maxLength: 30 }
+    Quote:
+      allOf:
+        - $ref: '#/components/schemas/QuoteInput'
+        - type: object
+          required: [public_id, exchange_rate, fee_amount, total_debit_amount, expires_at]
+          properties:
+            public_id: { type: string, format: uuid }
+            exchange_rate: { type: string }
+            fee_amount: { type: string }
+            total_debit_amount: { type: string }
+            expires_at: { type: string, format: date-time }
+    RemittanceInput:
+      type: object
+      required: [quote_public_id, beneficiary_public_id]
+      properties:
+        quote_public_id: { type: string, format: uuid }
+        beneficiary_public_id: { type: string, format: uuid }
+        direction: { type: string, enum: [ru_to_cu, cu_to_ru] }
+    Remittance:
+      type: object
+      required: [public_id, reference, direction, send_amount, receive_amount, status, compliance_status]
+      properties:
+        public_id: { type: string, format: uuid }
+        reference: { type: string }
+        direction: { type: string, enum: [ru_to_cu, cu_to_ru] }
+        send_amount: { type: string }
+        send_currency: { type: string }
+        receive_amount: { type: string }
+        receive_currency: { type: string }
+        status: { type: string, enum: [awaiting_payment, compliance_review, approved, cancelled, rejected] }
+        compliance_status: { type: string, enum: [pending, approved, rejected] }

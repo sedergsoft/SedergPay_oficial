@@ -1,0 +1,5 @@
+-- SEDERG_PAY
+-- El esquema autoritativo está implementado en la migración Yii2 incluida.
+-- Para evitar divergencias entre SQL manual y migración, crear el esquema con:
+-- php yii migrate --migrationPath=@app/migrations
+-- Requisito: MySQL 8.0.16+, InnoDB, utf8mb4.

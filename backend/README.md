@@ -1,0 +1,97 @@
+# SEDERG_PAY — Modelo físico MySQL y migración Yii2
+
+## Alcance
+Esquema inicial para una plataforma de remesas con operaciones en ambos sentidos, catálogo de beneficiarios y modalidades de pago, cotizaciones, órdenes de remesa, controles de cumplimiento, integración con bancos rusos (Sberbank, VTB y Alfa-Bank), recepción de notificaciones, importación/consulta de movimientos, conciliación y registro contable idempotente.
+
+## Requisitos
+- Yii 2.0 (basic o advanced).
+- MySQL 8.0.16 o superior (para aplicar las restricciones `CHECK`).
+- InnoDB y `utf8mb4`.
+- Extensión PHP `bcmath` para validar saldos de doble partida sin pérdida de precisión.
+- PHP compatible con la versión de Yii2 instalada.
+
+## Instalación
+1. Haga una copia de seguridad y cree una base de datos vacía.
+2. Configure `components['db']` en `config/db.php` con el DSN de MySQL.
+3. Copie la carpeta `migrations/` a la raíz de la aplicación Yii2 (o configure el `migrationPath`).
+4. Ejecute:
+
+   `php yii migrate --migrationPath=@app/migrations`
+
+5. Compruebe las tablas y los catálogos insertados.
+
+Para desarrollo local, el repositorio incluye `docker-compose.yml` en la raíz.
+La instalación de Composer y la ejecución de Yii2 requieren PHP 8.3; no se debe
+usar `--ignore-platform-req` en entornos de despliegue.
+
+## Bancos y seguridad
+`bank_connections` almacena referencias internas y metadatos no secretos. No guarde contraseñas, certificados privados, tokens de acceso ni claves API en texto claro en esta tabla. Use un gestor de secretos o un almacén cifrado y registre aquí únicamente un identificador seguro. La disponibilidad de API, extractos, webhooks y pagos debe validarse contractualmente con cada banco; el esquema no implica que el banco habilite esos productos para la empresa.
+
+## Reglas de diseño
+- Importes: `DECIMAL(20,2)`; tipos de cambio: `DECIMAL(20,10)`. No use `FLOAT`/`DOUBLE` para dinero.
+- UUID públicos separados de las claves primarias internas.
+- Claves de idempotencia para webhooks, creación de recursos y asientos de libro.
+- Los movimientos bancarios originales se conservan para auditoría y conciliación.
+- `wallet_ledger_entries` es un registro de movimientos inmutable por diseño de aplicación; correcciones deben hacerse con asientos compensatorios, no editando asientos históricos.
+- Estados se guardan como `VARCHAR` para permitir evolución; validar sus valores mediante enums de aplicación o tablas catálogo según las necesidades finales.
+- Los datos bancarios de beneficiarios se representan mediante `payout_account_token` y `payout_account_last4`; no se debe almacenar innecesariamente el número completo de cuenta o tarjeta.
+
+## Tablas incluidas
+1. `countries`
+2. `currencies`
+3. `users`
+4. `user_profiles`
+5. `beneficiaries`
+6. `payment_methods`
+7. `exchange_rates`
+8. `remittance_quotes`
+9. `remittances`
+10. `compliance_checks`
+11. `bank_connections`
+12. `deposit_requests`
+13. `bank_webhook_events`
+14. `bank_transactions`
+15. `reconciliation_cases`
+16. `wallets`
+17. `wallet_ledger_entries`
+18. `payout_orders`
+19. `payout_attempts`
+20. `bank_sync_cursors`
+21. `idempotency_keys`
+22. `audit_logs`
+23. `user_consents`
+24. `remittance_state_events`
+25. `ledger_accounts`
+26. `ledger_transactions`
+27. `ledger_entries`
+28. `outbox_messages`
+
+## Flujo operativo recomendado
+1. El usuario se registra y completa su perfil.
+2. El sistema crea una cotización con importes, tipo de cambio, comisión y vencimiento.
+3. Se registra la remesa y se crea una `deposit_request` con referencia única.
+4. Un adaptador bancario consulta movimientos y/o recibe webhook. Se verifica autenticidad, se guarda el evento y se normaliza la transacción.
+5. El motor de conciliación compara referencia, importe, moneda, fecha y cuenta receptora. Los casos ambiguos quedan en revisión manual.
+6. Al confirmar el ingreso, una transacción de base de datos cambia el estado de remesa y crea los asientos contables necesarios, con clave de idempotencia.
+7. Se ejecuta el pago al beneficiario mediante el proveedor/modalidad autorizados y se registran intentos y resultado.
+8. Se auditan los cambios sensibles y se gestionan devoluciones/reversiones mediante asientos compensatorios.
+
+## Límites importantes antes de producción
+- Completar reglas de negocio y estados válidos de cada entidad.
+- Confirmar licencias, AML/KYC, sanciones, controles cambiarios, protección de datos y posibilidad legal de operar entre Rusia y Cuba.
+- Confirmar el circuito real de liquidación, bancos corresponsales, monedas y modalidades de pago disponibles en ambos países.
+- Definir el tratamiento de devoluciones, transferencias parciales, pagos duplicados, disputas, comisiones bancarias y conciliación de diferencias.
+- Agregar cifrado de datos sensibles, retención de logs, política de acceso por roles, alertas y monitoreo.
+- Los catálogos de moneda y métodos son iniciales; no representan una promesa de disponibilidad operativa.
+
+## Relaciones principales
+- `users` 1:N `beneficiaries`, `remittance_quotes`, `remittances`.
+- `remittance_quotes` 1:N opcional con `remittances` (la remesa conserva su propia fotografía de importes y tasa).
+- `remittances` 1:N `compliance_checks`, `deposit_requests`, `payout_orders`, `wallet_ledger_entries`.
+- `bank_connections` 1:N `bank_webhook_events`, `bank_transactions`, `deposit_requests`, `bank_sync_cursors`.
+- `bank_transactions` 1:N `reconciliation_cases`; pueden vincularse a una `deposit_request` y/o remesa.
+- `payout_orders` 1:N `payout_attempts`.
+- `wallets` 1:N `wallet_ledger_entries`.
+
+## Nota sobre montos de remesa
+El esquema no fuerza un límite fijo de importe por fila porque los límites dependen del país, canal, moneda, proveedor y regulación. Si se decide aplicar el rango operativo inicialmente estudiado de 15.000 a 50.000, debe definirse explícitamente la moneda y si el límite se aplica al importe enviado, recibido o total debitado, y después implementarse en la capa de negocio y/o una restricción específica.

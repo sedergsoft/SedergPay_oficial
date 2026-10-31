@@ -1,0 +1,25 @@
+:root { font-family: Inter, system-ui, sans-serif; color: #172033; background: #f4f7fb; font-synthesis: none; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+.shell { max-width: 1080px; margin: auto; padding: 28px 20px 50px; }
+.narrow { max-width: 560px; }
+header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+.brand { font-size: 1.6rem; font-weight: 800; letter-spacing: -.05em; color: #1769e0; }
+.brand span { color: #172033; }
+.sandbox, .badge { background: #fff3cd; color: #8a5a00; border-radius: 999px; padding: 5px 10px; font-size: .75rem; font-weight: 700; }
+.toolbar, .row { display: flex; align-items: center; gap: 12px; }
+.toolbar { justify-content: space-between; margin-bottom: 18px; font-size: .85rem; }
+.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+.card { background: white; border: 1px solid #e4e9f1; border-radius: 16px; padding: 22px; box-shadow: 0 8px 24px #1720330b; margin-bottom: 18px; }
+h1, h2 { margin: 0 0 14px; } h2 { font-size: 1.1rem; }
+form { display: grid; gap: 12px; }
+label { display: grid; gap: 6px; font-size: .85rem; font-weight: 600; }
+input, select { width: 100%; padding: 11px 12px; border: 1px solid #d5dce7; border-radius: 9px; font: inherit; background: #fff; }
+button { border: 0; border-radius: 9px; padding: 11px 15px; background: #1769e0; color: white; font-weight: 700; cursor: pointer; }
+button:disabled { opacity: .6; cursor: wait; } button.secondary { background: #edf2fa; color: #315176; }
+.muted, footer { color: #6b7890; font-size: .88rem; } .result { display: grid; gap: 8px; margin-top: 16px; padding: 14px; background: #eef6ff; border-radius: 10px; }
+.result strong { font-size: 1.4rem; } .result span, .row span { color: #6b7890; font-size: .82rem; }
+.row { border-top: 1px solid #edf0f5; padding: 13px 0; } .row > div { display: grid; gap: 4px; flex: 1; }
+.alert { color: #9c2c2c; background: #fff0f0; border-radius: 9px; padding: 11px; }
+footer { text-align: center; padding-top: 18px; }
+@media (max-width: 720px) { .grid { grid-template-columns: 1fr; } .row { flex-wrap: wrap; } }

@@ -1,0 +1,58 @@
+services:
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_AUTH_MODE: ${VITE_AUTH_MODE:-development}
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+  backend:
+    build:
+      context: ./backend
+    environment:
+      SEDERG_DB_DSN: mysql:host=mysql;dbname=sederg_pay
+      SEDERG_DB_USER: ${SEDERG_DB_USER:-sederg_app}
+      SEDERG_DB_PASSWORD: ${SEDERG_DB_PASSWORD:?SEDERG_DB_PASSWORD is required}
+      SEDERG_AUTH_MODE: ${SEDERG_AUTH_MODE:-development}
+      SEDERG_COOKIE_KEY: ${SEDERG_COOKIE_KEY:?SEDERG_COOKIE_KEY is required}
+      SEDERG_OIDC_ISSUER: ${SEDERG_OIDC_ISSUER:-https://identity.example.invalid/realms/sederg}
+      SEDERG_OIDC_AUDIENCE: ${SEDERG_OIDC_AUDIENCE:-sederg-pay-api}
+      SEDERG_OIDC_PUBLIC_KEY: ${SEDERG_OIDC_PUBLIC_KEY:-}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/app
+    command: ["php", "yii", "serve", "0.0.0.0:8080", "--docroot=web"]
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: sederg_pay
+      MYSQL_USER: ${SEDERG_DB_USER:-sederg_app}
+      MYSQL_PASSWORD: ${SEDERG_DB_PASSWORD:?SEDERG_DB_PASSWORD is required}
+      MYSQL_ROOT_PASSWORD: ${SEDERG_MYSQL_ROOT_PASSWORD:?SEDERG_MYSQL_ROOT_PASSWORD is required}
+    ports:
+      - "3306:3306"
+    volumes:
+      - sederg_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - sederg_redis_data:/data
+
+volumes:
+  sederg_mysql_data:
+  sederg_redis_data:
