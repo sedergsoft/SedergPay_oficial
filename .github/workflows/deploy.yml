@@ -1,0 +1,75 @@
+name: Deploy SEDERG_PAY
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  frontend:
+    name: Publish frontend to GitHub Pages
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_AUTH_MODE: ${{ vars.VITE_AUTH_MODE || 'development' }}
+        run: |
+          npm ci
+          npm run build
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  backend:
+    name: Deploy backend to AWS EC2
+    if: ${{ vars.AWS_EC2_DEPLOY == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SSH key
+        env:
+          SSH_KEY: ${{ secrets.AWS_EC2_SSH_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/sederg-pay
+          chmod 600 ~/.ssh/sederg-pay
+      - name: Deploy source and restart Docker stack
+        env:
+          AWS_EC2_HOST: ${{ secrets.AWS_EC2_HOST }}
+          AWS_EC2_USER: ${{ secrets.AWS_EC2_USER }}
+        run: |
+          tar --exclude=.git --exclude=frontend/node_modules --exclude=backend/vendor -czf /tmp/sederg-pay.tar.gz .
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/sederg-pay /tmp/sederg-pay.tar.gz "$AWS_EC2_USER@$AWS_EC2_HOST:/tmp/sederg-pay.tar.gz"
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/sederg-pay "$AWS_EC2_USER@$AWS_EC2_HOST" '
+            set -eu
+            mkdir -p "$HOME/sederg-pay"
+            tar -xzf /tmp/sederg-pay.tar.gz -C "$HOME/sederg-pay"
+            cd "$HOME/sederg-pay"
+            docker compose up -d --build
+          '

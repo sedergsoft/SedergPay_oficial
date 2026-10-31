@@ -74,3 +74,23 @@ El frontend solo envía `Authorization: Bearer ...` cuando
 integración OIDC del host y almacenarse en `localStorage` como
 `sederg_access_token` durante el piloto. No incrustes tokens en el bundle ni
 en variables `VITE_*` de una imagen pública.
+
+### Despliegue gratuito con GitHub Pages y AWS
+
+El workflow [`deploy.yml`](./.github/workflows/deploy.yml) publica el frontend
+en GitHub Pages y puede desplegar el backend en una instancia EC2 elegible para
+AWS Free Tier. GitHub Pages es gratuito para el frontend; AWS no es gratuito
+permanentemente y requiere una cuenta elegible, límites de presupuesto y
+alertas de coste.
+
+Para activar el backend configura en GitHub:
+
+- Variable `AWS_EC2_DEPLOY=true`.
+- Secrets `AWS_EC2_HOST`, `AWS_EC2_USER` y `AWS_EC2_SSH_KEY`.
+- Variable `VITE_API_BASE_URL` con la URL HTTPS de la API.
+- Variable `VITE_AUTH_MODE=development` solo para sandbox; usa `oidc` en un
+  entorno protegido.
+
+La instancia EC2 debe tener Docker, Compose y un `.env` seguro en
+`~/sederg-pay/.env`. No subas ese archivo al repositorio. Configura
+`SEDERG_CORS_ORIGINS` con la URL exacta de GitHub Pages.
