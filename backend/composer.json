@@ -26,6 +26,9 @@
     "validate-ci": "@validate --strict"
   },
   "config": {
-    "platform-check": true
+    "platform-check": true,
+    "allow-plugins": {
+      "yiisoft/yii2-composer": true
+    }
   }
 }
