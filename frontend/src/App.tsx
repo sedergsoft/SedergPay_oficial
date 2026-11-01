@@ -38,7 +38,8 @@ export function App() {
 
   if (!userId) {
     return <main className="shell narrow"><Header /><section className="card">
-      <h1>{isDevelopmentAuth ? 'Crear cuenta' : 'Iniciar sesión'}</h1>
+      <div className="eyebrow">Remesas simples y trazables</div>
+      <h1>{isDevelopmentAuth ? 'Crea tu cuenta' : 'Inicia sesión'}</h1>
       <p className="muted">{isDevelopmentAuth
         ? 'MVP sandbox. Tus datos se guardan con consentimiento.'
         : 'La sesión OIDC debe ser iniciada por la integración de identidad del host.'}</p>
@@ -64,7 +65,7 @@ export function App() {
     </section></main>;
   }
 
-  return <main className="shell"><Header /><div className="toolbar"><span>Cliente sandbox: <code>{userId}</code></span><button className="secondary" onClick={() => { localStorage.removeItem('sederg_user'); setUserId(''); }}>Salir</button></div>
+  return <main className="shell"><Header /><section className="hero"><div><div className="eyebrow">Panel de operaciones</div><h1>Envía dinero con claridad.</h1><p>Gestiona beneficiarios, cotizaciones y remesas en un solo lugar.</p></div><div className="hero-mark" aria-hidden="true">↗</div></section><div className="toolbar"><span>Cliente sandbox: <code>{userId}</code></span><button className="secondary" onClick={() => { localStorage.removeItem('sederg_user'); setUserId(''); }}>Salir</button></div>
     <div className="grid">
       <section className="card"><h2>1. Beneficiario</h2><form onSubmit={(event) => submit(event, async () => {
         const data = new FormData(event.currentTarget);
@@ -82,6 +83,6 @@ export function App() {
   </main>;
 }
 
-function Header() { return <header><div className="brand">SEDERG<span>_PAY</span></div><span className="sandbox">SANDBOX</span></header>; }
+function Header() { return <header><div className="brand"><span className="brand-mark">S</span><span>SEDERG</span><b>_PAY</b></div><span className="sandbox"><i /> SANDBOX</span></header>; }
 function Alert({ text }: { text: string }) { return <p className="alert">{text}</p>; }
 function Field({ name, label, type = 'text', defaultValue }: { name: string; label: string; type?: string; defaultValue?: string }) { return <label>{label}<input required name={name} type={type} defaultValue={defaultValue} /></label>; }

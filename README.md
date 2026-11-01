@@ -61,6 +61,20 @@ El portal queda en `http://localhost:5173` y la API en
 `http://localhost:8080`. El flujo usa autenticación de desarrollo únicamente
 para demostración local; no es una configuración válida para producción.
 
+Comprobación rápida del entorno:
+
+```powershell
+curl.exe http://localhost:8080/health
+docker compose ps
+```
+
+La interfaz local usa el proxy de Nginx para enviar `/api/*` al backend. Para
+detener los contenedores sin borrar los datos:
+
+```powershell
+docker compose down
+```
+
 ### Autenticación para piloto
 
 En un entorno no local configura `SEDERG_AUTH_MODE=oidc` y proporciona el issuer,

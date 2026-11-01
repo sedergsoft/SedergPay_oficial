@@ -435,7 +435,7 @@ class m261014_000001_create_sederg_pay_schema extends Migration
             'response_status' => $this->smallInteger()->unsigned()->null(),
             'response_body' => $this->json()->null(),
             'resource_type' => $this->string(50)->null(),
-            'resource_id' => $this->bigInteger()->unsigned()->null(),
+            'resource_id' => $this->string(80)->null(),
             'expires_at' => $this->dateTime()->null(),
             'created_at' => $this->dateTime()->notNull()->defaultExpression('CURRENT_TIMESTAMP'),
         ], self::TABLE_OPTIONS);

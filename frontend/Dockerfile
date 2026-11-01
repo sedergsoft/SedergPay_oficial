@@ -1,7 +1,7 @@
-FROM node:20-alpine AS build
+FROM node:20-slim AS build
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --include=optional
 COPY . .
 ARG VITE_AUTH_MODE=development
 ENV VITE_AUTH_MODE=${VITE_AUTH_MODE}
