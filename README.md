@@ -94,3 +94,7 @@ Para activar el backend configura en GitHub:
 La instancia EC2 debe tener Docker, Compose y un `.env` seguro en
 `~/sederg-pay/.env`. No subas ese archivo al repositorio. Configura
 `SEDERG_CORS_ORIGINS` con la URL exacta de GitHub Pages.
+
+`VITE_API_BASE_URL` es obligatoria para GitHub Pages. El workflow detiene la
+publicación si está vacía para evitar que el navegador envíe peticiones POST al
+dominio estático de GitHub y produzca respuestas `405 Method Not Allowed`.

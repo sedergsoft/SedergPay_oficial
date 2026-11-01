@@ -34,6 +34,10 @@ jobs:
           VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
           VITE_AUTH_MODE: ${{ vars.VITE_AUTH_MODE || 'development' }}
         run: |
+          if [ -z "$VITE_API_BASE_URL" ]; then
+            echo "::error::VITE_API_BASE_URL no está configurada. No se publica un frontend que enviaría POST a GitHub Pages."
+            exit 1
+          fi
           npm ci
           npm run build
       - name: Configure Pages

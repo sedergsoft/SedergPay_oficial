@@ -1,4 +1,4 @@
-const apiBase = import.meta.env.VITE_API_BASE_URL ?? '';
+const apiBase = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '');
 const authMode = import.meta.env.VITE_AUTH_MODE ?? 'development';
 export const isDevelopmentAuth = authMode === 'development';
 
@@ -50,6 +50,9 @@ export type Remittance = {
 };
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  if (!isDevelopmentAuth && apiBase === '') {
+    throw new Error('La API no está configurada. Define VITE_API_BASE_URL en el despliegue.');
+  }
   const response = await fetch(`${apiBase}${path}`, {
     ...init,
     headers: {
