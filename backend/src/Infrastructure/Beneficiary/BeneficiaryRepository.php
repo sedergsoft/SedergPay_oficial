@@ -71,6 +71,8 @@ final class BeneficiaryRepository
             'payout_provider' => $payload['payout_provider'] ?? null,
             'payout_account_token' => $payload['payout_account_token'] ?? null,
             'payout_account_last4' => $payload['payout_account_last4'] ?? null,
+            'payout_card_token' => $payload['payout_card_token'] ?? null,
+            'payout_card_last4' => $payload['payout_card_last4'] ?? null,
             'status' => 'active',
         ])->execute();
     }
@@ -99,7 +101,7 @@ final class BeneficiaryRepository
         $row = $this->db->createCommand(
             'SELECT b.public_id, c.iso2 AS country_code, b.first_name, b.last_name,
                     b.phone_e164, b.email, b.payout_method_code, b.payout_provider,
-                    b.payout_account_last4, b.status, b.created_at, b.updated_at
+                    b.payout_account_last4, b.payout_card_last4, b.status, b.created_at, b.updated_at
              FROM {{%beneficiaries}} b
              JOIN {{%countries}} c ON c.id = b.country_id
              WHERE b.public_id = :public_id AND b.sender_user_id = :user_id
@@ -115,7 +117,7 @@ final class BeneficiaryRepository
         return $this->db->createCommand(
             'SELECT b.public_id, c.iso2 AS country_code, b.first_name, b.last_name,
                     b.phone_e164, b.email, b.payout_method_code, b.payout_provider,
-                    b.payout_account_last4, b.status, b.created_at, b.updated_at
+                    b.payout_account_last4, b.payout_card_last4, b.status, b.created_at, b.updated_at
              FROM {{%beneficiaries}} b
              JOIN {{%countries}} c ON c.id = b.country_id
              WHERE b.sender_user_id = :user_id AND b.status = :status

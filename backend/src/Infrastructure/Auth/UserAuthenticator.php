@@ -31,8 +31,10 @@ final class UserAuthenticator
 
         $claims = $this->verifyBearerToken();
         $id = $this->db->createCommand(
-            'SELECT id FROM {{%users}} WHERE oidc_subject = :subject AND deleted_at IS NULL LIMIT 1',
-            [':subject' => $claims['sub']]
+            'SELECT id FROM {{%users}}
+             WHERE oidc_subject = :subject AND status = :status
+               AND email_verified_at IS NOT NULL AND deleted_at IS NULL LIMIT 1',
+            [':subject' => $claims['sub'], ':status' => 'active']
         )->queryScalar();
         if ($id === false) {
             throw new ForbiddenHttpException('OIDC subject is not provisioned');
@@ -40,11 +42,31 @@ final class UserAuthenticator
         return (int) $id;
     }
 
+    public function role(): string
+    {
+        $userId = $this->userId();
+        $role = $this->db->createCommand(
+            'SELECT role FROM {{%users}} WHERE id = :id AND deleted_at IS NULL LIMIT 1',
+            [':id' => $userId]
+        )->queryScalar();
+
+        return is_string($role) ? $role : 'customer';
+    }
+
+    public function requireRole(string $requiredRole): void
+    {
+        if ($this->role() !== $requiredRole) {
+            throw new \yii\web\ForbiddenHttpException('Administrator access is required');
+        }
+    }
+
     private function findByPublicId(string $publicId): ?int
     {
         $id = $this->db->createCommand(
-            'SELECT id FROM {{%users}} WHERE public_id = :public_id AND deleted_at IS NULL LIMIT 1',
-            [':public_id' => $publicId]
+            'SELECT id FROM {{%users}}
+             WHERE public_id = :public_id AND status = :status
+               AND email_verified_at IS NOT NULL AND deleted_at IS NULL LIMIT 1',
+            [':public_id' => $publicId, ':status' => 'active']
         )->queryScalar();
         return $id === false ? null : (int) $id;
     }

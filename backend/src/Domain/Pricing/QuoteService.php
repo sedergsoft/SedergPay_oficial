@@ -13,6 +13,7 @@ final class QuoteService
     public function __construct(
         private readonly QuoteCalculator $calculator,
         private readonly PricingPolicy $policy,
+        private readonly int $validitySeconds = 900,
     ) {
     }
 
@@ -29,8 +30,9 @@ final class QuoteService
     public function createQuote(
         array $request,
         ?DateTimeInterface $now = null,
-        int $validitySeconds = 900
+        ?int $validitySeconds = null
     ): array {
+        $validitySeconds ??= $this->validitySeconds;
         if ($validitySeconds < 60 || $validitySeconds > 86400) {
             throw new DomainException('Quote validity must be between 60 and 86400 seconds');
         }

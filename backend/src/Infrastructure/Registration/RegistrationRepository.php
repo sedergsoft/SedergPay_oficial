@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\Infrastructure\Registration;
 
+use app\Infrastructure\Configuration\PlatformSettings;
 use yii\db\Connection;
 use yii\db\JsonExpression;
 use yii\db\Query;
@@ -58,7 +59,7 @@ final class RegistrationRepository
         string $ipAddress,
         string $userAgent,
         Transaction $transaction
-    ): void {
+    ): int {
         $this->db->createCommand()->insert('{{%users}}', [
             'public_id' => $publicId,
             'email' => $payload['email'],
@@ -88,6 +89,17 @@ final class RegistrationRepository
                 'user_agent' => $userAgent !== '' ? $userAgent : null,
             ])->execute();
         }
+
+        return $userId;
+    }
+
+    public function saveVerificationToken(int $userId, string $tokenHash): void
+    {
+        $this->db->createCommand()->insert('{{%email_verification_tokens}}', [
+            'user_id' => $userId,
+            'token_hash' => $tokenHash,
+            'expires_at' => (new \DateTimeImmutable('+' . PlatformSettings::get($this->db, 'security.verification_token_ttl_minutes') . ' minutes'))->format('Y-m-d H:i:s'),
+        ])->execute();
     }
 
     public function saveIdempotency(

@@ -24,6 +24,34 @@ ni acceso bancario por sí misma.
 - `frontend/`: portal React/TypeScript del cliente y flujo sandbox.
 - Documentos de entrada: especificaciones, arquitectura, DER y decisiones entregados para el proyecto.
 
+## Identidad y sistema visual
+
+La interfaz usa un sistema de tokens centralizado en
+[`frontend/src/styles.css`](./frontend/src/styles.css): azul principal `#0B4F9C`,
+azul tecnológico `#00AEEF`, verde éxito `#00C553`, rojo alerta `#E53935`,
+azul noche `#10264D`, gris neutro `#F4F6F9` y blanco `#FFFFFF`. El logotipo
+vectorial de globo y flecha está implementado en
+[`frontend/src/App.tsx`](./frontend/src/App.tsx) y no depende de emojis ni
+imágenes externas.
+
+La interfaz pública y la navegación admiten español y ruso mediante el catálogo
+centralizado de [`frontend/src/i18n.ts`](./frontend/src/i18n.ts). La preferencia
+se guarda localmente y el diseño mantiene una cuadrícula base de 8 px,
+contraste de estados y adaptación mobile-first.
+
+## Módulo de administración
+
+Los administradores pueden abrir **Administración** desde el panel y gestionar
+la configuración operativa en `GET/PUT /api/v1/admin/settings`. El módulo
+incluye comisión, límites de envío, vigencia de cotizaciones, habilitación de
+registros, habilitación de transferencias, límite de beneficiarios y expiración
+de enlaces de verificación. Los cambios se validan en backend, se aplican a
+nuevas operaciones y se registran en `audit_logs`.
+
+Las credenciales SMTP, OIDC, cifrado, base de datos y otras credenciales de
+infraestructura no se exponen en la interfaz; deben permanecer en el gestor de
+secretos o variables de entorno del despliegue.
+
 ## Primer arranque del backend
 
 Requisitos: PHP 8.3+, Composer, MySQL 8.4 y Yii2.
@@ -88,6 +116,85 @@ El frontend solo envía `Authorization: Bearer ...` cuando
 integración OIDC del host y almacenarse en `localStorage` como
 `sederg_access_token` durante el piloto. No incrustes tokens en el bundle ni
 en variables `VITE_*` de una imagen pública.
+
+### Administración local del sandbox
+
+En el sandbox local, el portal ofrece registro, inicio de sesión, menú de
+operaciones y un módulo administrativo. Las cuentas nuevas tienen rol
+`customer`. Para promover una cuenta de prueba a administradora, ejecuta el
+siguiente comando sustituyendo el correo por el de la cuenta registrada; la
+contraseña root se lee desde `.env` y no se guarda en el repositorio:
+
+```powershell
+$root = ((Get-Content .env | Where-Object { $_ -match '^SEDERG_MYSQL_ROOT_PASSWORD=' }) -split '=',2)[1]
+$email = 'admin@example.test'
+"UPDATE users SET role='admin' WHERE email='$email';" |
+  docker compose exec -T mysql mysql -uroot "-p$root" sederg_pay
+```
+
+Después de cerrar sesión y volver a entrar, el usuario verá la opción
+**Administración**, que consulta las operaciones globales. Un usuario normal
+recibe `403 Forbidden` al intentar acceder a `GET /api/v1/admin/operations`.
+
+El flujo de cliente solicita para cada beneficiario nombre, apellidos, teléfono,
+email, país y método de pago. Para **Abono en cuenta bancaria** también solicita
+el banco/proveedor y el número completo de cuenta; para **Transferencia a
+tarjeta** solicita el número completo de tarjeta. Estos valores se cifran en
+el backend y la interfaz solo muestra los últimos cuatro dígitos. Al cotizar se
+seleccionan el beneficiario y su método compatible; la remesa se crea usando
+esa selección, no el primer beneficiario guardado.
+
+### Verificación de correo
+
+Las cuentas nuevas quedan en estado `pending`. El backend genera un token de
+64 caracteres, guarda únicamente su hash y lo envía al correo registrado. La
+cuenta no puede iniciar sesión, cotizar ni transferir hasta consumir el token
+en `POST /api/v1/auth/verify-email`; el token vence en 30 minutos.
+
+El sistema no tiene fallback a logs ni devuelve el token en la respuesta HTTP.
+El correo se entrega como HTML y texto alternativo e incluye un enlace de
+activación de un solo uso; configura `SEDERG_APP_URL` con la URL pública del
+frontend (usa `http://localhost:5173` solo para desarrollo). Para enviar
+correos reales configura SMTP antes de iniciar Docker. Puedes usar
+un proveedor gratuito de SMTP, por ejemplo una cuenta con SMTP habilitado en
+Brevo, y su contraseña SMTP/API:
+
+```powershell
+$env:SEDERG_MAIL_TRANSPORT = 'smtp'
+$env:SEDERG_MAIL_HOST = 'smtp-relay.brevo.com'
+$env:SEDERG_MAIL_PORT = '587'
+$env:SEDERG_MAIL_ENCRYPTION = 'tls'
+$env:SEDERG_MAIL_USERNAME = 'tu-login-smtp'
+$env:SEDERG_MAIL_PASSWORD = 'tu-clave-smtp'
+$env:SEDERG_MAIL_FROM = 'no-reply@tu-dominio.example'
+$env:SEDERG_APP_URL = 'https://app.tu-dominio.example'
+docker compose up -d --force-recreate backend
+```
+
+En un despliegue persistente guarda esas variables únicamente en el secreto
+del proveedor/servidor, nunca en Git. Si faltan credenciales, el registro
+responde `503` y no crea la cuenta: así nunca se presenta una confirmación
+falsa de correo enviado.
+
+### Tasa RUB/CUP
+
+La cotización nunca acepta una tasa enviada por el navegador. El backend obtiene
+la tasa RUB/CUP desde la API diaria oficial del Banco Central de Cuba
+(`https://api.bc.gob.cu/v1/tasas-de-cambio/activas`), usando el segmento
+`tasaEspecial` para población/FGNE, y la guarda con fecha efectiva y fuente.
+Si el BCC no responde, consulta como respaldo el XML oficial del Banco de Rusia
+(`https://www.cbr.ru/scripts/XML_daily_eng.asp`) y convierte RUB por CUP a CUP por RUB.
+El servicio `rate-updater` ejecuta `php yii rates/update` al iniciar y cada
+24 horas; además, una cotización actualiza la tasa si todavía no existe para
+la fecha oficial disponible.
+
+La tasa efectiva se muestra en el portal antes y después del inicio de sesión.
+Un administrador puede definir una tasa manual desde **Administración** o
+mediante `POST /api/v1/admin/exchange-rate` con `{ "rate": "0.30" }`.
+Mientras exista un override administrativo vigente, se utiliza ese valor;
+si no existe, se utiliza la última tasa oficial diaria guardada. El endpoint
+público `GET /api/v1/exchange-rates/current` devuelve la tasa efectiva, fuente
+y fecha para integraciones y comprobaciones operativas.
 
 ### Despliegue gratuito con GitHub Pages y una VM free
 

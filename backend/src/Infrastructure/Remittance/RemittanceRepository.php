@@ -68,6 +68,7 @@ final class RemittanceRepository
         array $beneficiary,
         string $publicId,
         string $reference,
+        array $metadata,
         Transaction $transaction
     ): int {
         $this->db->createCommand()->insert('{{%remittances}}', [
@@ -89,6 +90,7 @@ final class RemittanceRepository
             'total_debit_amount' => $quote['total_debit_amount'],
             'status' => 'awaiting_payment',
             'compliance_status' => 'pending',
+            'metadata' => new JsonExpression($metadata),
         ])->execute();
         $remittanceId = (int) $this->db->getLastInsertID();
 
@@ -129,14 +131,57 @@ final class RemittanceRepository
             'SELECT r.public_id, r.reference, r.direction, r.send_amount, r.send_currency,
                     r.receive_amount, r.receive_currency, r.exchange_rate, r.fee_amount,
                     r.fee_currency, r.total_debit_amount, r.status, r.compliance_status,
-                    r.created_at, r.updated_at
+                    r.created_at, r.updated_at, r.paid_at, r.completed_at, r.cancelled_at,
+                    r.failure_reason_code, r.metadata,
+                    b.first_name AS beneficiary_first_name, b.last_name AS beneficiary_last_name,
+                    b.phone_e164 AS beneficiary_phone, b.email AS beneficiary_email,
+                    b.payout_method_code, b.payout_provider,
+                    b.payout_account_last4, b.payout_card_last4,
+                    su.email AS sender_email, sp.first_name AS sender_first_name,
+                    sp.last_name AS sender_last_name,
+                    d.public_id AS deposit_public_id, d.payment_reference,
+                    d.expected_amount AS deposit_expected_amount, d.currency_code AS deposit_currency,
+                    d.status AS deposit_status, d.expires_at AS deposit_expires_at,
+                    d.confirmed_at AS deposit_confirmed_at,
+                    po.public_id AS payout_public_id, po.status AS payout_status,
+                    po.provider_reference AS payout_provider_reference, po.paid_at AS payout_paid_at
              FROM {{%remittances}} r
+             INNER JOIN {{%beneficiaries}} b ON b.id = r.beneficiary_id
+             INNER JOIN {{%users}} su ON su.id = r.sender_user_id
+             LEFT JOIN {{%user_profiles}} sp ON sp.user_id = su.id
+             LEFT JOIN {{%deposit_requests}} d ON d.remittance_id = r.id
+             LEFT JOIN {{%payout_orders}} po ON po.remittance_id = r.id
              WHERE r.public_id = :public_id AND r.sender_user_id = :user_id
              LIMIT 1',
             [':public_id' => $publicId, ':user_id' => $userId]
         )->queryOne();
 
-        return $row === false ? null : $row;
+        if ($row === false) {
+            return null;
+        }
+        $row['metadata'] = $this->decodeJson($row['metadata'] ?? null);
+        $row['payment_qr_payload'] = $row['metadata']['payment_qr_payload'] ?? null;
+        $row['payment_instructions'] = $row['metadata'];
+        $row['state_events'] = $this->db->createCommand(
+            'SELECT from_status, to_status, reason, created_at
+             FROM {{%remittance_state_events}} WHERE remittance_id = (
+                 SELECT id FROM {{%remittances}} WHERE public_id = :public_id AND sender_user_id = :user_id LIMIT 1
+             ) ORDER BY created_at ASC, id ASC',
+            [':public_id' => $publicId, ':user_id' => $userId]
+        )->queryAll();
+        return $row;
+    }
+
+    private function decodeJson(mixed $value): array
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+        if (!is_string($value) || $value === '') {
+            return [];
+        }
+        $decoded = json_decode($value, true);
+        return is_array($decoded) ? $decoded : [];
     }
 
     public function listForUser(int $userId): array

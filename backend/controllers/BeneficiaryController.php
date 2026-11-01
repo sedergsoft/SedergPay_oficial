@@ -6,6 +6,7 @@ namespace app\controllers;
 
 use app\Infrastructure\Beneficiary\BeneficiaryRepository;
 use app\Infrastructure\Auth\UserAuthenticator;
+use app\Infrastructure\Configuration\PlatformSettings;
 use Yii;
 use yii\filters\ContentNegotiator;
 use yii\web\BadRequestHttpException;
@@ -57,6 +58,13 @@ final class BeneficiaryController extends Controller
                 ? json_decode($response, true, 512, JSON_THROW_ON_ERROR)
                 : $response;
         }
+        $beneficiaryCount = (int) Yii::$app->db->createCommand(
+            'SELECT COUNT(*) FROM {{%beneficiaries}} WHERE sender_user_id = :user_id AND status <> :deleted',
+            [':user_id' => $userId, ':deleted' => 'deleted']
+        )->queryScalar();
+        if ($beneficiaryCount >= (int) PlatformSettings::get(Yii::$app->db, 'operations.max_beneficiaries')) {
+            throw new UnprocessableEntityHttpException('The maximum number of beneficiaries has been reached');
+        }
 
         $countryId = $repository->countryId(strtoupper($payload['country_code']));
         if ($countryId === null) {
@@ -77,8 +85,19 @@ final class BeneficiaryController extends Controller
             'payout_method_code' => $payload['payout_method_code'],
             'payout_provider' => $payload['payout_provider'] ?? null,
             'payout_account_last4' => $payload['payout_account_last4'] ?? null,
+            'payout_card_last4' => $payload['payout_card_last4'] ?? null,
             'status' => 'active',
         ];
+        if ($payload['payout_method_code'] === 'bank_account') {
+            $payload['payout_account_token'] = $this->encryptPaymentValue($payload['payout_account_number']);
+            $payload['payout_account_last4'] = substr($payload['payout_account_number'], -4);
+            $response['payout_account_last4'] = $payload['payout_account_last4'];
+        }
+        if ($payload['payout_method_code'] === 'card_transfer') {
+            $payload['payout_card_token'] = $this->encryptPaymentValue($payload['payout_card_number']);
+            $payload['payout_card_last4'] = substr($payload['payout_card_number'], -4);
+            $response['payout_card_last4'] = $payload['payout_card_last4'];
+        }
         $transaction = $repository->beginTransaction();
         try {
             $repository->save($userId, $payload, $countryId, $publicId, $transaction);
@@ -120,7 +139,7 @@ final class BeneficiaryController extends Controller
 
     private function validatePayload(array &$payload): void
     {
-        foreach (['country_code', 'first_name', 'last_name', 'payout_method_code'] as $field) {
+        foreach (['country_code', 'first_name', 'last_name', 'phone_e164', 'email', 'payout_method_code'] as $field) {
             if (!isset($payload[$field]) || !is_string($payload[$field]) || trim($payload[$field]) === '') {
                 throw new UnprocessableEntityHttpException("Missing field: {$field}");
             }
@@ -152,9 +171,56 @@ final class BeneficiaryController extends Controller
             && (!is_string($payload['payout_account_last4']) || !preg_match('/^\d{4}$/', $payload['payout_account_last4']))) {
             throw new UnprocessableEntityHttpException('Payout account last4 must contain four digits');
         }
+        if ($payload['payout_method_code'] === 'bank_account'
+            && (!isset($payload['payout_provider'], $payload['payout_account_number'])
+                || trim((string) $payload['payout_provider']) === ''
+                || !preg_match('/^\d{6,34}$/', (string) $payload['payout_account_number']))) {
+            throw new UnprocessableEntityHttpException('Bank provider and account number are required');
+        }
+        if ($payload['payout_method_code'] === 'card_transfer'
+            && (!isset($payload['payout_card_number'])
+                || !$this->isValidCardNumber((string) $payload['payout_card_number']))) {
+            throw new UnprocessableEntityHttpException('A valid card number is required');
+        }
         $payload['country_code'] = strtoupper($payload['country_code']);
         $payload['first_name'] = trim($payload['first_name']);
         $payload['last_name'] = trim($payload['last_name']);
+        $payload['phone_e164'] = trim($payload['phone_e164']);
+        $payload['email'] = strtolower(trim($payload['email']));
+        if (isset($payload['payout_account_number'])) {
+            $payload['payout_account_number'] = preg_replace('/\D+/', '', $payload['payout_account_number']);
+        }
+        if (isset($payload['payout_card_number'])) {
+            $payload['payout_card_number'] = preg_replace('/\D+/', '', $payload['payout_card_number']);
+        }
+    }
+
+    private function encryptPaymentValue(string $value): string
+    {
+        $key = (string) (getenv('SEDERG_PII_KEY') ?: getenv('SEDERG_COOKIE_KEY'));
+        if (strlen($key) < 16) {
+            throw new \yii\web\ServerErrorHttpException('Payment data encryption is not configured');
+        }
+        return base64_encode(Yii::$app->security->encryptByKey($value, $key));
+    }
+
+    private function isValidCardNumber(string $value): bool
+    {
+        $digits = preg_replace('/\D+/', '', $value);
+        if (!is_string($digits) || !preg_match('/^\d{12,19}$/', $digits)) {
+            return false;
+        }
+        $sum = 0;
+        $alternate = false;
+        for ($index = strlen($digits) - 1; $index >= 0; $index--) {
+            $digit = (int) $digits[$index];
+            if ($alternate && ($digit *= 2) > 9) {
+                $digit -= 9;
+            }
+            $sum += $digit;
+            $alternate = !$alternate;
+        }
+        return $sum % 10 === 0;
     }
 
     private function generateUuid(): string

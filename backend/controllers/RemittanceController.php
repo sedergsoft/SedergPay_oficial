@@ -6,6 +6,8 @@ namespace app\controllers;
 
 use app\Infrastructure\Remittance\RemittanceRepository;
 use app\Infrastructure\Auth\UserAuthenticator;
+use app\Infrastructure\Configuration\PlatformSettings;
+use app\Infrastructure\Identity\VerificationMailer;
 use Yii;
 use yii\filters\ContentNegotiator;
 use yii\web\BadRequestHttpException;
@@ -32,6 +34,9 @@ final class RemittanceController extends Controller
 
     public function actionCreate(): array
     {
+        if (!PlatformSettings::getBool(Yii::$app->db, 'operations.transfers_enabled')) {
+            throw new ForbiddenHttpException('Transfers are temporarily disabled by the administrator');
+        }
         $request = Yii::$app->request;
         $userId = $this->authenticatedUserId();
         $idempotencyKey = trim((string) $request->headers->get('Idempotency-Key', ''));
@@ -81,6 +86,29 @@ final class RemittanceController extends Controller
 
         $publicId = $this->generateUuid();
         $reference = 'REM-' . gmdate('YmdHis') . '-' . strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
+        $fundingAccount = Yii::$app->db->createCommand(
+            "SELECT connection_name, account_mask, account_currency
+             FROM {{%bank_connections}}
+             WHERE status = 'active'
+             ORDER BY environment = 'production' DESC, id ASC LIMIT 1"
+        )->queryOne();
+        $paymentQrPayload = json_encode([
+            'platform' => 'SEDERG_PAY',
+            'operation' => $reference,
+            'amount' => $quote['total_debit_amount'],
+            'currency' => $quote['send_currency'],
+            'concept' => $reference,
+            'destination' => $fundingAccount['account_mask'] ?? null,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        $metadata = [
+            'payment_qr_payload' => $paymentQrPayload,
+            'payment_reference' => $reference,
+            'amount' => $quote['total_debit_amount'],
+            'currency' => $quote['send_currency'],
+            'payment_destination' => $fundingAccount['account_mask'] ?? null,
+            'payment_destination_name' => $fundingAccount['connection_name'] ?? null,
+            'payment_destination_currency' => $fundingAccount['account_currency'] ?? $quote['send_currency'],
+        ];
         $response = [
             'public_id' => $publicId,
             'reference' => $reference,
@@ -91,10 +119,13 @@ final class RemittanceController extends Controller
             'receive_currency' => $quote['receive_currency'],
             'status' => 'awaiting_payment',
             'compliance_status' => 'pending',
+            'payment_qr_payload' => $paymentQrPayload,
+            'payment_instructions' => $metadata,
+            'receipt_email_sent' => false,
         ];
         $transaction = $repository->beginTransaction();
         try {
-            $remittanceId = $repository->save($userId, $quote, $beneficiary, $publicId, $reference, $transaction);
+            $remittanceId = $repository->save($userId, $quote, $beneficiary, $publicId, $reference, $metadata, $transaction);
             $repository->saveIdempotency($scope, $idempotencyKey, $requestHash, $response, $remittanceId, $transaction);
             $transaction->commit();
         } catch (\Throwable $exception) {
@@ -105,6 +136,20 @@ final class RemittanceController extends Controller
         }
 
         Yii::$app->response->statusCode = 201;
+        $detail = $repository->findForUser($publicId, $userId);
+        if ($detail !== null) {
+            try {
+                (new VerificationMailer())->sendRemittanceReceipt(
+                    (string) $detail['sender_email'],
+                    (string) ($detail['sender_first_name'] ?: 'cliente'),
+                    $detail
+                );
+                $response['receipt_email_sent'] = true;
+            } catch (\Throwable $exception) {
+                Yii::error(['message' => 'Remittance receipt email failed', 'reference' => $reference, 'error' => $exception->getMessage()], __METHOD__);
+                $response['receipt_email_error'] = 'No se pudo enviar el comprobante por correo. Puedes consultar todos los datos en el detalle de la remesa.';
+            }
+        }
         return $response;
     }
 

@@ -18,10 +18,26 @@ export type Beneficiary = {
   country_code: string;
   first_name: string;
   last_name: string;
+  phone_e164?: string;
+  email?: string;
   payout_method_code: string;
+  payout_provider?: string;
+  payout_card_last4?: string;
   payout_account_last4?: string;
   status: string;
 };
+
+export type PaymentMethod = {
+  code: string;
+  name: string;
+  requires_bank_account: boolean;
+};
+
+export const paymentMethods: PaymentMethod[] = [
+  { code: 'cash_pickup', name: 'Pago en efectivo', requires_bank_account: false },
+  { code: 'bank_account', name: 'Abono en cuenta bancaria', requires_bank_account: true },
+  { code: 'card_transfer', name: 'Transferencia a tarjeta', requires_bank_account: false },
+];
 
 export type Quote = {
   public_id: string;
@@ -35,6 +51,19 @@ export type Quote = {
   payout_method_code: string;
   status: string;
   expires_at: string;
+  exchange_rate_source: string;
+  exchange_rate_effective_date: string;
+};
+
+export type ExchangeRate = {
+  base_currency: string;
+  quote_currency: string;
+  rate: string;
+  source: string;
+  source_label: string;
+  effective_date: string;
+  source_url: string | null;
+  manual_override: boolean;
 };
 
 export type Remittance = {
@@ -47,6 +76,99 @@ export type Remittance = {
   receive_currency: string;
   status: string;
   compliance_status: string;
+  created_at?: string;
+  updated_at?: string;
+  payment_qr_payload?: string | null;
+  payment_instructions?: Record<string, string | null>;
+  receipt_email_sent?: boolean;
+};
+
+export type RemittanceDetail = Remittance & {
+  exchange_rate: string;
+  fee_amount: string;
+  fee_currency: string;
+  total_debit_amount: string;
+  paid_at: string | null;
+  completed_at: string | null;
+  cancelled_at: string | null;
+  failure_reason_code: string | null;
+  beneficiary_first_name: string;
+  beneficiary_last_name: string;
+  beneficiary_phone: string | null;
+  beneficiary_email: string | null;
+  payout_method_code: string;
+  payout_provider: string | null;
+  payout_account_last4: string | null;
+  payout_card_last4: string | null;
+  sender_email: string;
+  sender_first_name: string;
+  sender_last_name: string;
+  deposit_public_id: string | null;
+  payment_reference: string | null;
+  deposit_expected_amount: string | null;
+  deposit_currency: string | null;
+  deposit_status: string | null;
+  deposit_expires_at: string | null;
+  deposit_confirmed_at: string | null;
+  payout_public_id: string | null;
+  payout_status: string | null;
+  payout_provider_reference: string | null;
+  payout_paid_at: string | null;
+  state_events: Array<{ from_status: string | null; to_status: string; reason: string; created_at: string }>;
+};
+
+export type User = {
+  public_id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: 'customer' | 'admin';
+  status: string;
+};
+
+export type AdminOperation = Remittance & {
+  customer_email: string;
+  customer_name: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AdminUser = {
+  public_id: string;
+  email: string;
+  phone_e164: string | null;
+  role: 'customer' | 'admin';
+  status: string;
+  email_verified_at: string | null;
+  created_at: string;
+  last_login_at: string | null;
+  full_name: string;
+  remittance_count: number;
+};
+
+export type AdminRate = {
+  rate: string;
+  source: string;
+  valid_from: string;
+  valid_until: string | null;
+  created_at: string;
+  created_by_email: string | null;
+};
+
+export type AdminDashboard = {
+  directions: Array<{ direction: string; currency: string; operations: number; sent_amount: string; receive_currency: string; received_amount: string }>;
+  statuses: Array<{ status: string; operations: number; send_amount: string; currency: string }>;
+  total_users: number;
+  total_remittances: number;
+};
+
+export type PlatformSetting = {
+  key: string;
+  value: string | number | boolean;
+  type: 'decimal' | 'integer' | 'boolean';
+  label: string;
+  category: 'pricing' | 'operations' | 'security';
+  updated_at: string | null;
 };
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -69,7 +191,22 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
-  register: (body: Record<string, unknown>) => request<{ public_id: string }>('/api/v1/registrations', {
+  login: (email: string, password: string) => request<User>('/api/v1/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  }),
+  me: (userId: string) => request<User>('/api/v1/auth/me', {
+    headers: authHeaders(userId),
+  }),
+  verifyEmail: (email: string, token: string) => request<{ public_id: string; status: string }>('/api/v1/auth/verify-email', {
+    method: 'POST',
+    body: JSON.stringify({ email, token }),
+  }),
+  resendVerification: (email: string) => request<{ verification_sent: boolean }>('/api/v1/auth/resend-verification', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  }),
+  register: (body: Record<string, unknown>) => request<{ public_id: string; email: string; verification_required: boolean }>('/api/v1/registrations', {
     method: 'POST',
     headers: { 'Idempotency-Key': `registration-${crypto.randomUUID()}` },
     body: JSON.stringify(body),
@@ -89,6 +226,35 @@ export const api = {
   }),
   remittances: (userId: string) => request<Remittance[]>('/api/v1/remittances', {
     headers: authHeaders(userId),
+  }),
+  remittance: (userId: string, publicId: string) => request<RemittanceDetail>('/api/v1/remittances/' + publicId, {
+    headers: authHeaders(userId),
+  }),
+  adminOperations: (userId: string) => request<AdminOperation[]>('/api/v1/admin/operations', {
+    headers: authHeaders(userId),
+  }),
+  adminUsers: (userId: string) => request<AdminUser[]>('/api/v1/admin/users', {
+    headers: authHeaders(userId),
+  }),
+  adminRateHistory: (userId: string) => request<{ rates: AdminRate[] }>('/api/v1/admin/rates/history', {
+    headers: authHeaders(userId),
+  }),
+  adminDashboard: (userId: string) => request<AdminDashboard>('/api/v1/admin/dashboard', {
+    headers: authHeaders(userId),
+  }),
+  adminSettings: (userId: string) => request<{ settings: PlatformSetting[] }>('/api/v1/admin/settings', {
+    headers: authHeaders(userId),
+  }),
+  updateAdminSettings: (userId: string, settings: Record<string, string | number | boolean>) => request<{ settings: PlatformSetting[] }>('/api/v1/admin/settings', {
+    method: 'PUT',
+    headers: authHeaders(userId),
+    body: JSON.stringify({ settings }),
+  }),
+  currentExchangeRate: () => request<ExchangeRate>('/api/v1/exchange-rates/current'),
+  setExchangeRate: (userId: string, rate: string) => request<ExchangeRate>('/api/v1/admin/exchange-rate', {
+    method: 'POST',
+    headers: authHeaders(userId),
+    body: JSON.stringify({ rate }),
   }),
   createRemittance: (userId: string, body: Record<string, unknown>) => request<Remittance>('/api/v1/remittances', {
     method: 'POST',

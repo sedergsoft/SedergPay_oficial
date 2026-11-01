@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace app\controllers;
 
 use app\Infrastructure\Registration\RegistrationRepository;
+use app\Infrastructure\Identity\VerificationMailer;
+use app\Infrastructure\Configuration\PlatformSettings;
 use Yii;
 use yii\filters\ContentNegotiator;
 use yii\web\BadRequestHttpException;
@@ -12,6 +14,7 @@ use yii\web\ConflictHttpException;
 use yii\web\Controller;
 use yii\web\ForbiddenHttpException;
 use yii\web\Response;
+use yii\web\HttpException;
 use yii\web\UnprocessableEntityHttpException;
 
 final class RegistrationController extends Controller
@@ -32,6 +35,9 @@ final class RegistrationController extends Controller
     {
         if (getenv('SEDERG_AUTH_MODE') !== 'development') {
             throw new ForbiddenHttpException('Client registration must be provisioned through OIDC');
+        }
+        if (!PlatformSettings::getBool(Yii::$app->db, 'operations.registrations_enabled')) {
+            throw new ForbiddenHttpException('New registrations are temporarily disabled by the administrator');
         }
         $request = Yii::$app->request;
         $idempotencyKey = trim((string) $request->headers->get('Idempotency-Key', ''));
@@ -73,6 +79,7 @@ final class RegistrationController extends Controller
         }
 
         $publicId = $this->generateUuid();
+        $verificationToken = bin2hex(random_bytes(32));
         $response = [
             'public_id' => $publicId,
             'status' => 'pending',
@@ -83,7 +90,7 @@ final class RegistrationController extends Controller
         ];
         $transaction = $repository->beginTransaction();
         try {
-            $repository->saveRegistration(
+            $userId = $repository->saveRegistration(
                 ['email' => $email, 'phone_e164' => $phone] + $payload,
                 $publicId,
                 Yii::$app->security->generatePasswordHash($payload['password']),
@@ -93,15 +100,19 @@ final class RegistrationController extends Controller
                 (string) $request->userAgent,
                 $transaction
             );
+            $repository->saveVerificationToken($userId, hash('sha256', $verificationToken));
+            (new VerificationMailer())->send($email, $payload['first_name'], $verificationToken);
             $repository->saveIdempotency($scope, $idempotencyKey, $requestHash, $response, $transaction);
             $transaction->commit();
         } catch (\Throwable $exception) {
             if ($transaction->getIsActive()) {
                 $transaction->rollBack();
             }
+            if ($exception instanceof \RuntimeException && str_starts_with($exception->getMessage(), 'SMTP')) {
+                throw new HttpException(503, 'No se pudo enviar el correo de verificación. Configura el SMTP e inténtalo de nuevo.', 0, $exception);
+            }
             throw $exception;
         }
-
         Yii::$app->response->statusCode = 201;
         return $response;
     }

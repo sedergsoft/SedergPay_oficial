@@ -6,7 +6,9 @@ namespace app\controllers;
 
 use app\Infrastructure\Pricing\QuoteFactory;
 use app\Infrastructure\Pricing\QuoteRepository;
+use app\Infrastructure\Pricing\ExchangeRateService;
 use app\Infrastructure\Auth\UserAuthenticator;
+use app\Infrastructure\Configuration\PlatformSettings;
 use DomainException;
 use Yii;
 use yii\filters\ContentNegotiator;
@@ -14,6 +16,7 @@ use yii\web\BadRequestHttpException;
 use yii\web\ConflictHttpException;
 use yii\web\Controller;
 use yii\web\ForbiddenHttpException;
+use yii\web\HttpException;
 use yii\web\NotFoundHttpException;
 use yii\web\Response;
 use yii\web\UnprocessableEntityHttpException;
@@ -34,15 +37,13 @@ final class QuoteController extends Controller
 
     public function actionCreate(): array
     {
+        if (!PlatformSettings::getBool(Yii::$app->db, 'operations.transfers_enabled')) {
+            throw new ForbiddenHttpException('Transfers are temporarily disabled by the administrator');
+        }
         $request = Yii::$app->request;
         $idempotencyKey = trim((string) $request->headers->get('Idempotency-Key', ''));
         if (!preg_match('/^[A-Za-z0-9._:-]{16,100}$/', $idempotencyKey)) {
             throw new BadRequestHttpException('A valid Idempotency-Key is required');
-        }
-
-        $userPublicId = trim((string) $request->headers->get('X-User-Public-Id', ''));
-        if (getenv('SEDERG_AUTH_MODE') !== 'development' || $userPublicId === '') {
-            throw new ForbiddenHttpException('OIDC authentication is required');
         }
 
         $payload = $request->bodyParams;
@@ -51,10 +52,7 @@ final class QuoteController extends Controller
         }
 
         $repository = new QuoteRepository(Yii::$app->db);
-        $userId = $repository->findUserIdByPublicId($userPublicId);
-        if ($userId === null) {
-            throw new ForbiddenHttpException('Authenticated user was not found');
-        }
+        $userId = (new UserAuthenticator(Yii::$app->db))->userId();
 
         $scope = "quote:create:user:{$userId}";
         $requestHash = hash('sha256', json_encode($payload, JSON_THROW_ON_ERROR));
@@ -89,13 +87,21 @@ final class QuoteController extends Controller
         }
 
         try {
-            $calculated = QuoteFactory::create()->createQuote($payload);
+            $exchangeRate = (new ExchangeRateService(Yii::$app->db))->resolve(
+                $payload['send_currency'],
+                $payload['receive_currency']
+            );
+            $payload['exchange_rate'] = $exchangeRate['rate'];
+            $calculated = QuoteFactory::create(Yii::$app->db)->createQuote($payload);
         } catch (DomainException $exception) {
-            throw new UnprocessableEntityHttpException($exception->getMessage(), $exception);
+            throw new UnprocessableEntityHttpException($exception->getMessage(), 0, $exception);
+        } catch (\RuntimeException $exception) {
+            throw new HttpException(503, 'La tasa RUB/CUP no está disponible en este momento.', 0, $exception);
         }
 
         $publicId = $this->generateUuid();
-        $response = ['public_id' => $publicId] + $calculated;
+        $response = ['public_id' => $publicId, 'exchange_rate_source' => $exchangeRate['source_label'],
+            'exchange_rate_effective_date' => $exchangeRate['effective_date']] + $calculated;
         $transaction = $repository->beginTransaction();
         try {
             $quoteId = $repository->saveQuote($userId, $payload, $calculated, $publicId, $transaction);

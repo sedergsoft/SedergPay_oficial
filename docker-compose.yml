@@ -18,6 +18,15 @@ services:
       SEDERG_AUTH_MODE: ${SEDERG_AUTH_MODE:-development}
       SEDERG_COOKIE_KEY: ${SEDERG_COOKIE_KEY:?SEDERG_COOKIE_KEY is required}
       SEDERG_DEBUG: ${SEDERG_DEBUG:-0}
+      SEDERG_PII_KEY: ${SEDERG_PII_KEY:-local-development-pii-key-2026}
+      SEDERG_MAIL_TRANSPORT: ${SEDERG_MAIL_TRANSPORT:-smtp}
+      SEDERG_MAIL_HOST: ${SEDERG_MAIL_HOST:-}
+      SEDERG_MAIL_PORT: ${SEDERG_MAIL_PORT:-587}
+      SEDERG_MAIL_ENCRYPTION: ${SEDERG_MAIL_ENCRYPTION:-tls}
+      SEDERG_MAIL_USERNAME: ${SEDERG_MAIL_USERNAME:-}
+      SEDERG_MAIL_PASSWORD: ${SEDERG_MAIL_PASSWORD:-}
+      SEDERG_MAIL_FROM: ${SEDERG_MAIL_FROM:-}
+      SEDERG_APP_URL: ${SEDERG_APP_URL:-http://localhost:5173}
       SEDERG_OIDC_ISSUER: ${SEDERG_OIDC_ISSUER:-https://identity.example.invalid/realms/sederg}
       SEDERG_OIDC_AUDIENCE: ${SEDERG_OIDC_AUDIENCE:-sederg-pay-api}
       SEDERG_OIDC_PUBLIC_KEY: ${SEDERG_OIDC_PUBLIC_KEY:-}
@@ -30,6 +39,18 @@ services:
     volumes:
       - ./backend:/app
     command: ["php", "yii", "serve", "0.0.0.0:8080", "--docroot=web"]
+  rate-updater:
+    build:
+      context: ./backend
+    environment:
+      SEDERG_DB_DSN: mysql:host=mysql;dbname=sederg_pay
+      SEDERG_DB_USER: ${SEDERG_DB_USER:-sederg_app}
+      SEDERG_DB_PASSWORD: ${SEDERG_DB_PASSWORD:?SEDERG_DB_PASSWORD is required}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    command: ["sh", "-c", "while true; do php yii rates/update || echo 'Exchange-rate refresh failed; retrying tomorrow.' >&2; sleep 86400; done"]
+    restart: unless-stopped
 
   mysql:
     image: mysql:8.4
