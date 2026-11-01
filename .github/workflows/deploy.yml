@@ -51,26 +51,26 @@ jobs:
         uses: actions/deploy-pages@v4
 
   backend:
-    name: Deploy backend to AWS EC2
-    if: ${{ vars.AWS_EC2_DEPLOY == 'true' }}
+    name: Deploy backend to free VM
+    if: ${{ vars.VM_DEPLOY == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Install SSH key
         env:
-          SSH_KEY: ${{ secrets.AWS_EC2_SSH_KEY }}
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/sederg-pay
           chmod 600 ~/.ssh/sederg-pay
       - name: Deploy source and restart Docker stack
         env:
-          AWS_EC2_HOST: ${{ secrets.AWS_EC2_HOST }}
-          AWS_EC2_USER: ${{ secrets.AWS_EC2_USER }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
         run: |
           tar --exclude=.git --exclude=frontend/node_modules --exclude=backend/vendor -czf /tmp/sederg-pay.tar.gz .
-          scp -o StrictHostKeyChecking=no -i ~/.ssh/sederg-pay /tmp/sederg-pay.tar.gz "$AWS_EC2_USER@$AWS_EC2_HOST:/tmp/sederg-pay.tar.gz"
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/sederg-pay "$AWS_EC2_USER@$AWS_EC2_HOST" '
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/sederg-pay /tmp/sederg-pay.tar.gz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/sederg-pay.tar.gz"
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/sederg-pay "$DEPLOY_USER@$DEPLOY_HOST" '
             set -eu
             mkdir -p "$HOME/sederg-pay"
             tar -xzf /tmp/sederg-pay.tar.gz -C "$HOME/sederg-pay"

@@ -136,6 +136,14 @@ la instalación de dependencias con PHP 8.3.
 - El ledger actual es una base inicial; debe evolucionar a doble partida explícita antes del piloto.
 - Los datos sensibles deben permanecer fuera de la base salvo tokenización y cifrado aprobado.
 
+## Despliegue gratuito del MVP
+
+El plan operativo de publicación está documentado en
+[`PLAN_DESPLIEGUE_GRATUITO.md`](./PLAN_DESPLIEGUE_GRATUITO.md). La arquitectura
+base usa GitHub Pages para el frontend y una VM free elegible para API, MySQL y
+Redis. AWS queda como alternativa, no como dependencia, porque la cuenta
+actual no tiene EC2 habilitado.
+
 ## Definition of Done del MVP con datos reales
 
 - Flujo E2E ejecutable con datos reales introducidos por clientes y proveedores simulados.
