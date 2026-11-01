@@ -45,6 +45,11 @@ AWS queda documentado como alternativa, pero no es el proveedor base: la cuenta
 actual devuelve `OptInRequired` para EC2 y el Free Tier de AWS no es
 permanente.
 
+Como alternativa de contingencia, Render Free puede alojar el contenedor de la
+API para el sandbox. Su servicio duerme tras inactividad y su disco es
+efímero; por ello requiere una base MySQL-compatible externa y no se considera
+una plataforma de producción.
+
 ## Fases de ejecución
 
 ### F0 — Código y contrato de despliegue

@@ -13,4 +13,4 @@ RUN composer install --no-interaction --no-progress --prefer-dist
 
 COPY . .
 
-CMD ["php", "yii", "help"]
+CMD ["sh", "-c", "php yii serve 0.0.0.0:${PORT:-8080} --docroot=web"]

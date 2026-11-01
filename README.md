@@ -104,3 +104,13 @@ origen exacto de GitHub Pages, sin la ruta `/SedergPay_oficial`, por ejemplo
 `VITE_API_BASE_URL` es obligatoria para GitHub Pages. El workflow detiene la
 publicación si está vacía para evitar que el navegador envíe peticiones POST al
 dominio estático de GitHub y produzca respuestas `405 Method Not Allowed`.
+
+### Alternativa Render Free
+
+El archivo [`render.yaml`](./render.yaml) permite crear el backend como un
+servicio Docker gratuito en Render. Render Free duerme tras inactividad y su
+disco es efímero, por lo que esta opción es únicamente para el sandbox. No
+uses una base MySQL dentro del contenedor: configura `SEDERG_DB_DSN` hacia una
+base MySQL-compatible persistente y privada, y completa las variables secretas
+que Render marca como `sync: false`. El servicio debe quedar en modo
+`development` hasta configurar OIDC/MFA.

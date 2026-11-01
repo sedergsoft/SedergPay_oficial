@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: sederg-pay-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "10000"
+      - key: SEDERG_AUTH_MODE
+        value: development
+      - key: SEDERG_DB_DSN
+        sync: false
+      - key: SEDERG_DB_USER
+        sync: false
+      - key: SEDERG_DB_PASSWORD
+        sync: false
+      - key: SEDERG_COOKIE_KEY
+        sync: false
+      - key: SEDERG_CORS_ORIGINS
+        value: https://sedergsoft.github.io
+      - key: SEDERG_OIDC_ISSUER
+        sync: false
+      - key: SEDERG_OIDC_AUDIENCE
+        sync: false
+      - key: SEDERG_OIDC_PUBLIC_KEY
+        sync: false
