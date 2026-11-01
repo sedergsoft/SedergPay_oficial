@@ -85,6 +85,8 @@ permanente.
 - Configurar la variable `VM_DEPLOY=true`.
 - Configurar `DEPLOY_HOST` y `DEPLOY_USER` como secrets.
 - Configurar `DEPLOY_SSH_KEY` como secret, sin subirlo al repositorio.
+- Configurar `DEPLOY_ENV` como secret multilínea con el `.env` privado de la
+  VM, incluyendo dominio, correo TLS y secretos de la aplicación.
 - Ejecutar el workflow manualmente.
 - Confirmar frontend, API y health check.
 
@@ -127,6 +129,7 @@ real se debe usar OIDC/MFA y `VITE_AUTH_MODE=oidc`.
 DEPLOY_HOST
 DEPLOY_USER
 DEPLOY_SSH_KEY
+DEPLOY_ENV
 ```
 
 ### Variables privadas de la VM
@@ -140,6 +143,8 @@ SEDERG_OIDC_ISSUER
 SEDERG_OIDC_AUDIENCE
 SEDERG_OIDC_PUBLIC_KEY
 SEDERG_CORS_ORIGINS
+API_DOMAIN
+TLS_EMAIL
 ```
 
 ## Criterio de finalización

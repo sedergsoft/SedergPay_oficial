@@ -67,13 +67,22 @@ jobs:
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_ENV: ${{ secrets.DEPLOY_ENV }}
         run: |
+          if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_USER" ] || [ -z "$DEPLOY_ENV" ]; then
+            echo "::error::Faltan DEPLOY_HOST, DEPLOY_USER o DEPLOY_ENV."
+            exit 1
+          fi
           tar --exclude=.git --exclude=frontend/node_modules --exclude=backend/vendor -czf /tmp/sederg-pay.tar.gz .
           scp -o StrictHostKeyChecking=no -i ~/.ssh/sederg-pay /tmp/sederg-pay.tar.gz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/sederg-pay.tar.gz"
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/sederg-pay "$DEPLOY_USER@$DEPLOY_HOST" '
+          printf '%s\n' "$DEPLOY_ENV" | ssh -o StrictHostKeyChecking=no -i ~/.ssh/sederg-pay "$DEPLOY_USER@$DEPLOY_HOST" '
             set -eu
             mkdir -p "$HOME/sederg-pay"
             tar -xzf /tmp/sederg-pay.tar.gz -C "$HOME/sederg-pay"
             cd "$HOME/sederg-pay"
-            docker compose up -d --build
+            umask 077
+            cat > .env
+            docker compose -f docker-compose.yml -f docker-compose.production.yml up -d --build mysql redis
+            docker compose -f docker-compose.yml -f docker-compose.production.yml run --rm backend php yii migrate --migrationPath=@app/migrations --interactive=0
+            docker compose -f docker-compose.yml -f docker-compose.production.yml up -d --build backend caddy
           '

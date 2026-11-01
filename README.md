@@ -85,14 +85,21 @@ límites gratuitos.
 Para activar el backend configura en GitHub:
 
 - Variable `VM_DEPLOY=true`.
-- Secrets `DEPLOY_HOST`, `DEPLOY_USER` y `DEPLOY_SSH_KEY`.
+- Secrets `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY` y `DEPLOY_ENV`.
 - Variable `VITE_API_BASE_URL` con la URL HTTPS de la API.
 - Variable `VITE_AUTH_MODE=development` solo para sandbox; usa `oidc` en un
   entorno protegido.
 
-La VM debe tener Docker, Compose y un `.env` seguro en
-`~/sederg-pay/.env`. No subas ese archivo al repositorio. Configura
-`SEDERG_CORS_ORIGINS` con la URL exacta de GitHub Pages.
+`DEPLOY_ENV` debe contener el archivo `.env` privado de la VM, incluyendo
+`API_DOMAIN`, `TLS_EMAIL`, `SEDERG_DB_PASSWORD`,
+`SEDERG_MYSQL_ROOT_PASSWORD` y `SEDERG_COOKIE_KEY`. El workflow lo escribe
+con permisos privados en `~/sederg-pay/.env`, ejecuta las migraciones y
+publica el backend mediante Caddy en los puertos 80/443. MySQL y Redis no se
+publican en la red externa.
+
+No subas ese archivo al repositorio. Configura `SEDERG_CORS_ORIGINS` con el
+origen exacto de GitHub Pages, sin la ruta `/SedergPay_oficial`, por ejemplo
+`https://sedergsoft.github.io`.
 
 `VITE_API_BASE_URL` es obligatoria para GitHub Pages. El workflow detiene la
 publicación si está vacía para evitar que el navegador envíe peticiones POST al
