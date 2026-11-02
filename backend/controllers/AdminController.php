@@ -276,7 +276,7 @@ final class AdminController extends Controller
         }
 
         $doc = Yii::$app->db->createCommand(
-            'SELECT d.id,d.storage_key,d.original_name,d.mime_type,d.file_size,k.public_id AS case_public_id
+            'SELECT d.id,d.storage_key,d.original_name,d.mime_type,d.file_size,d.sha256,k.public_id AS case_public_id
              FROM {{%kyc_documents}} d
              INNER JOIN {{%kyc_cases}} k ON k.id=d.kyc_case_id
              WHERE d.public_id=:id LIMIT 1',
@@ -298,7 +298,7 @@ final class AdminController extends Controller
         }
         $encrypted = file_get_contents($path);
         $content = $encrypted === false ? false : Yii::$app->security->decryptByKey($encrypted, $key);
-        if ($content === false || strlen($content) !== (int) $doc['file_size']) {
+        if ($content === false || strlen($content) !== (int) $doc['file_size'] || !hash_equals((string) $doc['sha256'], hash('sha256', $content))) {
             throw new \\yii\\web\\ServerErrorHttpException('KYC document integrity or decryption check failed');
         }
 
