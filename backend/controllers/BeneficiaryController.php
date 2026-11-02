@@ -147,7 +147,7 @@ final class BeneficiaryController extends Controller
         if ($current === null) {
             throw new NotFoundHttpException('Beneficiary not found');
         }
-        $this->validatePayload($payload);
+        $this->validatePayload($payload, false);
         $countryId = $repository->countryId(strtoupper($payload['country_code']));
         if ($countryId === null || !$repository->paymentMethodExists($payload['payout_method_code'])) {
             throw new UnprocessableEntityHttpException('Unsupported country or payout method');
@@ -175,7 +175,7 @@ final class BeneficiaryController extends Controller
         return (new UserAuthenticator(Yii::$app->db))->userId();
     }
 
-    private function validatePayload(array &$payload): void
+    private function validatePayload(array &$payload, bool $requirePaymentDetails = true): void
     {
         foreach (['country_code', 'first_name', 'last_name', 'phone_e164', 'email', 'payout_method_code'] as $field) {
             if (!isset($payload[$field]) || !is_string($payload[$field]) || trim($payload[$field]) === '') {
@@ -212,12 +212,12 @@ final class BeneficiaryController extends Controller
         if ($payload['payout_method_code'] === 'bank_account'
             && (!isset($payload['payout_provider'])
                 || trim((string) $payload['payout_provider']) === ''
-                || !isset($payload['payout_account_number'])
-                || !preg_match('/^\d{6,34}$/', (string) $payload['payout_account_number']))) {
+                || ($requirePaymentDetails && !isset($payload['payout_account_number']))
+                || (isset($payload['payout_account_number']) && !preg_match('/^\d{6,34}$/', (string) $payload['payout_account_number'])))) {
             throw new UnprocessableEntityHttpException('Bank provider and account number are required');
         }
         if ($payload['payout_method_code'] === 'card_transfer'
-            && (!isset($payload['payout_card_number']) || !$this->isValidCardNumber((string) $payload['payout_card_number']))) {
+            && (($requirePaymentDetails && !isset($payload['payout_card_number'])) || (isset($payload['payout_card_number']) && !$this->isValidCardNumber((string) $payload['payout_card_number'])))) {
             throw new UnprocessableEntityHttpException('A valid card number is required');
         }
         $payload['country_code'] = strtoupper($payload['country_code']);
