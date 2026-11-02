@@ -274,7 +274,7 @@ function NavButton({ active, onClick, children }: { active: boolean; onClick: ()
 function Logo({ language, monochrome = false }: { language: Language; monochrome?: boolean }) {
   const slogan = translate(language, 'brand.slogan');
   return <div className={monochrome ? 'logo logo-monochrome' : 'logo'} aria-label={`SEDERG_PAY — ${slogan}`}>
-    <img className="logo-symbol logo-brand-image" src="/assets/sederg-pay/logos/sederg-pay-horizontal.svg" alt="" aria-hidden="true" />
+    <img className="logo-symbol logo-brand-image" src="/assets/sederg-pay/logos/sederg-pay-isotipo.svg" alt="" aria-hidden="true" />
     <span className="logo-wordmark logo-wordmark-accessible"><strong>SEDERG</strong><b>_PAY</b><small>{slogan}</small></span>
   </div>;
 }
