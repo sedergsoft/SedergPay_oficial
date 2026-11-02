@@ -54,10 +54,10 @@ final class VerificationMailer
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:32px 12px;background:#f4f7fc;">
     <tr><td align="center">
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border-radius:20px;overflow:hidden;border:1px solid #e1e7f3;">
-        <tr><td style="padding:30px 34px;background:linear-gradient(120deg,#173b93,#245bd7 58%,#e23b45);">
+        <tr><td style="padding:30px 34px;background:linear-gradient(120deg,#0D1B33,#1F46D6 58%,#FF6247);">
           <div style="font-size:24px;font-weight:800;letter-spacing:-1px;color:#ffffff;">
-            <span style="display:inline-block;width:36px;height:36px;line-height:36px;text-align:center;border-radius:11px;background:#ffffff;color:#245bd7;margin-right:8px;">S</span>
-            SEDERG<span style="color:#ffd9dc;">_PAY</span>
+            <span style="display:inline-block;width:36px;height:36px;line-height:36px;text-align:center;border-radius:11px;background:#ffffff;color:#1F46D6;margin-right:8px;">S</span>
+            SEDERG<span style="color:#FFB4A5;">_PAY</span>
           </div>
         </td></tr>
         <tr><td style="padding:38px 34px 30px;">
@@ -84,30 +84,67 @@ HTML;
 
     public function sendRemittanceReceipt(string $email, string $firstName, array $remittance): void
     {
-        $safeFirstName = htmlspecialchars($firstName, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-        $safeReference = htmlspecialchars((string) $remittance['reference'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-        $safeSend = htmlspecialchars((string) $remittance['send_amount'] . ' ' . $remittance['send_currency'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-        $safeReceive = htmlspecialchars((string) $remittance['receive_amount'] . ' ' . $remittance['receive_currency'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-        $safeStatus = htmlspecialchars((string) $remittance['status'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-        $safeQrPayload = htmlspecialchars((string) ($remittance['payment_qr_payload'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $esc = static fn(mixed $v): string => htmlspecialchars((string) $v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $dash = static fn(mixed $v): string => ($v === null || $v === '') ? '—' : (string) $v;
+
+        $direction = ($remittance['direction'] ?? '') === 'cu_to_ru' ? 'Cuba → Rusia' : 'Rusia → Cuba';
+        $bFirst = trim((string) ($remittance['beneficiary_first_name'] ?? ''));
+        $bLast = trim((string) ($remittance['beneficiary_last_name'] ?? ''));
+        $beneficiary = trim($bFirst . ' ' . $bLast);
+        if ($beneficiary === '') {
+            $beneficiary = '—';
+        }
+        $account = !empty($remittance['payout_account_last4'])
+            ? 'Cuenta ****' . $remittance['payout_account_last4']
+            : (!empty($remittance['payout_card_last4']) ? 'Tarjeta ****' . $remittance['payout_card_last4'] : '—');
+        $rate = $dash($remittance['exchange_rate']) . ' ' . $dash($remittance['receive_currency']) . ' por ' . $dash($remittance['send_currency']);
+
+        $rows = [
+            'Referencia' => (string) $remittance['reference'],
+            'Dirección' => $direction,
+            'Enviar' => $dash($remittance['send_amount']) . ' ' . $dash($remittance['send_currency']),
+            'Recibir' => $dash($remittance['receive_amount']) . ' ' . $dash($remittance['receive_currency']),
+            'Comisión' => $dash($remittance['fee_amount']) . ' ' . $dash($remittance['fee_currency']),
+            'Total a transferir' => $dash($remittance['total_debit_amount']) . ' ' . $dash($remittance['send_currency']),
+            'Tasa' => $rate,
+            'Estado' => $dash($remittance['status']),
+            'Beneficiario' => $beneficiary,
+            'Método de pago' => $dash($remittance['payout_method_code']) . (!empty($remittance['payout_provider']) ? ' · ' . $dash($remittance['payout_provider']) : ''),
+            'Cuenta/tarjeta' => $account,
+            'Creada' => $dash($remittance['created_at']),
+        ];
+
         $subject = 'Comprobante de remesa ' . $remittance['reference'];
-        $body = "Hola {$firstName},\n\n"
-            . "Tu remesa {$remittance['reference']} fue creada.\n"
-            . "Enviar: {$remittance['send_amount']} {$remittance['send_currency']}\n"
-            . "Recibir: {$remittance['receive_amount']} {$remittance['receive_currency']}\n"
-            . "Estado: {$remittance['status']}\n"
-            . "Referencia de pago: {$remittance['reference']}\n"
-            . "Información QR: {$remittance['payment_qr_payload']}\n";
+        $lines = ["Hola {$firstName},", '', 'Tu remesa fue creada:', ''];
+        foreach ($rows as $label => $value) {
+            $lines[] = "{$label}: {$value}";
+        }
+        $lines[] = '';
+        $lines[] = 'Información incluida en el QR: ' . $dash($remittance['payment_qr_payload'] ?? '');
+        $body = implode("\n", $lines);
+
+        $rowsHtml = '';
+        foreach ($rows as $label => $value) {
+            $rowsHtml .= '<tr><td style="padding:5px 0;font-size:13px;color:#8a94a9;">' . $esc($label) . '</td>'
+                . '<td style="padding:5px 0 5px 14px;font-size:13px;color:#17213d;text-align:right;">' . $esc($value) . '</td></tr>';
+        }
+
+        $safeFirstName = $esc($firstName);
+        $safeReference = $esc((string) $remittance['reference']);
+        $safeQrPayload = $esc((string) ($remittance['payment_qr_payload'] ?? ''));
         $html = <<<HTML
 <!doctype html><html lang="es"><body style="margin:0;background:#f4f7fc;color:#17213d;font-family:Arial,Helvetica,sans-serif;">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:32px 12px;background:#f4f7fc;"><tr><td align="center">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#fff;border-radius:20px;overflow:hidden;border:1px solid #e1e7f3;">
-<tr><td style="padding:30px 34px;background:#0b4f9c;color:#fff;font-size:24px;font-weight:800;">SEDERG<span style="color:#00aeef;">_PAY</span></td></tr>
-<tr><td style="padding:34px;"><p style="color:#0b4f9c;font-size:12px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;">Comprobante de operación</p>
-<h1 style="color:#10264d;">Remesa creada</h1><p>Hola {$safeFirstName}, guardamos los datos de tu operación.</p>
-<p><strong>Referencia:</strong> {$safeReference}<br><strong>Enviar:</strong> {$safeSend}<br><strong>Recibir:</strong> {$safeReceive}<br><strong>Estado:</strong> {$safeStatus}</p>
-<p style="padding:16px;background:#f4f6f9;border-radius:10px;word-break:break-all;"><strong>Datos incluidos en el QR:</strong><br>{$safeQrPayload}</p>
-</td></tr><tr><td style="padding:20px 34px;background:#f8faff;color:#71809d;font-size:12px;">SEDERG_PAY · Conserva este comprobante para dar seguimiento.</td></tr>
+<tr><td style="padding:30px 34px;background:#1F46D6;color:#fff;font-size:24px;font-weight:800;">SEDERG<span style="color:#FF6247;">_PAY</span></td></tr>
+<tr><td style="padding:34px;">
+<p style="margin:0 0 10px;color:#0b4f9c;font-size:12px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;">Comprobante de operación</p>
+<h1 style="margin:0 0 16px;font-size:26px;color:#10264d;">Remesa {$safeReference}</h1>
+<p style="margin:0 0 22px;font-size:15px;color:#53617d;">Hola {$safeFirstName}, guardamos los datos de tu operación.</p>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-top:1px solid #edf0f6;">{$rowsHtml}</table>
+<p style="margin:20px 0 0;padding:16px;background:#f4f6f9;border-radius:10px;word-break:break-all;font-size:12px;color:#71809d;"><strong style="color:#10264d;">Datos incluidos en el QR:</strong><br>{$safeQrPayload}</p>
+</td></tr>
+<tr><td style="padding:20px 34px;background:#f8faff;color:#71809d;font-size:12px;">SEDERG_PAY · Conserva este comprobante para dar seguimiento a tu remesa.</td></tr>
 </table></td></tr></table></body></html>
 HTML;
         $this->sendMessage($email, $subject, $body, $html);
