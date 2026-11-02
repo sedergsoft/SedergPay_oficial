@@ -120,6 +120,19 @@ final class PlatformSettings
             $before[$key] = self::get($db, $key);
             $validated[$key] = $normalized;
         }
+        if (($validated['pricing.exchange_rate_source'] ?? null) === 'admin_override') {
+            $manualRateExists = (int) $db->createCommand(
+                'SELECT COUNT(*) FROM {{%exchange_rates}}
+                 WHERE base_currency = :base AND quote_currency = :quote
+                   AND source = :source AND valid_from <= UTC_TIMESTAMP()
+                   AND (valid_until IS NULL OR valid_until > UTC_TIMESTAMP())',
+                [':base' => 'RUB', ':quote' => 'CUP', ':source' => 'admin_override']
+            )->queryScalar();
+            if ($manualRateExists === 0) {
+                throw new DomainException('No hay una tasa manual guardada para activar.');
+            }
+        }
+
         $effectiveMinimum = $validated['pricing.minimum_send_amount']
             ?? self::get($db, 'pricing.minimum_send_amount');
         $effectiveMaximum = $validated['pricing.maximum_send_amount']
