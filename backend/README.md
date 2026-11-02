@@ -65,6 +65,8 @@ usar `--ignore-platform-req` en entornos de despliegue.
 26. `ledger_transactions`
 27. `ledger_entries`
 28. `outbox_messages`
+29. `kyc_cases`
+30. `kyc_documents`
 
 ## Flujo operativo recomendado
 1. El usuario se registra y completa su perfil.
