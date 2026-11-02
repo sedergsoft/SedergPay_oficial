@@ -150,8 +150,8 @@ function AuthScreen({ language, onLanguageChange, mode, setMode, busy, message, 
   const [activationState, setActivationState] = useState<'idle' | 'activating' | 'success' | 'error'>('idle');
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const email = params.get('verify_email');
-    const token = params.get('token');
+    const email = params.getext('verify_email');
+    const token = params.getext('token');
     if (!email || !token) return;
     setVerificationEmail(email);
     setActivationState('activating');
@@ -159,7 +159,7 @@ function AuthScreen({ language, onLanguageChange, mode, setMode, busy, message, 
       try {
         await api.verifyEmail(email, token);
         setActivationState('success');
-        setNotification('Tu cuenta ha sido activada correctamente. Ya puedes iniciar sesión.');
+        setNotification(text('auth.activationSuccess'));
         setVerificationEmail('');
         setVerificationToken('');
         window.history.replaceState({}, '', '/?access=login');
@@ -171,29 +171,29 @@ function AuthScreen({ language, onLanguageChange, mode, setMode, busy, message, 
     });
   }, []);
   return <main className="shell narrow"><Header language={language} onLanguageChange={onLanguageChange} /><RateBanner /><section className="auth-card card">
-    <button className="back-link" type="button" onClick={onBack}>{text('common.backHome')}</button>
-    <div className="eyebrow">{text('auth.secure')}</div><h1>{mode === 'login' ? text('auth.welcome') : text('auth.create')}</h1>
-    <p className="muted">{isDevelopmentAuth ? text('auth.description') : t('auth.oidcDescription')}</p>
-    <div className="tabs"><button className={mode === 'login' ? 'tab active' : 'tab'} onClick={() => setMode('login')}>{text('common.login')}</button><button className={mode === 'register' ? 'tab active' : 'tab'} onClick={() => setMode('register')}>{text('common.register')}</button></div>
-    {!isDevelopmentAuth && <p className="alert">Configura el proveedor OIDC para habilitar el acceso en producción.</p>}
-    {activationState === 'activating' && <div className="activation-panel"><span className="activation-spinner" /><strong>{text('auth.activating')}</strong><p>Estamos verificando tu enlace de forma segura.</p></div>}
-    {activationState === 'error' && <div className="alert" role="alert">El enlace no es válido o ha caducado. Solicita un nuevo correo desde el registro.</div>}
-    {verificationEmail && activationState === 'idle' && <div className="verification-panel"><div className="success-alert" role="status">{notification || <>Se ha enviado un correo de verificación a <strong>{verificationEmail}</strong>. Revisa tu bandeja de entrada y spam.</>}</div><p className="muted">Abre el enlace del correo para activar tu cuenta automáticamente. No necesitas introducir la contraseña de nuevo.</p><button type="button" className="secondary" disabled={busy} onClick={() => void run(async () => { await api.resendVerification(verificationEmail); setNotification('Se ha reenviado el enlace de activación a tu correo.'); })}>Reenviar enlace</button></div>}
-    {notification && activationState === 'success' && <div className="success-alert" role="status">{notification || text('auth.activationSuccess')}</div>}
+    <button className="back-link" type="button" onClick={onBack}>{textext('common.backHome')}</button>
+    <div className="eyebrow">{textext('auth.secure')}</div><h1>{mode === 'login' ? textext('auth.welcome') : textext('auth.create')}</h1>
+    <p className="muted">{isDevelopmentAuth ? textext('auth.description') : text('auth.oidcDescription')}</p>
+    <div className="tabs"><button className={mode === 'login' ? 'tab active' : 'tab'} onClick={() => setMode('login')}>{textext('common.login')}</button><button className={mode === 'register' ? 'tab active' : 'tab'} onClick={() => setMode('register')}>{textext('common.register')}</button></div>
+    {!isDevelopmentAuth && <p className="alert">{text('auth.oidcSetup')}</p>}
+    {activationState === 'activating' && <div className="activation-panel"><span className="activation-spinner" /><strong>{textext('auth.activating')}</strong><p>{text('auth.verifyingLink')}</p></div>}
+    {activationState === 'error' && <div className="alert" role="alert">{text('auth.invalidLink')}</div>}
+    {verificationEmail && activationState === 'idle' && <div className="verification-panel"><div className="success-alert" role="status">{notification || <>{text('auth.verificationSent')} <strong>{verificationEmail}</strong>. {text('auth.checkInbox')}</>}</div><p className="muted">{text('auth.openActivationLink')}</p><button type="button" className="secondary" disabled={busy} onClick={() => void run(async () => { await api.resendVerification(verificationEmail); setNotification(text('auth.resent')); })}>Reenviar enlace</button></div>}
+    {notification && activationState === 'success' && <div className="success-alert" role="status">{notification || textext('auth.activationSuccess')}</div>}
     {!verificationEmail && isDevelopmentAuth && mode === 'login' && <form onSubmit={(event) => {
       event.preventDefault(); const data = new FormData(event.currentTarget);
-      void run(async () => onAuthenticated(await api.login(String(data.get('email')), String(data.get('password')))));
-    }}><Field name="email" label={t('field.email')} type="email" /><Field name="password" label={t('field.password')} type="password" /><button disabled={busy}>{busy ? t('common.validating') : t('common.login')}</button></form>}
+      void run(async () => onAuthenticated(await api.login(String(data.getext('email')), String(data.getext('password')))));
+    }}><Field name="email" label={text('field.email')} type="email" /><Field name="password" label={text('field.password')} type="password" /><button disabled={busy}>{busy ? text('common.validating') : text('common.login')}</button></form>}
     {!verificationEmail && isDevelopmentAuth && mode === 'register' && <form onSubmit={(event) => {
       event.preventDefault(); const data = new FormData(event.currentTarget);
       void run(async () => {
-        const email = String(data.get('email')); const password = String(data.get('password'));
-        const result = await api.register({ email, password, first_name: data.get('first_name'), last_name: data.get('last_name'), residence_country_code: data.get('country'), consent_policy_version: 'v1', accept_terms: true, accept_privacy: true });
+        const email = String(data.getext('email')); const password = String(data.getext('password'));
+        const result = await api.register({ email, password, first_name: data.getext('first_name'), last_name: data.getext('last_name'), residence_country_code: data.getext('country'), consent_policy_version: 'v1', accept_terms: true, accept_privacy: true });
         setVerificationEmail(email);
         setVerificationToken('');
-        setNotification(`Cuenta creada. Se ha enviado un correo con el código de verificación a ${result.email}.`);
+        setNotification(`${text('auth.accountCreated')} ${result.email}.`);
       });
-    }}><Field name="first_name" label={t('field.firstName')} /><Field name="last_name" label={t('field.lastName')} /><Field name="email" label={t('field.email')} type="email" /><Field name="password" label={t('field.passwordMin')} type="password" /><label>{t('field.residenceCountry')}<select name="country" defaultValue="RU"><option value="RU">{t('country.russia')}</option><option value="CU">{t('country.cuba')}</option></select></label><button disabled={busy}>{busy ? t('common.creating') : t('common.register')}</button></form>}
+    }}><Field name="first_name" label={text('field.firstName')} /><Field name="last_name" label={text('field.lastName')} /><Field name="email" label={text('field.email')} type="email" /><Field name="password" label={text('field.passwordMin')} type="password" /><label>{text('field.residenceCountry')}<select name="country" defaultValue="RU"><option value="RU">{text('country.russia')}</option><option value="CU">{text('country.cuba')}</option></select></label><button disabled={busy}>{busy ? text('common.creating') : text('common.register')}</button></form>}
     {message && <Alert text={message} />}
   </section></main>;
 }
