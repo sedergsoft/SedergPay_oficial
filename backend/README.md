@@ -119,3 +119,14 @@ El esquema no fuerza un límite fijo de importe por fila porque los límites dep
 - Configure `SEDERG_PRIVATE_STORAGE_PATH` como directorio persistente **fuera del document root**, con permisos restringidos para el usuario del proceso PHP. Los documentos se cifran con `SEDERG_PII_KEY` antes de guardarse. En producción, `SEDERG_PII_KEY` es obligatorio y debe ser un secreto fuerte y estable; perderlo impide descifrar los documentos existentes. El volumen Docker `sederg_private_data` conserva los archivos entre despliegues. No exponga este directorio mediante Apache/Nginx ni backups públicos.
 - `SEDERG_KYC_REQUIRED=1` obliga a tener KYC aprobado antes de crear remesas. Fuera del modo de autenticación development, esta condición se aplica por defecto. En sandbox/desarrollo se puede probar el flujo sin bloquear remesas.
 - La política documental y los controles de KYC/AML deben validarse para cada corredor RU-CU y CU-RU con asesoría legal y los operadores autorizados. Esta implementación aporta el flujo técnico; no certifica por sí sola el cumplimiento regulatorio.
+
+
+### KYC hardening and deployment
+
+- KYC uploads are validated against actual MIME, file size (1 byte–5 MB), and file signatures. Documents are scanned through ClamAV using the daemon INSTREAM protocol before encryption and storage.
+- The Compose stack includes an internal-only ClamAV service with a persistent virus-definition volume. It is not published to the host.
+- Production must set a dedicated random `SEDERG_PII_KEY` (at least 32 characters), `SEDERG_KYC_REQUIRED=1`, and must keep the private storage volume and encryption key in protected backups. Never reuse `SEDERG_COOKIE_KEY` as the document encryption key.
+- Malware scanning fails closed whenever KYC is required or auth mode is not development. If ClamAV is down, uploads are rejected rather than accepted without scanning.
+- Administrative KYC downloads are attachment-only, disable caching, validate path containment, decrypt, verify SHA-256 and create an audit event.
+- Configure backup retention, access controls and a documented key-rotation procedure before onboarding real customers. Key rotation must re-encrypt all retained files; simply replacing the key makes existing files unreadable.
+- These controls are technical safeguards, not a determination that KYC/AML or privacy obligations in Russia and Cuba have been satisfied. Legal, data-localization, retention, sanctions-screening and reporting requirements must be confirmed separately for each corridor.
