@@ -52,7 +52,7 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-    command: ["sh", "-c", "while true; do php yii rates/update || echo 'Exchange-rate refresh failed; retrying tomorrow.' >&2; sleep 43200; done"]
+    command: ["sh", "-c", "while true; do php yii rates/update || echo 'Exchange-rate refresh failed; retrying in 12 hours.' >&2; sleep 43200; done"]
     restart: unless-stopped
 
   mysql:
