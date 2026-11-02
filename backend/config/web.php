@@ -58,6 +58,8 @@ return [
                 'POST api/v1/kyc/submit' => 'kyc/submit',
                 'POST api/v1/kyc/documents' => 'kyc/upload-document',
                 'GET api/v1/admin/kyc' => 'admin/kyc-index',
+                'GET api/v1/admin/kyc/<publicId:[0-9a-fA-F-]{36}>/documents' => 'admin/kyc-documents',
+                'GET api/v1/admin/kyc/documents/<publicId:[0-9a-fA-F-]{36}>' => 'admin/kyc-document',
                 'POST api/v1/admin/kyc/<publicId:[0-9a-fA-F-]{36}>/review' => 'admin/kyc-review',
                 'POST api/v1/remittances' => 'remittance/create',
                 'GET api/v1/remittances' => 'remittance/index',
