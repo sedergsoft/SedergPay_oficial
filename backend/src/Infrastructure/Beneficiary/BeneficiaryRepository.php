@@ -96,6 +96,23 @@ final class BeneficiaryRepository
         ])->execute();
     }
 
+    public function updateForUser(string $publicId, int $userId, array $payload, int $countryId): void
+    {
+        $this->db->createCommand()->update('{{%beneficiaries}}', [
+            'country_id' => $countryId,
+            'first_name' => trim($payload['first_name']),
+            'last_name' => trim($payload['last_name']),
+            'phone_e164' => $payload['phone_e164'] ?? null,
+            'email' => isset($payload['email']) ? strtolower(trim($payload['email'])) : null,
+            'payout_method_code' => $payload['payout_method_code'],
+            'payout_provider' => $payload['payout_provider'] ?? null,
+            'payout_account_token' => $payload['payout_account_token'] ?? null,
+            'payout_account_last4' => $payload['payout_account_last4'] ?? null,
+            'payout_card_token' => $payload['payout_card_token'] ?? null,
+            'payout_card_last4' => $payload['payout_card_last4'] ?? null,
+        ], ['public_id' => $publicId, 'sender_user_id' => $userId])->execute();
+    }
+
     public function findForUser(string $publicId, int $userId): ?array
     {
         $row = $this->db->createCommand(
