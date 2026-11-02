@@ -35,6 +35,48 @@ jobs:
         working-directory: backend
         run: vendor/bin/phpunit -c phpunit.xml
 
+  mysql-integration:
+    name: MySQL migrations and schema smoke test
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: sederg_pay
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: bcmath, openssl, pdo_mysql, fileinfo
+          coverage: none
+      - name: Install PHP dependencies
+        working-directory: backend
+        run: composer install --no-interaction --prefer-dist
+      - name: Apply all Yii migrations against MySQL 8.4
+        working-directory: backend
+        env:
+          SEDERG_DB_DSN: mysql:host=127.0.0.1;port=3306;dbname=sederg_pay
+          SEDERG_DB_USER: root
+          SEDERG_DB_PASSWORD: root
+        run: php yii migrate --interactive=0
+      - name: Verify critical schema objects
+        env:
+          DB_HOST: 127.0.0.1
+          DB_USER: root
+          DB_PASSWORD: root
+          DB_NAME: sederg_pay
+        run: |
+          php -r '$pdo=new PDO("mysql:host=".$_ENV["DB_HOST"].";dbname=".$_ENV["DB_NAME"],$_ENV["DB_USER"],$_ENV["DB_PASSWORD"]); $tables=["users","user_profiles","beneficiaries","kyc_cases","kyc_documents","audit_logs","remittances"]; foreach($tables as $table){$q=$pdo->prepare("SHOW TABLES LIKE ?");$q->execute([$table]);if(!$q->fetchColumn()){fwrite(STDERR,"Missing table: $table\\n");exit(1);}} echo "Critical MySQL tables verified.\\n";'
+
   frontend:
     name: TypeScript and Vite production build
     runs-on: ubuntu-latest
