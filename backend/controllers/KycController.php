@@ -124,11 +124,6 @@ final class KycController extends Controller
         }
 
         $path = $folderReal . DIRECTORY_SEPARATOR . basename($relativeKey);
-        $safeOriginalName = preg_replace('/[^A-Za-z0-9._-]+/u', '_', basename((string) $file->name));
-        $safeOriginalName = trim((string) $safeOriginalName, '._-');
-        if ($safeOriginalName === '') {
-            $safeOriginalName = 'kyc-document.' . $extensions[$mime];
-        }
         $written = file_put_contents($path, $encryptedContent, LOCK_EX);
         if ($written === false || $written !== strlen($encryptedContent)) {
             @unlink($path);
@@ -159,12 +154,21 @@ final class KycController extends Controller
                 $caseId = (int) $case['id'];
             }
 
+            $usage = $db->createCommand(
+                'SELECT COUNT(*) AS document_count, COALESCE(SUM(file_size),0) AS total_bytes
+                 FROM {{%kyc_documents}} WHERE kyc_case_id=:id',
+                [':id' => $caseId]
+            )->queryOne();
+            if ((int) $usage['document_count'] >= 10 || (int) $usage['total_bytes'] + strlen($originalContent) > 25 * 1024 * 1024) {
+                throw new UnprocessableEntityHttpException('A KYC case is limited to 10 documents and 25 MB in total');
+            }
+
             $db->createCommand()->insert('{{%kyc_documents}}', [
                 'public_id' => $this->uuid(),
                 'kyc_case_id' => $caseId,
                 'document_type' => $type,
                 'storage_key' => $relativeKey,
-                'original_name' => mb_substr($safeOriginalName, 0, 190),
+                'original_name' => mb_substr(basename($file->name), 0, 190),
                 'mime_type' => $mime,
                 'file_size' => strlen($originalContent),
                 'sha256' => hash('sha256', $originalContent),
@@ -201,7 +205,7 @@ final class KycController extends Controller
             throw $exception;
         }
 
-        return ['uploaded' => true, 'document_type' => $type, 'file_name' => $safeOriginalName];
+        return ['uploaded' => true, 'document_type' => $type, 'file_name' => basename($file->name)];
     }
 
     public function actionSubmit(): array

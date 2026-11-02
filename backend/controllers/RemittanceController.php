@@ -39,6 +39,12 @@ final class RemittanceController extends Controller
         }
         $request = Yii::$app->request;
         $userId = $this->authenticatedUserId();
+        if (getenv('SEDERG_KYC_REQUIRED') === '1' || getenv('SEDERG_AUTH_MODE') !== 'development') {
+            $kycStatus = Yii::$app->db->createCommand('SELECT status FROM {{%kyc_cases}} WHERE user_id = :user_id LIMIT 1', [':user_id' => $userId])->queryScalar();
+            if ($kycStatus !== 'approved') {
+                throw new ForbiddenHttpException('Complete and obtain approval for KYC verification before creating a remittance');
+            }
+        }
         $idempotencyKey = trim((string) $request->headers->get('Idempotency-Key', ''));
         if (!preg_match('/^[A-Za-z0-9._:-]{16,100}$/', $idempotencyKey)) {
             throw new BadRequestHttpException('A valid Idempotency-Key is required');

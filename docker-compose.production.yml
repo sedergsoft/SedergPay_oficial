@@ -1,7 +1,19 @@
 services:
   backend:
+    environment:
+      SEDERG_AUTH_MODE: production
+      SEDERG_CLAMD_HOST: clamav
+      SEDERG_CLAMD_PORT: 3310
+      SEDERG_PII_KEY: ${SEDERG_PII_KEY:?SEDERG_PII_KEY is required in production}
+      SEDERG_PRIVATE_STORAGE_PATH: /var/lib/sederg-private
+      SEDERG_KYC_REQUIRED: ${SEDERG_KYC_REQUIRED:-1}
     ports: !reset []
-    volumes: !reset []
+    volumes: !reset
+      - sederg_private_data:/var/lib/sederg-private
+    restart: unless-stopped
+
+  clamav:
+    ports: !reset []
     restart: unless-stopped
 
   mysql:
@@ -31,3 +43,4 @@ services:
 volumes:
   caddy_data:
   caddy_config:
+  sederg_private_data:
