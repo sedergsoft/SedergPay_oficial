@@ -176,7 +176,30 @@ final class BeneficiaryController extends Controller
                 throw new UnprocessableEntityHttpException('A card number is required when changing the payout method');
             }
         }
-        $repository->updateForUser($publicId, $userId, $payload, $countryId);
+        $tx = Yii::$app->db->beginTransaction();
+        try {
+            $repository->updateForUser($publicId, $userId, $payload, $countryId);
+            Yii::$app->db->createCommand()->insert('{{%audit_logs}}', [
+                'actor_user_id' => $userId,
+                'action' => 'beneficiary.updated',
+                'entity_type' => 'beneficiary',
+                'entity_id' => $publicId,
+                'ip_address' => Yii::$app->request->userIP,
+                'user_agent' => substr((string) Yii::$app->request->userAgent, 0, 500),
+                'after_data' => new \\yii\\db\\JsonExpression([
+                    'changed_fields' => array_values(array_intersect(array_keys($payload), [
+                        'country_code', 'first_name', 'last_name', 'phone_e164', 'email',
+                        'payout_method_code', 'payout_provider',
+                    ])),
+                ]),
+            ])->execute();
+            $tx->commit();
+        } catch (\\Throwable $exception) {
+            if ($tx->getIsActive()) {
+                $tx->rollBack();
+            }
+            throw $exception;
+        }
         return $repository->findForUser($publicId, $userId) ?? [];
     }
 
@@ -187,6 +210,11 @@ final class BeneficiaryController extends Controller
 
     private function validatePayload(array &$payload, bool $requirePaymentDetails = true): void
     {
+        foreach (['payout_account_token', 'payout_account_last4', 'payout_card_token', 'payout_card_last4'] as $serverField) {
+            if (array_key_exists($serverField, $payload)) {
+                throw new UnprocessableEntityHttpException('Payment credential metadata is server-managed');
+            }
+        }
         foreach (['country_code', 'first_name', 'last_name', 'payout_method_code'] as $field) {
             if (!isset($payload[$field]) || !is_string($payload[$field]) || trim($payload[$field]) === '') {
                 throw new UnprocessableEntityHttpException("Missing field: {$field}");
@@ -205,10 +233,10 @@ final class BeneficiaryController extends Controller
             throw new UnprocessableEntityHttpException('Phone must use E.164 format');
         }
         if (isset($payload['email']) && $payload['email'] !== ''
-            && (filter_var($payload['email'], FILTER_VALIDATE_EMAIL) === false || strlen($payload['email']) > 190)) {
+            && (!is_string($payload['email']) || filter_var($payload['email'], FILTER_VALIDATE_EMAIL) === false || strlen($payload['email']) > 190)) {
             throw new UnprocessableEntityHttpException('Invalid beneficiary email');
         }
-        if (isset($payload['payout_provider']) && mb_strlen($payload['payout_provider']) > 80) {
+        if (isset($payload['payout_provider']) && (!is_string($payload['payout_provider']) || mb_strlen($payload['payout_provider']) > 80)) {
             throw new UnprocessableEntityHttpException('Payout provider is too long');
         }
         if (isset($payload['payout_account_token'])
