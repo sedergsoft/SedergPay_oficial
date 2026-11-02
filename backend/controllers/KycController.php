@@ -46,6 +46,11 @@ final class KycController extends Controller
         $finfo=new \finfo(FILEINFO_MIME_TYPE); $mime=$finfo->file($file->tempName);
         $extensions=['application/pdf'=>'pdf','image/jpeg'=>'jpg','image/png'=>'png'];
         if (!isset($extensions[$mime])) throw new UnprocessableEntityHttpException('Only PDF, JPG and PNG documents are accepted');
+        $encryptionKey=(string)(getenv('SEDERG_PII_KEY') ?: getenv('SEDERG_COOKIE_KEY'));
+        if (strlen($encryptionKey)<16) throw new \\yii\\web\\ServerErrorHttpException('KYC encryption key is not configured');
+        $originalContent=file_get_contents($file->tempName);
+        if ($originalContent===false) throw new \\yii\\web\\ServerErrorHttpException('Cannot read uploaded document');
+        $encryptedContent=Yii::$app->security->encryptByKey($originalContent,$encryptionKey);
         $root=trim((string)getenv('SEDERG_PRIVATE_STORAGE_PATH'));
         if ($root==='' || !is_dir($root) && !mkdir($root,0700,true) && !is_dir($root)) throw new \yii\web\ServerErrorHttpException('Private document storage is not configured');
         $key=bin2hex(random_bytes(24)).'.'.$extensions[$mime];
@@ -61,9 +66,10 @@ final class KycController extends Controller
             Yii::$app->db->createCommand()->insert('{{%kyc_documents}}',[
                 'public_id'=>$this->uuid(),'kyc_case_id'=>$caseId,'document_type'=>$type,
                 'storage_key'=>'kyc/'.$userId.'/'.$key,'original_name'=>mb_substr(basename($file->name),0,190),
-                'mime_type'=>$mime,'file_size'=>$file->size,'sha256'=>hash_file('sha256',$folder.'/'.$key),
+                'mime_type'=>$mime,'file_size'=>$file->size,'sha256'=>hash('sha256',$originalContent),
             ])->execute();
             Yii::$app->db->createCommand()->update('{{%kyc_cases}}',['status'=>'draft','review_reason'=>null,'reviewed_at'=>null,'reviewed_by_user_id'=>null],['id'=>$caseId])->execute();
+            Yii::$app->db->createCommand()->insert('{{%audit_logs}}',['actor_user_id'=>$userId,'action'=>'kyc.document.uploaded','entity_type'=>'kyc_case','entity_id'=>(string)$caseId,'ip_address'=>Yii::$app->request->userIP,'user_agent'=>substr((string)Yii::$app->request->userAgent,0,500),'after_data'=>new \\yii\\db\\JsonExpression(['document_type'=>$type,'mime_type'=>$mime,'file_size'=>$file->size])])->execute();
             $tx->commit();
         } catch (\Throwable $e) { if ($tx->getIsActive()) $tx->rollBack(); @unlink($folder.'/'.$key); throw $e; }
         return ['uploaded'=>true,'document_type'=>$type,'file_name'=>basename($file->name)];
@@ -77,6 +83,7 @@ final class KycController extends Controller
         $types=Yii::$app->db->createCommand('SELECT DISTINCT document_type FROM {{%kyc_documents}} WHERE kyc_case_id=:id',[':id'=>$case['id']])->queryColumn();
         if (!in_array('identity',$types,true) || !in_array('address',$types,true)) throw new UnprocessableEntityHttpException('Identity and proof-of-address documents are required');
         Yii::$app->db->createCommand()->update('{{%kyc_cases}}',['status'=>'pending_review','submitted_at'=>gmdate('Y-m-d H:i:s'),'review_reason'=>null],['id'=>$case['id']])->execute();
+        Yii::$app->db->createCommand()->insert('{{%audit_logs}}',['actor_user_id'=>$userId,'action'=>'kyc.case.submitted','entity_type'=>'kyc_case','entity_id'=>(string)$case['id'],'ip_address'=>Yii::$app->request->userIP,'user_agent'=>substr((string)Yii::$app->request->userAgent,0,500)])->execute();
         return ['status'=>'pending_review'];
     }
 }
