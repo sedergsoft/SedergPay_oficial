@@ -6,6 +6,7 @@ namespace app\Infrastructure\Pricing;
 
 use DateTimeImmutable;
 use DomainException;
+use app\\Infrastructure\\Configuration\\PlatformSettings;
 use yii\db\Connection;
 use yii\db\Transaction;
 
@@ -41,9 +42,12 @@ final class ExchangeRateService
             throw new DomainException('Only RUB/CUP exchange rates are supported');
         }
 
-        $direct = $this->findEffective('RUB', 'CUP', self::ADMIN_SOURCE);
-        if ($direct === null) {
-            $direct = $this->findEffectiveOfficial();
+        $activeSource = PlatformSettings::get($this->db, 'pricing.exchange_rate_source');
+        $direct = $activeSource === 'admin_override'
+            ? $this->findEffective('RUB', 'CUP', self::ADMIN_SOURCE)
+            : $this->findEffectiveOfficial();
+        if ($direct === null && $activeSource === 'admin_override') {
+            throw new DomainException('No existe una tasa manual activa. Seleccione la tasa oficial o defina una tasa manual.');
         }
         if ($direct === null) {
             $official = $this->officialClient->fetchRubCup();
@@ -120,6 +124,39 @@ final class ExchangeRateService
             }
             throw $exception;
         }
+
+        $this->db->createCommand()->upsert('{{%platform_settings}}', [
+            'setting_key' => 'pricing.exchange_rate_source',
+            'setting_value' => 'admin_override',
+            'value_type' => 'enum',
+            'updated_by_user_id' => $userId,
+        ], [
+            'setting_value' => 'admin_override',
+            'value_type' => 'enum',
+            'updated_by_user_id' => $userId,
+        ])->execute();
+
+        return $this->resolve('RUB', 'CUP');
+    }
+
+    public function setActiveSource(string $source, int $userId): array
+    {
+        if (!in_array($source, ['official', 'admin_override'], true)) {
+            throw new DomainException('La fuente debe ser official o admin_override.');
+        }
+        if ($source === 'admin_override' && $this->findEffective('RUB', 'CUP', self::ADMIN_SOURCE) === null) {
+            throw new DomainException('No hay una tasa manual guardada para activar.');
+        }
+        $this->db->createCommand()->upsert('{{%platform_settings}}', [
+            'setting_key' => 'pricing.exchange_rate_source',
+            'setting_value' => $source,
+            'value_type' => 'enum',
+            'updated_by_user_id' => $userId,
+        ], [
+            'setting_value' => $source,
+            'value_type' => 'enum',
+            'updated_by_user_id' => $userId,
+        ])->execute();
 
         return $this->resolve('RUB', 'CUP');
     }
@@ -207,6 +244,10 @@ final class ExchangeRateService
             ]
         )->queryScalar();
         if ($existing !== false) {
+            $this->db->createCommand()->update('{{%exchange_rates}}', [
+                'rate' => $official['rate'],
+                'valid_until' => null,
+            ], ['id' => $existing])->execute();
             return;
         }
 
