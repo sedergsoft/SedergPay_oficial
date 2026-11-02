@@ -1,7 +1,8 @@
 services:
   backend:
     ports: !reset []
-    volumes: !reset []
+    volumes: !reset
+      - sederg_private_data:/var/lib/sederg-private
     restart: unless-stopped
 
   mysql:
