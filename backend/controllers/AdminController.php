@@ -236,7 +236,7 @@ final class AdminController extends Controller
                 'after_data' => new JsonExpression(['status' => $status, 'reason' => $reason]),
             ])->execute();
             $tx->commit();
-        } catch (\\Throwable $exception) {
+        } catch (\Throwable $exception) {
             if ($tx->getIsActive()) {
                 $tx->rollBack();
             }
@@ -294,12 +294,12 @@ final class AdminController extends Controller
 
         $key = (string) getenv('SEDERG_PII_KEY');
         if (strlen($key) < 32) {
-            throw new \\yii\\web\\ServerErrorHttpException('KYC encryption key is not configured');
+            throw new \yii\web\\ServerErrorHttpException('KYC encryption key is not configured');
         }
         $encrypted = file_get_contents($path);
         $content = $encrypted === false ? false : Yii::$app->security->decryptByKey($encrypted, $key);
         if ($content === false || strlen($content) !== (int) $doc['file_size'] || !hash_equals((string) $doc['sha256'], hash('sha256', $content))) {
-            throw new \\yii\\web\\ServerErrorHttpException('KYC document integrity or decryption check failed');
+            throw new \yii\web\\ServerErrorHttpException('KYC document integrity or decryption check failed');
         }
 
         Yii::$app->db->createCommand()->insert('{{%audit_logs}}', [
