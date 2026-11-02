@@ -159,7 +159,7 @@ final class ProfileController extends Controller
                 'entity_id' => (string) $userId,
                 'ip_address' => Yii::$app->request->userIP,
                 'user_agent' => substr((string) Yii::$app->request->userAgent, 0, 500),
-                'after_data' => new \yii\db\\JsonExpression([
+                'after_data' => new \yii\db\JsonExpression([
                     'changed_fields' => array_values(array_intersect(array_keys($p), $allowed)),
                 ]),
             ])->execute();
