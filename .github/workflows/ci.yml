@@ -77,6 +77,21 @@ jobs:
         run: |
           php -r '$pdo=new PDO("mysql:host=".getenv("DB_HOST").";dbname=".getenv("DB_NAME"),getenv("DB_USER"),getenv("DB_PASSWORD")); $tables=["users","user_profiles","beneficiaries","kyc_cases","kyc_documents","audit_logs","remittances"]; foreach($tables as $table){$q=$pdo->prepare("SHOW TABLES LIKE ?");$q->execute([$table]);if(!$q->fetchColumn()){fwrite(STDERR,"Missing table: $table\\n");exit(1);}} echo "Critical MySQL tables verified.\\n";'
 
+  deployment-config:
+    name: Docker Compose production configuration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate development and production Compose merge
+        env:
+          SEDERG_DB_PASSWORD: ci-test-db-password
+          SEDERG_MYSQL_ROOT_PASSWORD: ci-test-root-password
+          SEDERG_COOKIE_KEY: ci-test-cookie-key-long-enough-for-compose-validation
+          SEDERG_PII_KEY: ci-test-pii-key-long-enough-for-compose-validation-0001
+          API_DOMAIN: sederg.example.invalid
+          TLS_EMAIL: ci@example.invalid
+        run: docker compose -f docker-compose.yml -f docker-compose.production.yml config --quiet
+
   frontend:
     name: TypeScript and Vite production build
     runs-on: ubuntu-latest
