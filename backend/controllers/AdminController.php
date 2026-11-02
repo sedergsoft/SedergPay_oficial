@@ -177,59 +177,151 @@ final class AdminController extends Controller
         $auth = new UserAuthenticator(Yii::$app->db);
         $reviewerId = $auth->userId();
         $auth->requireRole('admin');
+        if (!preg_match('/^[0-9a-f-]{36}$/i', $publicId)) {
+            throw new BadRequestHttpException('Invalid KYC case identifier');
+        }
+
         $payload = Yii::$app->request->bodyParams;
         $decision = $payload['decision'] ?? null;
-        $reason = trim((string)($payload['reason'] ?? ''));
+        $reason = trim((string) ($payload['reason'] ?? ''));
         if (!in_array($decision, ['approved', 'rejected', 'more_information'], true)) {
             throw new BadRequestHttpException('Invalid KYC decision');
         }
-        if ($decision !== 'approved' && $reason === '') {
-            throw new BadRequestHttpException('A reason is required for this decision');
+        if ($decision !== 'approved' && ($reason === '' || mb_strlen($reason) > 1000)) {
+            throw new BadRequestHttpException('A reason of at most 1000 characters is required for this decision');
         }
-        $case = Yii::$app->db->createCommand('SELECT id,status FROM {{%kyc_cases}} WHERE public_id=:id LIMIT 1', [':id'=>$publicId])->queryOne();
-        if ($case === false || $case['status'] !== 'pending_review') {
-            throw new UnprocessableEntityHttpException('KYC case is not awaiting review');
+
+        $db = Yii::$app->db;
+        $tx = $db->beginTransaction();
+        try {
+            $case = $db->createCommand(
+                'SELECT id,user_id,status FROM {{%kyc_cases}} WHERE public_id=:id LIMIT 1 FOR UPDATE',
+                [':id' => $publicId]
+            )->queryOne();
+            if ($case === false || $case['status'] !== 'pending_review') {
+                throw new UnprocessableEntityHttpException('KYC case is not awaiting review');
+            }
+
+            if ($decision === 'approved') {
+                $profile = $db->createCommand(
+                    'SELECT date_of_birth,address_line,city,residence_country_id FROM {{%user_profiles}} WHERE user_id=:id LIMIT 1',
+                    [':id' => $case['user_id']]
+                )->queryOne();
+                $types = $db->createCommand(
+                    'SELECT DISTINCT document_type FROM {{%kyc_documents}} WHERE kyc_case_id=:id',
+                    [':id' => $case['id']]
+                )->queryColumn();
+                if ($profile === false || empty($profile['date_of_birth']) || empty($profile['address_line'])
+                    || empty($profile['city']) || empty($profile['residence_country_id'])
+                    || !in_array('identity', $types, true) || !in_array('address', $types, true)) {
+                    throw new UnprocessableEntityHttpException('KYC requirements are incomplete; approval is blocked');
+                }
+            }
+
+            $status = $decision === 'more_information' ? 'requires_action' : $decision;
+            $db->createCommand()->update('{{%kyc_cases}}', [
+                'status' => $status,
+                'reviewed_at' => gmdate('Y-m-d H:i:s'),
+                'reviewed_by_user_id' => $reviewerId,
+                'review_reason' => $reason !== '' ? $reason : null,
+            ], ['id' => $case['id'], 'status' => 'pending_review'])->execute();
+
+            $db->createCommand()->insert('{{%audit_logs}}', [
+                'actor_user_id' => $reviewerId,
+                'action' => 'kyc.case.reviewed',
+                'entity_type' => 'kyc_case',
+                'entity_id' => $publicId,
+                'ip_address' => Yii::$app->request->userIP,
+                'user_agent' => substr((string) Yii::$app->request->userAgent, 0, 500),
+                'after_data' => new JsonExpression(['status' => $status, 'reason' => $reason]),
+            ])->execute();
+            $tx->commit();
+        } catch (\\Throwable $exception) {
+            if ($tx->getIsActive()) {
+                $tx->rollBack();
+            }
+            throw $exception;
         }
-        $status = $decision === 'more_information' ? 'requires_action' : $decision;
-        Yii::$app->db->createCommand()->update('{{%kyc_cases}}', [
-            'status'=>$status, 'reviewed_at'=>gmdate('Y-m-d H:i:s'),
-            'reviewed_by_user_id'=>$reviewerId, 'review_reason'=>$reason !== '' ? mb_substr($reason,0,1000) : null,
-        ], ['id'=>$case['id']])->execute();
-        Yii::$app->db->createCommand()->insert('{{%audit_logs}}', [
-            'actor_user_id'=>$reviewerId, 'action'=>'kyc.case.reviewed', 'entity_type'=>'kyc_case',
-            'entity_id'=>$publicId, 'ip_address'=>Yii::$app->request->userIP,
-            'user_agent'=>substr((string)Yii::$app->request->userAgent,0,500),
-            'after_data'=>new JsonExpression(['status'=>$status,'reason'=>$reason]),
-        ])->execute();
-        return ['public_id'=>$publicId,'status'=>$status,'review_reason'=>$reason];
+
+        return ['public_id' => $publicId, 'status' => $status, 'review_reason' => $reason];
     }
 
     public function actionKycDocuments(string $publicId): array
     {
         (new UserAuthenticator(Yii::$app->db))->requireRole('admin');
-        $case=Yii::$app->db->createCommand('SELECT id FROM {{%kyc_cases}} WHERE public_id=:id LIMIT 1',[':id'=>$publicId])->queryOne();
-        if ($case===false) throw new BadRequestHttpException('KYC case not found');
-        return ['documents'=>Yii::$app->db->createCommand('SELECT public_id,document_type,original_name,mime_type,file_size,created_at FROM {{%kyc_documents}} WHERE kyc_case_id=:id ORDER BY created_at',[':id'=>$case['id']])->queryAll()];
+        if (!preg_match('/^[0-9a-f-]{36}$/i', $publicId)) {
+            throw new BadRequestHttpException('Invalid KYC case identifier');
+        }
+        $case = Yii::$app->db->createCommand(
+            'SELECT id FROM {{%kyc_cases}} WHERE public_id=:id LIMIT 1',
+            [':id' => $publicId]
+        )->queryOne();
+        if ($case === false) {
+            throw new BadRequestHttpException('KYC case not found');
+        }
+        return ['documents' => Yii::$app->db->createCommand(
+            'SELECT public_id,document_type,original_name,mime_type,file_size,created_at
+             FROM {{%kyc_documents}} WHERE kyc_case_id=:id ORDER BY created_at',
+            [':id' => $case['id']]
+        )->queryAll()];
     }
 
     public function actionKycDocument(string $publicId)
     {
-        (new UserAuthenticator(Yii::$app->db))->requireRole('admin');
-        $doc=Yii::$app->db->createCommand('SELECT d.storage_key,d.original_name,d.mime_type FROM {{%kyc_documents}} d WHERE d.public_id=:id LIMIT 1',[':id'=>$publicId])->queryOne();
-        if ($doc===false) throw new BadRequestHttpException('KYC document not found');
-        $root=realpath((string)getenv('SEDERG_PRIVATE_STORAGE_PATH'));
-        $path=$root===false?false:realpath($root.DIRECTORY_SEPARATOR.$doc['storage_key']);
-        if ($path===false || !str_starts_with($path,$root.DIRECTORY_SEPARATOR) || !is_file($path)) throw new BadRequestHttpException('KYC file is unavailable');
-        $key=(string)(getenv('SEDERG_PII_KEY') ?: getenv('SEDERG_COOKIE_KEY'));
-        if (strlen($key)<16) throw new \yii\web\ServerErrorHttpException('KYC encryption key is not configured');
-        $encrypted=file_get_contents($path);
-        $content=$encrypted===false?false:Yii::$app->security->decryptByKey($encrypted,$key);
-        if ($content===false) throw new \yii\web\ServerErrorHttpException('KYC document decryption failed');
-        Yii::$app->response->headers->set('X-Content-Type-Options','nosniff');
-        return Yii::$app->response->sendContentAsFile($content,$doc['original_name'],['mimeType'=>$doc['mime_type'],'inline'=>true]);
+        $auth = new UserAuthenticator(Yii::$app->db);
+        $reviewerId = $auth->userId();
+        $auth->requireRole('admin');
+        if (!preg_match('/^[0-9a-f-]{36}$/i', $publicId)) {
+            throw new BadRequestHttpException('Invalid KYC document identifier');
+        }
+
+        $doc = Yii::$app->db->createCommand(
+            'SELECT d.id,d.storage_key,d.original_name,d.mime_type,d.file_size,k.public_id AS case_public_id
+             FROM {{%kyc_documents}} d
+             INNER JOIN {{%kyc_cases}} k ON k.id=d.kyc_case_id
+             WHERE d.public_id=:id LIMIT 1',
+            [':id' => $publicId]
+        )->queryOne();
+        if ($doc === false) {
+            throw new BadRequestHttpException('KYC document not found');
+        }
+
+        $root = realpath((string) getenv('SEDERG_PRIVATE_STORAGE_PATH'));
+        $path = $root === false ? false : realpath($root . DIRECTORY_SEPARATOR . $doc['storage_key']);
+        if ($path === false || !str_starts_with($path, $root . DIRECTORY_SEPARATOR) || !is_file($path)) {
+            throw new BadRequestHttpException('KYC file is unavailable');
+        }
+
+        $key = (string) getenv('SEDERG_PII_KEY');
+        if (strlen($key) < 32) {
+            throw new \\yii\\web\\ServerErrorHttpException('KYC encryption key is not configured');
+        }
+        $encrypted = file_get_contents($path);
+        $content = $encrypted === false ? false : Yii::$app->security->decryptByKey($encrypted, $key);
+        if ($content === false || strlen($content) !== (int) $doc['file_size']) {
+            throw new \\yii\\web\\ServerErrorHttpException('KYC document integrity or decryption check failed');
+        }
+
+        Yii::$app->db->createCommand()->insert('{{%audit_logs}}', [
+            'actor_user_id' => $reviewerId,
+            'action' => 'kyc.document.downloaded',
+            'entity_type' => 'kyc_document',
+            'entity_id' => $publicId,
+            'ip_address' => Yii::$app->request->userIP,
+            'user_agent' => substr((string) Yii::$app->request->userAgent, 0, 500),
+            'after_data' => new JsonExpression(['case_public_id' => $doc['case_public_id']]),
+        ])->execute();
+
+        Yii::$app->response->headers->set('X-Content-Type-Options', 'nosniff');
+        Yii::$app->response->headers->set('Cache-Control', 'no-store, private');
+        return Yii::$app->response->sendContentAsFile(
+            $content,
+            basename((string) $doc['original_name']),
+            ['mimeType' => $doc['mime_type'], 'inline' => false]
+        );
     }
 
-    public function actionSettings(): array
+        public function actionSettings(): array
     {
         (new UserAuthenticator(Yii::$app->db))->requireRole('admin');
 
