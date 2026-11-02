@@ -156,6 +156,54 @@ final class AdminController extends Controller
         }
     }
 
+    public function actionKycIndex(): array
+    {
+        (new UserAuthenticator(Yii::$app->db))->requireRole('admin');
+        return ['cases' => Yii::$app->db->createCommand(
+            'SELECT k.public_id, k.status, k.submitted_at, k.reviewed_at, k.review_reason,
+                    u.public_id AS user_public_id, u.email,
+                    p.first_name, p.last_name,
+                    (SELECT COUNT(*) FROM {{%kyc_documents}} d WHERE d.kyc_case_id=k.id) AS document_count
+             FROM {{%kyc_cases}} k
+             INNER JOIN {{%users}} u ON u.id=k.user_id
+             LEFT JOIN {{%user_profiles}} p ON p.user_id=u.id
+             ORDER BY FIELD(k.status, "pending_review", "draft", "rejected", "approved"), k.updated_at DESC
+             LIMIT 300'
+        )->queryAll()];
+    }
+
+    public function actionKycReview(string $publicId): array
+    {
+        $auth = new UserAuthenticator(Yii::$app->db);
+        $reviewerId = $auth->userId();
+        $auth->requireRole('admin');
+        $payload = Yii::$app->request->bodyParams;
+        $decision = $payload['decision'] ?? null;
+        $reason = trim((string)($payload['reason'] ?? ''));
+        if (!in_array($decision, ['approved', 'rejected', 'more_information'], true)) {
+            throw new BadRequestHttpException('Invalid KYC decision');
+        }
+        if ($decision !== 'approved' && $reason === '') {
+            throw new BadRequestHttpException('A reason is required for this decision');
+        }
+        $case = Yii::$app->db->createCommand('SELECT id,status FROM {{%kyc_cases}} WHERE public_id=:id LIMIT 1', [':id'=>$publicId])->queryOne();
+        if ($case === false || $case['status'] !== 'pending_review') {
+            throw new UnprocessableEntityHttpException('KYC case is not awaiting review');
+        }
+        $status = $decision === 'more_information' ? 'requires_action' : $decision;
+        Yii::$app->db->createCommand()->update('{{%kyc_cases}}', [
+            'status'=>$status, 'reviewed_at'=>gmdate('Y-m-d H:i:s'),
+            'reviewed_by_user_id'=>$reviewerId, 'review_reason'=>$reason !== '' ? mb_substr($reason,0,1000) : null,
+        ], ['id'=>$case['id']])->execute();
+        Yii::$app->db->createCommand()->insert('{{%audit_logs}}', [
+            'actor_user_id'=>$reviewerId, 'action'=>'kyc.case.reviewed', 'entity_type'=>'kyc_case',
+            'entity_id'=>$publicId, 'ip_address'=>Yii::$app->request->userIP,
+            'user_agent'=>substr((string)Yii::$app->request->userAgent,0,500),
+            'after_data'=>new JsonExpression(['status'=>$status,'reason'=>$reason]),
+        ])->execute();
+        return ['public_id'=>$publicId,'status'=>$status,'review_reason'=>$reason];
+    }
+
     public function actionSettings(): array
     {
         (new UserAuthenticator(Yii::$app->db))->requireRole('admin');
