@@ -100,7 +100,7 @@ function Landing({ language, onLanguageChange, onLogin, onRegister }: { language
         <div className="eyebrow">{text('landing.eyebrow')}</div>
         <h1>{text('landing.title')} <em>{text('landing.titleAccent')}</em></h1>
         <p>{text('landing.description')}</p>
-        <div className="landing-cta"><button onClick={onRegister}>{text('landing.start')} <span aria-hidden="true">↗</span></button><button className="secondary" onClick={onLogin}>{text('landing.existing')}</button></div>
+        <div className="landing-cta"><button className="cta" onClick={onRegister}>{text('landing.start')} <span aria-hidden="true">↗</span></button><button className="secondary" onClick={onLogin}>{text('landing.existing')}</button></div>
         <div className="landing-proof"><span className="proof-icon">✓</span><span>{text('landing.proofOne')}</span><span className="proof-icon">✓</span><span>{text('landing.proofTwo')}</span></div>
       </div>
       <div className="landing-visual" aria-label="Resumen de una operación">
@@ -192,7 +192,7 @@ function AuthScreen({ language, onLanguageChange, mode, setMode, busy, message, 
 function Summary({ userId, setView, run }: { userId: string; setView: (view: View) => void; run: (action: () => Promise<void>) => Promise<void> }) {
   const [remittances, setRemittances] = useState<Remittance[]>([]);
   useEffect(() => { void run(async () => setRemittances(await api.remittances(userId))); }, [userId]);
-  return <><div className="stats"><Stat label="Remesas creadas" value={String(remittances.length)} /><Stat label="Completadas" value={String(remittances.filter((item) => item.status === 'completed').length)} /><Stat label="Estado de cuenta" value="Activo" /></div><section className="card"><h2>¿Qué quieres hacer?</h2><div className="quick-actions"><button onClick={() => setView('quote')}>Cotizar una remesa</button><button className="secondary" onClick={() => setView('beneficiaries')}>Gestionar beneficiarios</button><button className="secondary" onClick={() => setView('remittances')}>Ver mis remesas</button></div></section></>;
+  return <><div className="stats"><Stat label="Remesas creadas" value={String(remittances.length)} /><Stat label="Completadas" value={String(remittances.filter((item) => item.status === 'completed').length)} /><Stat label="Estado de cuenta" value="Activo" /></div><section className="card"><h2>¿Qué quieres hacer?</h2><div className="quick-actions"><button className="cta" onClick={() => setView('quote')}>Cotizar una remesa</button><button className="secondary" onClick={() => setView('beneficiaries')}>Gestionar beneficiarios</button><button className="secondary" onClick={() => setView('remittances')}>Ver mis remesas</button></div></section></>;
 }
 
 function Beneficiaries({ userId, run }: { userId: string; run: (action: () => Promise<void>) => Promise<void> }) {
@@ -223,7 +223,74 @@ function PaymentQr({ remittance }: { remittance: Remittance }) {
 }
 
 function RemittanceDetails({ detail, onClose }: { detail: RemittanceDetail; onClose: () => void }) {
-  return <div className="detail-panel"><div className="section-heading"><div><div className="eyebrow">Comprobante de operación</div><h2>{detail.reference}</h2></div><button className="secondary" onClick={onClose}>Cerrar</button></div><div className="detail-grid"><Detail label="Estado" value={detail.status} /><Detail label="Cumplimiento" value={detail.compliance_status} /><Detail label="Enviado" value={`${detail.send_amount} ${detail.send_currency}`} /><Detail label="Recibido" value={`${detail.receive_amount} ${detail.receive_currency}`} /><Detail label="Comisión" value={`${detail.fee_amount} ${detail.fee_currency}`} /><Detail label="Total a transferir" value={`${detail.total_debit_amount} ${detail.send_currency}`} /><Detail label="Tasa" value={`${detail.exchange_rate} CUP por RUB`} /><Detail label="Creada" value={detail.created_at ?? '—'} /><Detail label="Beneficiario" value={`${detail.beneficiary_first_name} ${detail.beneficiary_last_name}`} /><Detail label="Contacto" value={detail.beneficiary_phone || detail.beneficiary_email || '—'} /><Detail label="Método" value={`${detail.payout_method_code}${detail.payout_provider ? ` · ${detail.payout_provider}` : ''}`} /><Detail label="Cuenta/tarjeta" value={detail.payout_account_last4 ? `Cuenta ****${detail.payout_account_last4}` : detail.payout_card_last4 ? `Tarjeta ****${detail.payout_card_last4}` : '—'} /></div>{detail.payment_qr_payload && <PaymentQr remittance={detail} />}<h3>Historial de estados</h3><div className="timeline">{detail.state_events.map((event) => <div className="timeline-item" key={`${event.to_status}-${event.created_at}`}><strong>{event.to_status}</strong><span>{event.created_at}</span><small>{event.reason}</small></div>)}</div></div>;
+  const direction = detail.direction === 'cu_to_ru' ? 'Cuba → Rusia' : 'Rusia → Cuba';
+  const senderName = `${detail.sender_first_name ?? ''} ${detail.sender_last_name ?? ''}`.trim() || '—';
+  const account = detail.payout_account_last4 ? `Cuenta ****${detail.payout_account_last4}` : detail.payout_card_last4 ? `Tarjeta ****${detail.payout_card_last4}` : '—';
+  return (
+    <div className="detail-panel">
+      <div className="section-heading"><div><div className="eyebrow">Comprobante de operación</div><h2>{detail.reference}</h2></div><button className="secondary" onClick={onClose}>Cerrar</button></div>
+
+      <h3>Operación</h3>
+      <div className="detail-grid">
+        <Detail label="Estado" value={detail.status} />
+        <Detail label="Cumplimiento" value={detail.compliance_status} />
+        <Detail label="Dirección" value={direction} />
+        <Detail label="Enviado" value={`${detail.send_amount} ${detail.send_currency}`} />
+        <Detail label="Recibido" value={`${detail.receive_amount} ${detail.receive_currency}`} />
+        <Detail label="Comisión" value={`${detail.fee_amount} ${detail.fee_currency}`} />
+        <Detail label="Total a transferir" value={`${detail.total_debit_amount} ${detail.send_currency}`} />
+        <Detail label="Tasa" value={`${detail.exchange_rate} ${detail.receive_currency} por ${detail.send_currency}`} />
+        <Detail label="Creada" value={detail.created_at ?? '—'} />
+        <Detail label="Completada" value={detail.completed_at ?? '—'} />
+        <Detail label="Cancelada" value={detail.cancelled_at ?? '—'} />
+        {detail.failure_reason_code ? <Detail label="Motivo de fallo" value={detail.failure_reason_code} /> : null}
+        <Detail label="Comprobante por email" value={detail.receipt_email_sent ? 'Enviado' : 'Pendiente'} />
+      </div>
+
+      <h3>Remitente</h3>
+      <div className="detail-grid">
+        <Detail label="Email" value={detail.sender_email ?? '—'} />
+        <Detail label="Nombre" value={senderName} />
+      </div>
+
+      <h3>Beneficiario y entrega</h3>
+      <div className="detail-grid">
+        <Detail label="Beneficiario" value={`${detail.beneficiary_first_name} ${detail.beneficiary_last_name}`} />
+        <Detail label="Contacto" value={detail.beneficiary_phone || detail.beneficiary_email || '—'} />
+        <Detail label="Método" value={`${detail.payout_method_code}${detail.payout_provider ? ` · ${detail.payout_provider}` : ''}`} />
+        <Detail label="Cuenta/tarjeta" value={account} />
+      </div>
+
+      {detail.deposit_public_id && (
+        <>
+          <h3>Depósito</h3>
+          <div className="detail-grid">
+            <Detail label="Estado" value={detail.deposit_status ?? '—'} />
+            <Detail label="Referencia de pago" value={detail.payment_reference ?? '—'} />
+            <Detail label="Importe esperado" value={`${detail.deposit_expected_amount ?? '—'} ${detail.deposit_currency ?? ''}`} />
+            <Detail label="Confirmado" value={detail.deposit_confirmed_at ?? '—'} />
+            <Detail label="Vence" value={detail.deposit_expires_at ?? '—'} />
+          </div>
+        </>
+      )}
+
+      {detail.payout_public_id && (
+        <>
+          <h3>Payout</h3>
+          <div className="detail-grid">
+            <Detail label="Estado" value={detail.payout_status ?? '—'} />
+            <Detail label="Referencia proveedor" value={detail.payout_provider_reference ?? '—'} />
+            <Detail label="Pagado" value={detail.payout_paid_at ?? '—'} />
+          </div>
+        </>
+      )}
+
+      {detail.payment_qr_payload && <PaymentQr remittance={detail} />}
+
+      <h3>Historial de estados</h3>
+      <div className="timeline">{detail.state_events.map((event) => <div className="timeline-item" key={`${event.to_status}-${event.created_at}`}><strong>{event.to_status}</strong><span>{event.created_at}</span><small>{event.reason}</small></div>)}</div>
+    </div>
+  );
 }
 
 function Detail({ label, value }: { label: string; value: string }) { return <div className="detail-item"><span>{label}</span><strong>{value}</strong></div>; }
@@ -262,9 +329,10 @@ function Logo({ language, monochrome = false }: { language: Language; monochrome
   const slogan = translate(language, 'brand.slogan');
   return <div className={monochrome ? 'logo logo-monochrome' : 'logo'} aria-label={`SEDERG_PAY — ${slogan}`}>
     <svg className="logo-symbol" viewBox="0 0 48 48" role="img" aria-hidden="true">
-      <circle cx="24" cy="24" r="20" />
-      <path d="M7 24h34M24 4c6 5 9 12 9 20s-3 15-9 20M24 4c-6 5-9 12-9 20s3 15 9 20" />
-      <path className="logo-arrow" d="M10 31c8-1 16-5 24-14M27 16h8v8" />
+      <path className="logo-bridge" d="M11 37 C 20 21, 30 17, 39 11" />
+      <circle className="logo-node logo-node-a" cx="11" cy="37" r="5" />
+      <circle className="logo-flow" cx="26" cy="22" r="2.6" />
+      <circle className="logo-node logo-node-b" cx="39" cy="11" r="5" />
     </svg>
     <span className="logo-wordmark"><strong>SEDERG</strong><b>_PAY</b><small>{slogan}</small></span>
   </div>;

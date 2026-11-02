@@ -1,6 +1,9 @@
 /backend/vendor/
 /backend/runtime/
 /backend/web/assets/
+/backend/.phpunit.result.cache
+/frontend/node_modules/
+*.tsbuildinfo
 /.env
 /.env.*
 !.env.example

@@ -30,6 +30,7 @@ final class ReconciliationController extends Controller
 
     public function actionComplete(string $publicId): array
     {
+        $this->requireBackOfficeAccess();
         $userId = $this->authenticatedUserId();
         $key = trim((string) Yii::$app->request->headers->get('Idempotency-Key', ''));
         if (!preg_match('/^[A-Za-z0-9._:-]{16,100}$/', $key)) {
@@ -72,5 +73,12 @@ final class ReconciliationController extends Controller
     private function authenticatedUserId(): int
     {
         return (new UserAuthenticator(Yii::$app->db))->userId();
+    }
+
+    private function requireBackOfficeAccess(): void
+    {
+        if (getenv('SEDERG_AUTH_MODE') !== 'development') {
+            (new UserAuthenticator(Yii::$app->db))->requireRole('admin');
+        }
     }
 }

@@ -30,6 +30,7 @@ final class PayoutController extends Controller
 
     public function actionCreate(string $publicId): array
     {
+        $this->requireBackOfficeAccess();
         $userId = $this->authenticatedUserId();
         $request = Yii::$app->request;
         $key = trim((string) $request->headers->get('Idempotency-Key', ''));
@@ -76,6 +77,7 @@ final class PayoutController extends Controller
 
     public function actionSimulateComplete(string $publicId): array
     {
+        $this->requireBackOfficeAccess();
         $userId = $this->authenticatedUserId();
         $repository = new PayoutRepository(Yii::$app->db);
         $remittance = $repository->findRemittanceByPayout($publicId, $userId);
@@ -94,6 +96,13 @@ final class PayoutController extends Controller
     private function authenticatedUserId(): int
     {
         return (new UserAuthenticator(Yii::$app->db))->userId();
+    }
+
+    private function requireBackOfficeAccess(): void
+    {
+        if (getenv('SEDERG_AUTH_MODE') !== 'development') {
+            (new UserAuthenticator(Yii::$app->db))->requireRole('admin');
+        }
     }
 
     private function uuid(): string

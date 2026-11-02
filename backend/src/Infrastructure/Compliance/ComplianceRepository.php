@@ -41,7 +41,7 @@ final class ComplianceRepository
     public function findIdempotency(string $scope, string $key): ?array
     {
         $row = $this->db->createCommand(
-            'SELECT * FROM {{%idempotency_keys}} WHERE scope = :scope AND idempotency_key = :key LIMIT 1',
+            'SELECT * FROM {{%idempotency_keys}} WHERE scope = :scope AND idempotency_key = :key AND (expires_at IS NULL OR expires_at > UTC_TIMESTAMP()) LIMIT 1',
             [':scope' => $scope, ':key' => $key]
         )->queryOne();
 
@@ -55,8 +55,16 @@ final class ComplianceRepository
         string $reason,
         Transaction $transaction
     ): void {
+        $currentStatus = $this->db->createCommand(
+            'SELECT status FROM {{%remittances}} WHERE id = :id FOR UPDATE',
+            [':id' => $remittance['id']]
+        )->queryScalar();
+        if (!is_string($currentStatus)) {
+            throw new \DomainException('Remittance not found');
+        }
+
         $newStatus = $decision === 'approved' ? 'approved' : 'rejected';
-        (new RemittanceStateMachine())->assertCanTransition($remittance['status'], $newStatus);
+        (new RemittanceStateMachine())->assertCanTransition($currentStatus, $newStatus);
 
         $this->db->createCommand()->insert('{{%compliance_checks}}', [
             'remittance_id' => $remittance['id'],
@@ -76,7 +84,7 @@ final class ComplianceRepository
 
         $this->db->createCommand()->insert('{{%remittance_state_events}}', [
             'remittance_id' => $remittance['id'],
-            'from_status' => $remittance['status'],
+            'from_status' => $currentStatus,
             'to_status' => $newStatus,
             'actor_user_id' => $actorUserId,
             'reason' => $reason,

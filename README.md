@@ -196,6 +196,29 @@ si no existe, se utiliza la última tasa oficial diaria guardada. El endpoint
 público `GET /api/v1/exchange-rates/current` devuelve la tasa efectiva, fuente
 y fecha para integraciones y comprobaciones operativas.
 
+### Detalle, pago y comprobante de remesas
+
+El historial de remesas incluye **Ver detalles**, con importes, tasa, comisión,
+beneficiario, método de pago, estados, eventos, depósito y payout cuando
+existan. Al crear una remesa se genera un payload QR con la referencia, importe
+total, moneda y destino de pago configurado para la plataforma; el frontend lo
+renderiza localmente y también lo muestra dentro del detalle.
+
+El comprobante multipart (texto y HTML) se envía al email del usuario mediante
+el mismo SMTP real configurado para verificación. `receipt_email_sent` indica
+el resultado del envío y, si el servidor SMTP no está disponible, la operación
+conserva todos sus datos y devuelve un error explícito para permitir su
+seguimiento, sin presentar un envío exitoso falso.
+
+El panel administrativo incorpora:
+
+- listado de usuarios, estado de verificación, rol, último acceso y cantidad de
+  remesas;
+- historial de tasas RUB/CUP con fuente, vigencia y administrador que la
+  registró;
+- cuadro de mando con usuarios, operaciones, importes transferidos por
+  dirección y distribución de importes por estado.
+
 ### Despliegue gratuito con GitHub Pages y una VM free
 
 El workflow [`deploy.yml`](./.github/workflows/deploy.yml) publica el frontend

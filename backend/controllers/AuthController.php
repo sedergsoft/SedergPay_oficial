@@ -152,9 +152,10 @@ final class AuthController extends Controller
             'SELECT u.id, u.public_id, u.email, u.role, u.status, p.first_name, p.last_name
              FROM {{%users}} u
              LEFT JOIN {{%user_profiles}} p ON p.user_id = u.id
-             WHERE u.public_id = :public_id AND u.deleted_at IS NULL
+             WHERE u.public_id = :public_id AND u.status = :status
+               AND u.email_verified_at IS NOT NULL AND u.deleted_at IS NULL
              LIMIT 1',
-            [':public_id' => $publicId]
+            [':public_id' => $publicId, ':status' => 'active']
         )->queryOne();
         if ($user === false) {
             throw new ForbiddenHttpException('Authenticated user was not found');

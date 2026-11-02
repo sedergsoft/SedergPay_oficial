@@ -84,6 +84,7 @@ final class RemittanceController extends Controller
             throw new UnprocessableEntityHttpException('Beneficiary does not match quote destination');
         }
 
+        $direction = $repository->findDirection((int) $quote['source_country_id'], (int) $quote['destination_country_id']);
         $publicId = $this->generateUuid();
         $reference = 'REM-' . gmdate('YmdHis') . '-' . strtoupper(substr(bin2hex(random_bytes(3)), 0, 6));
         $fundingAccount = Yii::$app->db->createCommand(
@@ -112,7 +113,7 @@ final class RemittanceController extends Controller
         $response = [
             'public_id' => $publicId,
             'reference' => $reference,
-            'direction' => (int) $quote['source_country_id'] === 1 ? 'ru_to_cu' : 'cu_to_ru',
+            'direction' => $direction,
             'send_amount' => $quote['send_amount'],
             'send_currency' => $quote['send_currency'],
             'receive_amount' => $quote['receive_amount'],
@@ -125,9 +126,15 @@ final class RemittanceController extends Controller
         ];
         $transaction = $repository->beginTransaction();
         try {
-            $remittanceId = $repository->save($userId, $quote, $beneficiary, $publicId, $reference, $metadata, $transaction);
+            $repository->consumeQuote((int) $quote['id'], $transaction);
+            $remittanceId = $repository->save($userId, $quote, $beneficiary, $publicId, $reference, $direction, $metadata, $transaction);
             $repository->saveIdempotency($scope, $idempotencyKey, $requestHash, $response, $remittanceId, $transaction);
             $transaction->commit();
+        } catch (\DomainException $exception) {
+            if ($transaction->getIsActive()) {
+                $transaction->rollBack();
+            }
+            throw new UnprocessableEntityHttpException($exception->getMessage(), 0, $exception);
         } catch (\Throwable $exception) {
             if ($transaction->getIsActive()) {
                 $transaction->rollBack();
