@@ -132,6 +132,44 @@ final class BeneficiaryController extends Controller
         return $beneficiary;
     }
 
+    public function actionUpdate(string $publicId): array
+    {
+        $userId = $this->authenticatedUserId();
+        if (!preg_match('/^[0-9a-f-]{36}$/i', $publicId)) {
+            throw new NotFoundHttpException('Beneficiary not found');
+        }
+        $payload = Yii::$app->request->bodyParams;
+        if (!is_array($payload)) {
+            throw new BadRequestHttpException('JSON object body is required');
+        }
+        $repository = new BeneficiaryRepository(Yii::$app->db);
+        $current = $repository->findForUser($publicId, $userId);
+        if ($current === null) {
+            throw new NotFoundHttpException('Beneficiary not found');
+        }
+        $this->validatePayload($payload);
+        $countryId = $repository->countryId(strtoupper($payload['country_code']));
+        if ($countryId === null || !$repository->paymentMethodExists($payload['payout_method_code'])) {
+            throw new UnprocessableEntityHttpException('Unsupported country or payout method');
+        }
+        if ($payload['payout_method_code'] === 'bank_account') {
+            if (!isset($payload['payout_account_number']) || !preg_match('/^\d{6,34}$/', (string) $payload['payout_account_number'])) {
+                throw new UnprocessableEntityHttpException('A valid bank account number is required when changing bank details');
+            }
+            $payload['payout_account_token'] = $this->encryptPaymentValue($payload['payout_account_number']);
+            $payload['payout_account_last4'] = substr($payload['payout_account_number'], -4);
+        }
+        if ($payload['payout_method_code'] === 'card_transfer') {
+            if (!isset($payload['payout_card_number']) || !$this->isValidCardNumber((string) $payload['payout_card_number'])) {
+                throw new UnprocessableEntityHttpException('A valid card number is required when changing card details');
+            }
+            $payload['payout_card_token'] = $this->encryptPaymentValue($payload['payout_card_number']);
+            $payload['payout_card_last4'] = substr($payload['payout_card_number'], -4);
+        }
+        $repository->updateForUser($publicId, $userId, $payload, $countryId);
+        return $repository->findForUser($publicId, $userId) ?? [];
+    }
+
     private function authenticatedUserId(): int
     {
         return (new UserAuthenticator(Yii::$app->db))->userId();
@@ -172,14 +210,14 @@ final class BeneficiaryController extends Controller
             throw new UnprocessableEntityHttpException('Payout account last4 must contain four digits');
         }
         if ($payload['payout_method_code'] === 'bank_account'
-            && (!isset($payload['payout_provider'], $payload['payout_account_number'])
+            && (!isset($payload['payout_provider'])
                 || trim((string) $payload['payout_provider']) === ''
-                || !preg_match('/^\d{6,34}$/', (string) $payload['payout_account_number']))) {
+                || (isset($payload['payout_account_number']) && !preg_match('/^\d{6,34}$/', (string) $payload['payout_account_number'])))) {
             throw new UnprocessableEntityHttpException('Bank provider and account number are required');
         }
         if ($payload['payout_method_code'] === 'card_transfer'
-            && (!isset($payload['payout_card_number'])
-                || !$this->isValidCardNumber((string) $payload['payout_card_number']))) {
+            && isset($payload['payout_card_number'])
+            && !$this->isValidCardNumber((string) $payload['payout_card_number'])) {
             throw new UnprocessableEntityHttpException('A valid card number is required');
         }
         $payload['country_code'] = strtoupper($payload['country_code']);
