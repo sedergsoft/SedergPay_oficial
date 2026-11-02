@@ -132,14 +132,90 @@ final class BeneficiaryController extends Controller
         return $beneficiary;
     }
 
+    public function actionUpdate(string $publicId): array
+    {
+        $userId = $this->authenticatedUserId();
+        if (!preg_match('/^[0-9a-f-]{36}$/i', $publicId)) {
+            throw new NotFoundHttpException('Beneficiary not found');
+        }
+        $payload = Yii::$app->request->bodyParams;
+        if (!is_array($payload)) {
+            throw new BadRequestHttpException('JSON object body is required');
+        }
+        $repository = new BeneficiaryRepository(Yii::$app->db);
+        $current = $repository->findForUser($publicId, $userId);
+        if ($current === null) {
+            throw new NotFoundHttpException('Beneficiary not found');
+        }
+        $this->validatePayload($payload, false);
+        $countryId = $repository->countryId(strtoupper($payload['country_code']));
+        if ($countryId === null || !$repository->paymentMethodExists($payload['payout_method_code'])) {
+            throw new UnprocessableEntityHttpException('Unsupported country or payout method');
+        }
+        if ($payload['payout_method_code'] === 'bank_account') {
+            if ($current['payout_method_code'] !== 'bank_account' && !isset($payload['payout_account_number'])) {
+                throw new UnprocessableEntityHttpException('A bank account number is required when changing the payout method');
+            }
+            if (isset($payload['payout_account_number'])) {
+                if (!preg_match('/^\d{6,34}$/', (string) $payload['payout_account_number'])) throw new UnprocessableEntityHttpException('A valid bank account number is required');
+                $payload['payout_account_token'] = $this->encryptPaymentValue($payload['payout_account_number']);
+                $payload['payout_account_last4'] = substr($payload['payout_account_number'], -4);
+            } elseif ($current['payout_method_code'] !== 'bank_account') {
+                throw new UnprocessableEntityHttpException('A bank account number is required when changing the payout method');
+            }
+        }
+        if ($payload['payout_method_code'] === 'card_transfer') {
+            if ($current['payout_method_code'] !== 'card_transfer' && !isset($payload['payout_card_number'])) {
+                throw new UnprocessableEntityHttpException('A card number is required when changing the payout method');
+            }
+            if (isset($payload['payout_card_number'])) {
+                if (!$this->isValidCardNumber((string) $payload['payout_card_number'])) throw new UnprocessableEntityHttpException('A valid card number is required');
+                $payload['payout_card_token'] = $this->encryptPaymentValue($payload['payout_card_number']);
+                $payload['payout_card_last4'] = substr($payload['payout_card_number'], -4);
+            } elseif ($current['payout_method_code'] !== 'card_transfer') {
+                throw new UnprocessableEntityHttpException('A card number is required when changing the payout method');
+            }
+        }
+        $tx = Yii::$app->db->beginTransaction();
+        try {
+            $repository->updateForUser($publicId, $userId, $payload, $countryId);
+            Yii::$app->db->createCommand()->insert('{{%audit_logs}}', [
+                'actor_user_id' => $userId,
+                'action' => 'beneficiary.updated',
+                'entity_type' => 'beneficiary',
+                'entity_id' => $publicId,
+                'ip_address' => Yii::$app->request->userIP,
+                'user_agent' => substr((string) Yii::$app->request->userAgent, 0, 500),
+                'after_data' => new \yii\db\JsonExpression([
+                    'changed_fields' => array_values(array_intersect(array_keys($payload), [
+                        'country_code', 'first_name', 'last_name', 'phone_e164', 'email',
+                        'payout_method_code', 'payout_provider',
+                    ])),
+                ]),
+            ])->execute();
+            $tx->commit();
+        } catch (\Throwable $exception) {
+            if ($tx->getIsActive()) {
+                $tx->rollBack();
+            }
+            throw $exception;
+        }
+        return $repository->findForUser($publicId, $userId) ?? [];
+    }
+
     private function authenticatedUserId(): int
     {
         return (new UserAuthenticator(Yii::$app->db))->userId();
     }
 
-    private function validatePayload(array &$payload): void
+    private function validatePayload(array &$payload, bool $requirePaymentDetails = true): void
     {
-        foreach (['country_code', 'first_name', 'last_name', 'phone_e164', 'email', 'payout_method_code'] as $field) {
+        foreach (['payout_account_token', 'payout_account_last4', 'payout_card_token', 'payout_card_last4'] as $serverField) {
+            if (array_key_exists($serverField, $payload)) {
+                throw new UnprocessableEntityHttpException('Payment credential metadata is server-managed');
+            }
+        }
+        foreach (['country_code', 'first_name', 'last_name', 'payout_method_code'] as $field) {
             if (!isset($payload[$field]) || !is_string($payload[$field]) || trim($payload[$field]) === '') {
                 throw new UnprocessableEntityHttpException("Missing field: {$field}");
             }
@@ -152,15 +228,15 @@ final class BeneficiaryController extends Controller
                 throw new UnprocessableEntityHttpException("Field too long: {$field}");
             }
         }
-        if (isset($payload['phone_e164'])
+        if (isset($payload['phone_e164']) && $payload['phone_e164'] !== ''
             && (!is_string($payload['phone_e164']) || !preg_match('/^\+[1-9]\d{7,14}$/', $payload['phone_e164']))) {
             throw new UnprocessableEntityHttpException('Phone must use E.164 format');
         }
-        if (isset($payload['email'])
-            && (filter_var($payload['email'], FILTER_VALIDATE_EMAIL) === false || strlen($payload['email']) > 190)) {
+        if (isset($payload['email']) && $payload['email'] !== ''
+            && (!is_string($payload['email']) || filter_var($payload['email'], FILTER_VALIDATE_EMAIL) === false || strlen($payload['email']) > 190)) {
             throw new UnprocessableEntityHttpException('Invalid beneficiary email');
         }
-        if (isset($payload['payout_provider']) && mb_strlen($payload['payout_provider']) > 80) {
+        if (isset($payload['payout_provider']) && (!is_string($payload['payout_provider']) || mb_strlen($payload['payout_provider']) > 80)) {
             throw new UnprocessableEntityHttpException('Payout provider is too long');
         }
         if (isset($payload['payout_account_token'])
@@ -172,21 +248,21 @@ final class BeneficiaryController extends Controller
             throw new UnprocessableEntityHttpException('Payout account last4 must contain four digits');
         }
         if ($payload['payout_method_code'] === 'bank_account'
-            && (!isset($payload['payout_provider'], $payload['payout_account_number'])
+            && (!isset($payload['payout_provider'])
                 || trim((string) $payload['payout_provider']) === ''
-                || !preg_match('/^\d{6,34}$/', (string) $payload['payout_account_number']))) {
+                || ($requirePaymentDetails && !isset($payload['payout_account_number']))
+                || (isset($payload['payout_account_number']) && !preg_match('/^\d{6,34}$/', (string) $payload['payout_account_number'])))) {
             throw new UnprocessableEntityHttpException('Bank provider and account number are required');
         }
         if ($payload['payout_method_code'] === 'card_transfer'
-            && (!isset($payload['payout_card_number'])
-                || !$this->isValidCardNumber((string) $payload['payout_card_number']))) {
+            && (($requirePaymentDetails && !isset($payload['payout_card_number'])) || (isset($payload['payout_card_number']) && !$this->isValidCardNumber((string) $payload['payout_card_number'])))) {
             throw new UnprocessableEntityHttpException('A valid card number is required');
         }
         $payload['country_code'] = strtoupper($payload['country_code']);
         $payload['first_name'] = trim($payload['first_name']);
         $payload['last_name'] = trim($payload['last_name']);
-        $payload['phone_e164'] = trim($payload['phone_e164']);
-        $payload['email'] = strtolower(trim($payload['email']));
+        $payload['phone_e164'] = isset($payload['phone_e164']) && trim((string)$payload['phone_e164']) !== '' ? trim((string)$payload['phone_e164']) : null;
+        $payload['email'] = isset($payload['email']) && trim((string)$payload['email']) !== '' ? strtolower(trim((string)$payload['email'])) : null;
         if (isset($payload['payout_account_number'])) {
             $payload['payout_account_number'] = preg_replace('/\D+/', '', $payload['payout_account_number']);
         }

@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, feature/admin-exchange-rate-source]
+  push:
+    branches: [feature/user-profile-beneficiaries-kyc]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: PHP syntax and unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: bcmath, openssl, pdo_mysql, fileinfo
+          coverage: none
+      - uses: actions/cache@v4
+        with:
+          path: backend/vendor
+          key: composer-${{ runner.os }}-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+      - name: Install PHP dependencies
+        working-directory: backend
+        run: composer install --no-interaction --prefer-dist
+      - name: PHP syntax check
+        run: find backend -path backend/vendor -prune -o -name '*.php' -type f -print0 | xargs -0 -n1 php -l
+      - name: Run PHPUnit
+        working-directory: backend
+        run: vendor/bin/phpunit -c phpunit.xml
+
+  mysql-integration:
+    name: MySQL migrations and schema smoke test
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: sederg_pay
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: bcmath, openssl, pdo_mysql, fileinfo
+          coverage: none
+      - name: Install PHP dependencies
+        working-directory: backend
+        run: composer install --no-interaction --prefer-dist
+      - name: Apply all Yii migrations against MySQL 8.4
+        working-directory: backend
+        env:
+          SEDERG_DB_DSN: mysql:host=127.0.0.1;port=3306;dbname=sederg_pay
+          SEDERG_DB_USER: root
+          SEDERG_DB_PASSWORD: root
+        run: |
+          php yii migrate --interactive=0
+          php yii migrate/down 1 --interactive=0
+          php yii migrate --interactive=0
+      - name: Verify critical schema objects
+        env:
+          DB_HOST: 127.0.0.1
+          DB_USER: root
+          DB_PASSWORD: root
+          DB_NAME: sederg_pay
+        run: |
+          php -r '$pdo=new PDO("mysql:host=".getenv("DB_HOST").";dbname=".getenv("DB_NAME"),getenv("DB_USER"),getenv("DB_PASSWORD")); $tables=["users","user_profiles","beneficiaries","kyc_cases","kyc_documents","audit_logs","remittances"]; foreach($tables as $table){$q=$pdo->prepare("SHOW TABLES LIKE ?");$q->execute([$table]);if(!$q->fetchColumn()){fwrite(STDERR,"Missing table: $table\\n");exit(1);}} echo "Critical MySQL tables verified.\\n";'
+
+  deployment-config:
+    name: Docker Compose production configuration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate development and production Compose merge
+        env:
+          SEDERG_DB_PASSWORD: ci-test-db-password
+          SEDERG_MYSQL_ROOT_PASSWORD: ci-test-root-password
+          SEDERG_COOKIE_KEY: ci-test-cookie-key-long-enough-for-compose-validation
+          SEDERG_PII_KEY: ci-test-pii-key-long-enough-for-compose-validation-0001
+          API_DOMAIN: sederg.example.invalid
+          TLS_EMAIL: ci@example.invalid
+        run: docker compose -f docker-compose.yml -f docker-compose.production.yml config --quiet
+
+  frontend:
+    name: TypeScript and Vite production build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
