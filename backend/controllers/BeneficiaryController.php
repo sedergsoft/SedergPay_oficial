@@ -187,7 +187,7 @@ final class BeneficiaryController extends Controller
 
     private function validatePayload(array &$payload, bool $requirePaymentDetails = true): void
     {
-        foreach (['country_code', 'first_name', 'last_name', 'phone_e164', 'email', 'payout_method_code'] as $field) {
+        foreach (['country_code', 'first_name', 'last_name', 'payout_method_code'] as $field) {
             if (!isset($payload[$field]) || !is_string($payload[$field]) || trim($payload[$field]) === '') {
                 throw new UnprocessableEntityHttpException("Missing field: {$field}");
             }
@@ -200,11 +200,11 @@ final class BeneficiaryController extends Controller
                 throw new UnprocessableEntityHttpException("Field too long: {$field}");
             }
         }
-        if (isset($payload['phone_e164'])
+        if (isset($payload['phone_e164']) && $payload['phone_e164'] !== ''
             && (!is_string($payload['phone_e164']) || !preg_match('/^\+[1-9]\d{7,14}$/', $payload['phone_e164']))) {
             throw new UnprocessableEntityHttpException('Phone must use E.164 format');
         }
-        if (isset($payload['email'])
+        if (isset($payload['email']) && $payload['email'] !== ''
             && (filter_var($payload['email'], FILTER_VALIDATE_EMAIL) === false || strlen($payload['email']) > 190)) {
             throw new UnprocessableEntityHttpException('Invalid beneficiary email');
         }
@@ -233,8 +233,8 @@ final class BeneficiaryController extends Controller
         $payload['country_code'] = strtoupper($payload['country_code']);
         $payload['first_name'] = trim($payload['first_name']);
         $payload['last_name'] = trim($payload['last_name']);
-        $payload['phone_e164'] = trim($payload['phone_e164']);
-        $payload['email'] = strtolower(trim($payload['email']));
+        $payload['phone_e164'] = isset($payload['phone_e164']) && trim((string)$payload['phone_e164']) !== '' ? trim((string)$payload['phone_e164']) : null;
+        $payload['email'] = isset($payload['email']) && trim((string)$payload['email']) !== '' ? strtolower(trim((string)$payload['email'])) : null;
         if (isset($payload['payout_account_number'])) {
             $payload['payout_account_number'] = preg_replace('/\D+/', '', $payload['payout_account_number']);
         }
