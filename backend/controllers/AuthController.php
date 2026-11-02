@@ -6,6 +6,7 @@ namespace app\controllers;
 
 use app\Infrastructure\Identity\VerificationMailer;
 use app\Infrastructure\Configuration\PlatformSettings;
+use app\Infrastructure\Auth\UserAuthenticator;
 use Yii;
 use yii\filters\ContentNegotiator;
 use yii\web\Controller;
@@ -143,19 +144,18 @@ final class AuthController extends Controller
 
     public function actionMe(): array
     {
-        $publicId = trim((string) Yii::$app->request->headers->get('X-User-Public-Id', ''));
-        if ($publicId === '') {
-            throw new ForbiddenHttpException('Development identity is required');
-        }
+        // Use the same authentication path as profile, beneficiaries and remittances.
+        // Development resolves X-User-Public-Id; production validates the OIDC bearer token.
+        $userId = (new UserAuthenticator(Yii::$app->db))->userId();
 
         $user = Yii::$app->db->createCommand(
             'SELECT u.id, u.public_id, u.email, u.role, u.status, p.first_name, p.last_name
              FROM {{%users}} u
              LEFT JOIN {{%user_profiles}} p ON p.user_id = u.id
-             WHERE u.public_id = :public_id AND u.status = :status
+             WHERE u.id = :id AND u.status = :status
                AND u.email_verified_at IS NOT NULL AND u.deleted_at IS NULL
              LIMIT 1',
-            [':public_id' => $publicId, ':status' => 'active']
+            [':id' => $userId, ':status' => 'active']
         )->queryOne();
         if ($user === false) {
             throw new ForbiddenHttpException('Authenticated user was not found');
