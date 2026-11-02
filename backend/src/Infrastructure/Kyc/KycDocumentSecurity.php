@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace app\\Infrastructure\\Kyc;
+namespace app\Infrastructure\Kyc;
 
 use Yii;
-use yii\\web\\ServerErrorHttpException;
-use yii\\web\\UnprocessableEntityHttpException;
+use yii\web\ServerErrorHttpException;
+use yii\web\UnprocessableEntityHttpException;
 
 /**
  * Validates KYC upload signatures and scans the temporary file with ClamAV.
@@ -21,7 +21,7 @@ final class KycDocumentSecurity
             throw new UnprocessableEntityHttpException('The document is empty or exceeds 5 MB');
         }
 
-        $detectedMime = (new \\finfo(FILEINFO_MIME_TYPE))->file($path);
+        $detectedMime = (new \finfo(FILEINFO_MIME_TYPE))->file($path);
         if ($detectedMime !== $expectedMime) {
             throw new UnprocessableEntityHttpException('The document content does not match its declared file type');
         }
@@ -35,8 +35,8 @@ final class KycDocumentSecurity
 
         $valid = match ($expectedMime) {
             'application/pdf' => str_starts_with($signature, '%PDF-'),
-            'image/jpeg' => str_starts_with($signature, "\\xFF\\xD8\\xFF"),
-            'image/png' => str_starts_with($signature, "\\x89PNG\\r\\n\\x1A\\n"),
+            'image/jpeg' => str_starts_with($signature, "\xFF\xD8\xFF"),
+            'image/png' => str_starts_with($signature, "\x89PNG\r\n\x1A\n"),
             default => false,
         };
         if (!$valid) {
@@ -60,7 +60,7 @@ final class KycDocumentSecurity
         }
         stream_set_timeout($socket, 20);
         try {
-            if (fwrite($socket, "nINSTREAM\\n") === false) {
+            if (fwrite($socket, "nINSTREAM\n") === false) {
                 throw new ServerErrorHttpException('Cannot communicate with malware scanner');
             }
             $file = fopen($path, 'rb');
