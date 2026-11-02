@@ -60,11 +60,11 @@ export function App() {
     <div className="workspace">
       <nav className="menu" aria-label="Navegación principal">
         <strong>Tu plataforma</strong>
-        <NavButton active={view === 'summary'} onClick={() => setView('summary')}>{translate(language, 'nav.summary')}</NavButton>
-        <NavButton active={view === 'beneficiaries'} onClick={() => setView('beneficiaries')}>{translate(language, 'nav.beneficiaries')}</NavButton>
-        <NavButton active={view === 'quote'} onClick={() => setView('quote')}>{translate(language, 'nav.quote')}</NavButton>
-        <NavButton active={view === 'remittances'} onClick={() => setView('remittances')}>{translate(language, 'nav.remittances')}</NavButton><NavButton active={view === 'profile'} onClick={() => setView('profile')}>Mi perfil</NavButton><NavButton active={view === 'kyc'} onClick={() => setView('kyc')}>Verificación KYC</NavButton>
-        {user.role === 'admin' && <NavButton active={view === 'admin'} onClick={() => setView('admin')}>{translate(language, 'nav.admin')}</NavButton>}
+        <NavButton icon="home" active={view === 'summary'} onClick={() => setView('summary')}>{translate(language, 'nav.summary')}</NavButton>
+        <NavButton icon="users" active={view === 'beneficiaries'} onClick={() => setView('beneficiaries')}>{translate(language, 'nav.beneficiaries')}</NavButton>
+        <NavButton icon="send" active={view === 'quote'} onClick={() => setView('quote')}>{translate(language, 'nav.quote')}</NavButton>
+        <NavButton icon="history" active={view === 'remittances'} onClick={() => setView('remittances')}>{translate(language, 'nav.remittances')}</NavButton><NavButton icon="user" active={view === 'profile'} onClick={() => setView('profile')}>Mi perfil</NavButton><NavButton icon="shield" active={view === 'kyc'} onClick={() => setView('kyc')}>Verificación KYC</NavButton>
+        {user.role === 'admin' && <NavButton icon="settings" active={view === 'admin'} onClick={() => setView('admin')}>{translate(language, 'nav.admin')}</NavButton>}
         <button className="secondary menu-exit" onClick={signOut}>{translate(language, 'nav.logout')}</button>
       </nav>
       <section className="content">
@@ -119,14 +119,15 @@ function Landing({ language, onLanguageChange, onLogin, onRegister }: { language
     <section className="landing-rate"><div><span className="eyebrow">{text('landing.transparency')}</span><strong>{text('landing.rate')}</strong></div><div className="landing-rate-value"><strong>{currentRate}</strong><span>{text('landing.updated')} {rate ? rate.effective_date : '…'}</span></div></section>
     <section className="landing-section">
       <div className="section-intro"><span className="eyebrow">{text('landing.featuresEyebrow')}</span><h2>{text('landing.featuresTitle')}<br /><em>{text('landing.featuresAccent')}</em></h2><p>{text('landing.featuresDescription')}</p></div>
-      <div className="feature-grid"><Feature icon="↗" title={text('landing.featureClear')} text={text('landing.featureClearText')} /><Feature icon="◈" title={text('landing.featureSecure')} text={text('landing.featureSecureText')} /><Feature icon="◎" title={text('landing.featureTrack')} text={text('landing.featureTrackText')} /></div>
+      <div className="feature-grid"><Feature icon="transfer" title={text('landing.featureClear')} text={text('landing.featureClearText')} /><Feature icon="shield" title={text('landing.featureSecure')} text={text('landing.featureSecureText')} /><Feature icon="history" title={text('landing.featureTrack')} text={text('landing.featureTrackText')} /></div>
     </section>
     <section className="landing-steps"><div className="section-intro"><span className="eyebrow">{text('landing.stepsEyebrow')}</span><h2>{text('landing.stepsTitle')}<br /><em>{text('landing.stepsAccent')}</em></h2></div><div className="steps"><Step number="01" title={text('landing.stepOne')} text={text('landing.stepOneText')} /><Step number="02" title={text('landing.stepTwo')} text={text('landing.stepTwoText')} /><Step number="03" title={text('landing.stepThree')} text={text('landing.stepThreeText')} /></div></section>
     <footer className="landing-footer"><Brand language={language} /><span>{text('brand.slogan')}</span><span>© 2026 SEDERG_PAY</span></footer>
   </main>;
 }
 
-function Feature({ icon, title, text }: { icon: string; title: string; text: string }) { return <article className="feature"><span className="feature-icon">{icon}</span><h3>{title}</h3><p>{text}</p></article>; }
+function Icon({ name, className = "" }: { name: string; className?: string }) { return <svg className={"ui-icon " + className} aria-hidden="true" focusable="false"><use href={"/assets/sederg-pay/icons/sprite.svg#" + name} /></svg>; }
+function Feature({ icon, title, text }: { icon: string; title: string; text: string }) { return <article className="feature"><span className="feature-icon"><Icon name={icon} /></span><h3>{title}</h3><p>{text}</p></article>; }
 function Step({ number, title, text }: { number: string; title: string; text: string }) { return <article className="step"><span>{number}</span><div><h3>{title}</h3><p>{text}</p></div></article>; }
 
 function AuthScreen({ language, onLanguageChange, mode, setMode, busy, message, run, onBack, onAuthenticated }: {
@@ -270,7 +271,7 @@ function SettingsGroup({ title, settings, onChange }: { title: string; settings:
   return <section className="settings-group"><h3>{title}</h3>{settings.map((setting) => <label key={setting.key}>{setting.label}{setting.type === 'boolean' ? <span className="toggle-row"><input type="checkbox" checked={Boolean(setting.value)} onChange={(event) => onChange(setting.key, event.target.checked)} /><span>{setting.value ? 'Habilitado' : 'Deshabilitado'}</span></span> : setting.type === 'enum' ? <select value={String(setting.value)} onChange={(event) => onChange(setting.key, event.target.value)}>{(setting.options ?? []).map((option) => <option key={option} value={option}>{option === 'official' ? 'Tasa oficial' : option === 'admin_override' ? 'Tasa administrativa' : option}</option>)}</select> : <input type={setting.type === 'integer' ? 'number' : 'text'} inputMode={setting.type === 'integer' ? 'numeric' : 'decimal'} value={String(setting.value)} onChange={(event) => onChange(setting.key, event.target.value)} />}</label>)}</section>;
 }
 
-function NavButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: string }) { return <button className={active ? 'nav-button active' : 'nav-button'} onClick={onClick}>{children}</button>; }
+function NavButton({ active, onClick, children, icon }: { active: boolean; onClick: () => void; children: string; icon?: string }) { return <button className={active ? 'nav-button active' : 'nav-button'} onClick={onClick}>{icon && <Icon name={icon} />}<span>{children}</span></button>; }
 function Logo({ language, monochrome = false }: { language: Language; monochrome?: boolean }) {
   const slogan = translate(language, 'brand.slogan');
   return <div className={monochrome ? 'logo logo-monochrome' : 'logo'} aria-label={`SEDERG_PAY — ${slogan}`}>
