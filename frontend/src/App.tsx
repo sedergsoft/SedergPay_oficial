@@ -274,12 +274,8 @@ function NavButton({ active, onClick, children }: { active: boolean; onClick: ()
 function Logo({ language, monochrome = false }: { language: Language; monochrome?: boolean }) {
   const slogan = translate(language, 'brand.slogan');
   return <div className={monochrome ? 'logo logo-monochrome' : 'logo'} aria-label={`SEDERG_PAY — ${slogan}`}>
-    <svg className="logo-symbol" viewBox="0 0 48 48" role="img" aria-hidden="true">
-      <circle cx="24" cy="24" r="20" />
-      <path d="M7 24h34M24 4c6 5 9 12 9 20s-3 15-9 20M24 4c-6 5-9 12-9 20s3 15 9 20" />
-      <path className="logo-arrow" d="M10 31c8-1 16-5 24-14M27 16h8v8" />
-    </svg>
-    <span className="logo-wordmark"><strong>SEDERG</strong><b>_PAY</b><small>{slogan}</small></span>
+    <img className="logo-symbol logo-brand-image" src="/assets/sederg-pay/logos/sederg-pay-horizontal.svg" alt="" aria-hidden="true" />
+    <span className="logo-wordmark logo-wordmark-accessible"><strong>SEDERG</strong><b>_PAY</b><small>{slogan}</small></span>
   </div>;
 }
 function Brand({ language }: { language: Language }) { return <Logo language={language} />; }
