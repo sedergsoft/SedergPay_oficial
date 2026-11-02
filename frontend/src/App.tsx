@@ -10,6 +10,7 @@ type View = 'summary' | 'beneficiaries' | 'quote' | 'remittances' | 'profile' | 
 const storedUserId = isDevelopmentAuth ? localStorage.getItem('sederg_user') ?? '' : '';
 
 export function App() {
+  const [language, setLanguage] = useState<Language>(getInitialLanguage);
   const changeLanguage = (next: Language) => {
     setLanguage(next);
     localStorage.setItem('sederg_language', next);
@@ -22,7 +23,6 @@ export function App() {
 function AppContent({ language, onLanguageChange }: { language: Language; onLanguageChange: (language: Language) => void }) {
   const t = useT();
   const [user, setUser] = useState<User | null>(null);
-  const [language, setLanguage] = useState<Language>(getInitialLanguage);
   const [authReady, setAuthReady] = useState(!storedUserId);
   const [publicView, setPublicView] = useState<'landing' | 'auth'>(() => {
     const params = new URLSearchParams(window.location.search);
@@ -32,8 +32,6 @@ function AppContent({ language, onLanguageChange }: { language: Language; onLang
   const [view, setView] = useState<View>('summary');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => { document.documentElement.lang = language; }, [language]);
 
   useEffect(() => {
     if (!storedUserId) return;
@@ -334,8 +332,13 @@ function SettingsGroup({ title, settings, onChange }: { title: string; settings:
   return <section className="settings-group"><h3>{title}</h3>{settings.map((setting) => <label key={setting.key}>{setting.label}{setting.type === 'boolean' ? <span className="toggle-row"><input type="checkbox" checked={Boolean(setting.value)} onChange={(event) => onChange(setting.key, event.target.checked)} /><span>{setting.value ? 'Habilitado' : 'Deshabilitado'}</span></span> : setting.type === 'enum' ? <select value={String(setting.value)} onChange={(event) => onChange(setting.key, event.target.value)}>{(setting.options ?? []).map((option) => <option key={option} value={option}>{option === 'official' ? 'Tasa oficial' : option === 'admin_override' ? 'Tasa administrativa' : option}</option>)}</select> : <input type={setting.type === 'integer' ? 'number' : 'text'} inputMode={setting.type === 'integer' ? 'numeric' : 'decimal'} value={String(setting.value)} onChange={(event) => onChange(setting.key, event.target.value)} />}</label>)}</section>;
 }
 
-function StatusBadge({status}:{status:string}){const normalized=(status||'pending').toLowerCase();const tone=['completed','approved','active','verified','success','received'].includes(normalized)?'success':['rejected','failed','cancelled','error'].includes(normalized)?'danger':['pending_review','compliance_review','awaiting_payment','pending'].includes(normalized)?'warning':'info';return <span className={`status-pill status-${tone}`}>{
-  const t = useT();status.replace(/_/g,' ')}</span>;}
+function StatusBadge({status}:{status:string}) {
+  const t = useT();
+  const normalized=(status||'pending').toLowerCase();
+  const tone=['completed','approved','active','verified','success','received'].includes(normalized)?'success':['rejected','failed','cancelled','error'].includes(normalized)?'danger':['pending_review','compliance_review','awaiting_payment','pending'].includes(normalized)?'warning':'info';
+  return <span className={`status-pill status-${tone}`}>{t(`status.${normalized}`) === `status.${normalized}` ? status.replace(/_/g,' ') : t(`status.${normalized}`)}</span>;
+}
+
 function NavButton({ active, onClick, children, icon }: { active: boolean; onClick: () => void; children: string; icon?: string }) { return <button className={active ? 'nav-button active' : 'nav-button'} onClick={onClick}>{icon && <Icon name={icon} />}<span>{children}</span></button>; }
 function Logo({ language, monochrome = false }: { language: Language; monochrome?: boolean }) {
   const slogan = translate(language, 'brand.slogan');
