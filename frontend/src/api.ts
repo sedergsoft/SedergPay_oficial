@@ -13,6 +13,10 @@ function authHeaders(userId?: string): Record<string, string> {
   return { Authorization: `Bearer ${token}` };
 }
 
+export type UserProfile = { public_id: string; email: string; phone_e164: string | null; preferred_language: string; status: string; first_name: string; last_name: string; middle_name: string | null; date_of_birth: string | null; residence_country_code: string | null; nationality_country_code: string | null; address_line: string | null; city: string | null; postal_code: string | null };
+export type KycCase = { public_id?: string; status: string; submitted_at?: string | null; reviewed_at?: string | null; review_reason?: string | null; documents?: Array<{ public_id: string; document_type: string; original_name: string; mime_type: string; file_size: number; created_at: string }> };
+export type AdminKycCase = { public_id: string; status: string; submitted_at: string | null; reviewed_at: string | null; review_reason: string | null; user_public_id: string; email: string; first_name: string; last_name: string; document_count: number };
+
 export type Beneficiary = {
   public_id: string;
   country_code: string;
@@ -212,6 +216,13 @@ export const api = {
     headers: { 'Idempotency-Key': `registration-${crypto.randomUUID()}` },
     body: JSON.stringify(body),
   }),
+  profile: (userId: string) => request<UserProfile>('/api/v1/profile', { headers: authHeaders(userId) }),
+  updateProfile: (userId: string, body: Record<string, unknown>) => request<UserProfile>('/api/v1/profile', { method: 'PUT', headers: authHeaders(userId), body: JSON.stringify(body) }),
+  kyc: (userId: string) => request<KycCase>('/api/v1/kyc', { headers: authHeaders(userId) }),
+  submitKyc: (userId: string) => request<KycCase>('/api/v1/kyc/submit', { method: 'POST', headers: authHeaders(userId), body: '{}' }),
+  uploadKycDocument: async (userId: string, file: File, documentType: string) => { const form = new FormData(); form.append('file', file); form.append('document_type', documentType); const headers = authHeaders(userId); const response = await fetch(`${apiBase}/api/v1/kyc/documents`, { method: 'POST', headers, body: form }); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.message ?? `HTTP ${response.status}`); return body; },
+  adminKyc: (userId: string) => request<{ cases: AdminKycCase[] }>('/api/v1/admin/kyc', { headers: authHeaders(userId) }),
+  reviewKyc: (userId: string, publicId: string, decision: 'approved' | 'rejected' | 'more_information', reason: string) => request<KycCase>(`/api/v1/admin/kyc/${publicId}/review`, { method: 'POST', headers: authHeaders(userId), body: JSON.stringify({ decision, reason }) }),
   beneficiaries: (userId: string) => request<Beneficiary[]>('/api/v1/beneficiaries', {
     headers: authHeaders(userId),
   }),
