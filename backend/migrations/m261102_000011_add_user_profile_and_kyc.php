@@ -6,7 +6,7 @@ use yii\db\Migration;
  * Adds editable customer profile and KYC case/document storage.
  * KYC files are stored outside the public web root; configure SEDERG_PRIVATE_STORAGE_PATH.
  */
-class m261103_000011_add_user_profile_and_kyc extends Migration
+class m261102_000011_add_user_profile_and_kyc extends Migration
 {
     public function safeUp(): void
     {
