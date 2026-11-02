@@ -80,6 +80,7 @@ final class PlatformSettings
                 'type' => $definition['type'],
                 'label' => $definition['label'],
                 'category' => $definition['category'],
+                'options' => $definition['options'] ?? null,
                 'updated_at' => $row['updated_at'] ?? null,
             ];
         }
