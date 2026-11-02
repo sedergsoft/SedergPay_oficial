@@ -6,7 +6,7 @@ namespace app\Infrastructure\Pricing;
 
 use DateTimeImmutable;
 use DomainException;
-use app\\Infrastructure\\Configuration\\PlatformSettings;
+use app\Infrastructure\Configuration\PlatformSettings;
 use yii\db\Connection;
 use yii\db\Transaction;
 
