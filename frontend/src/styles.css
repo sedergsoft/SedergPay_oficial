@@ -506,3 +506,8 @@ td,th { border-bottom:1px solid #E5EDF5; }
 @media (prefers-reduced-motion:reduce) {
   button { transition:none; }
 }
+
+.logo-brand-image { width:48px; height:48px; flex:0 0 48px; object-fit:contain; }
+.logo-wordmark-accessible { display:grid; }
+.logo-wordmark-accessible strong { color:#10264D; }
+.logo-wordmark-accessible b { color:#00AEEF; }
