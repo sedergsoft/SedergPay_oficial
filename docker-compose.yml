@@ -21,6 +21,8 @@ services:
       SEDERG_PII_KEY: ${SEDERG_PII_KEY:-local-development-pii-key-2026}
       SEDERG_PRIVATE_STORAGE_PATH: ${SEDERG_PRIVATE_STORAGE_PATH:-/var/lib/sederg-private}
       SEDERG_KYC_REQUIRED: ${SEDERG_KYC_REQUIRED:-0}
+      SEDERG_CLAMD_HOST: clamav
+      SEDERG_CLAMD_PORT: 3310
       SEDERG_MAIL_TRANSPORT: ${SEDERG_MAIL_TRANSPORT:-smtp}
       SEDERG_MAIL_HOST: ${SEDERG_MAIL_HOST:-}
       SEDERG_MAIL_PORT: ${SEDERG_MAIL_PORT:-587}
@@ -36,12 +38,26 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      clamav:
+        condition: service_healthy
     ports:
       - "8080:8080"
     volumes:
       - ./backend:/app
       - sederg_private_data:/var/lib/sederg-private
     command: ["php", "yii", "serve", "0.0.0.0:8080", "--docroot=web"]
+  clamav:
+    image: clamav/clamav:stable
+    restart: unless-stopped
+    volumes:
+      - clamav_database:/var/lib/clamav
+    healthcheck:
+      test: ["CMD-SHELL", "clamdscan --ping 3"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
   rate-updater:
     build:
       context: ./backend
@@ -83,3 +99,4 @@ volumes:
   sederg_mysql_data:
   sederg_redis_data:
   sederg_private_data:
+  clamav_database:
