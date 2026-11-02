@@ -186,7 +186,7 @@ final class BeneficiaryController extends Controller
                 'entity_id' => $publicId,
                 'ip_address' => Yii::$app->request->userIP,
                 'user_agent' => substr((string) Yii::$app->request->userAgent, 0, 500),
-                'after_data' => new \\yii\\db\\JsonExpression([
+                'after_data' => new \yii\db\\JsonExpression([
                     'changed_fields' => array_values(array_intersect(array_keys($payload), [
                         'country_code', 'first_name', 'last_name', 'phone_e164', 'email',
                         'payout_method_code', 'payout_provider',
@@ -194,7 +194,7 @@ final class BeneficiaryController extends Controller
                 ]),
             ])->execute();
             $tx->commit();
-        } catch (\\Throwable $exception) {
+        } catch (\Throwable $exception) {
             if ($tx->getIsActive()) {
                 $tx->rollBack();
             }
