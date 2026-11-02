@@ -30,6 +30,11 @@ final class PlatformSettings
                 'type' => 'decimal', 'default' => getenv('SEDERG_MAX_SEND_AMOUNT') ?: '50000.00',
                 'min' => '0.01', 'max' => '999999999.99', 'label' => 'Importe máximo de envío', 'category' => 'pricing',
             ],
+            'pricing.exchange_rate_source' => [
+                'type' => 'enum', 'default' => 'official',
+                'options' => ['official', 'admin_override'],
+                'label' => 'Fuente de tasa de cambio', 'category' => 'pricing',
+            ],
             'pricing.quote_validity_seconds' => [
                 'type' => 'integer', 'default' => '900', 'min' => '60', 'max' => '86400',
                 'label' => 'Vigencia de cotización (segundos)', 'category' => 'pricing',
@@ -159,6 +164,9 @@ final class PlatformSettings
         }
 
         $string = is_int($value) || is_float($value) ? (string) $value : trim((string) $value);
+        if ($type === 'enum' && !in_array($string, $definition['options'] ?? [], true)) {
+            throw new DomainException('Invalid value for platform setting');
+        }
         if ($type === 'integer' && !preg_match('/^\d+$/', $string)) {
             throw new DomainException('Integer platform settings require a whole number');
         }
