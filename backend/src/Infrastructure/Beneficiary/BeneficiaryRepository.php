@@ -69,10 +69,10 @@ final class BeneficiaryRepository
             'email' => isset($payload['email']) ? strtolower($payload['email']) : null,
             'payout_method_code' => $payload['payout_method_code'],
             'payout_provider' => $payload['payout_provider'] ?? null,
-            'payout_account_token' => $accountToken,
-            'payout_account_last4' => $accountLast4,
-            'payout_card_token' => $cardToken,
-            'payout_card_last4' => $cardLast4,
+            'payout_account_token' => $payload['payout_account_token'] ?? null,
+            'payout_account_last4' => $payload['payout_account_last4'] ?? null,
+            'payout_card_token' => $payload['payout_card_token'] ?? null,
+            'payout_card_last4' => $payload['payout_card_last4'] ?? null,
             'status' => 'active',
         ])->execute();
     }
@@ -116,10 +116,10 @@ final class BeneficiaryRepository
             'email' => isset($payload['email']) ? strtolower(trim($payload['email'])) : null,
             'payout_method_code' => $payload['payout_method_code'],
             'payout_provider' => $payload['payout_provider'] ?? null,
-            'payout_account_token' => $payload['payout_account_token'] ?? null,
-            'payout_account_last4' => $payload['payout_account_last4'] ?? null,
-            'payout_card_token' => $payload['payout_card_token'] ?? null,
-            'payout_card_last4' => $payload['payout_card_last4'] ?? null,
+            'payout_account_token' => $accountToken,
+            'payout_account_last4' => $accountLast4,
+            'payout_card_token' => $cardToken,
+            'payout_card_last4' => $cardLast4,
         ], ['public_id' => $publicId, 'sender_user_id' => $userId])->execute();
     }
 
