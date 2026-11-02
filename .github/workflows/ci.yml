@@ -75,7 +75,7 @@ jobs:
           DB_PASSWORD: root
           DB_NAME: sederg_pay
         run: |
-          php -r '$pdo=new PDO("mysql:host=".$_ENV["DB_HOST"].";dbname=".$_ENV["DB_NAME"],$_ENV["DB_USER"],$_ENV["DB_PASSWORD"]); $tables=["users","user_profiles","beneficiaries","kyc_cases","kyc_documents","audit_logs","remittances"]; foreach($tables as $table){$q=$pdo->prepare("SHOW TABLES LIKE ?");$q->execute([$table]);if(!$q->fetchColumn()){fwrite(STDERR,"Missing table: $table\\n");exit(1);}} echo "Critical MySQL tables verified.\\n";'
+          php -r '$pdo=new PDO("mysql:host=".getenv("DB_HOST").";dbname=".getenv("DB_NAME"),getenv("DB_USER"),getenv("DB_PASSWORD")); $tables=["users","user_profiles","beneficiaries","kyc_cases","kyc_documents","audit_logs","remittances"]; foreach($tables as $table){$q=$pdo->prepare("SHOW TABLES LIKE ?");$q->execute([$table]);if(!$q->fetchColumn()){fwrite(STDERR,"Missing table: $table\\n");exit(1);}} echo "Critical MySQL tables verified.\\n";'
 
   frontend:
     name: TypeScript and Vite production build
