@@ -154,6 +154,15 @@ final class KycController extends Controller
                 $caseId = (int) $case['id'];
             }
 
+            $usage = $db->createCommand(
+                'SELECT COUNT(*) AS document_count, COALESCE(SUM(file_size),0) AS total_bytes
+                 FROM {{%kyc_documents}} WHERE kyc_case_id=:id',
+                [':id' => $caseId]
+            )->queryOne();
+            if ((int) $usage['document_count'] >= 10 || (int) $usage['total_bytes'] + strlen($originalContent) > 25 * 1024 * 1024) {
+                throw new UnprocessableEntityHttpException('A KYC case is limited to 10 documents and 25 MB in total');
+            }
+
             $db->createCommand()->insert('{{%kyc_documents}}', [
                 'public_id' => $this->uuid(),
                 'kyc_case_id' => $caseId,
