@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main, feature/admin-exchange-rate-source]
   push:
-    branches: [feature/user-profile-beneficiaries-kyc]
+    branches: [feature/user-profile-beneficiaries-kyc, feature/ui-brand-redesign]
   workflow_dispatch:
 
 permissions:
