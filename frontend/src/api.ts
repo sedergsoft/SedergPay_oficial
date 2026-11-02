@@ -165,7 +165,8 @@ export type AdminDashboard = {
 export type PlatformSetting = {
   key: string;
   value: string | number | boolean;
-  type: 'decimal' | 'integer' | 'boolean';
+  type: 'decimal' | 'integer' | 'boolean' | 'enum';
+  options?: string[] | null;
   label: string;
   category: 'pricing' | 'operations' | 'security';
   updated_at: string | null;
@@ -251,6 +252,11 @@ export const api = {
     body: JSON.stringify({ settings }),
   }),
   currentExchangeRate: () => request<ExchangeRate>('/api/v1/exchange-rates/current'),
+  setExchangeRateSource: (userId: string, source: 'official' | 'admin_override') => request<ExchangeRate>('/api/v1/admin/exchange-rate/source', {
+    method: 'PUT',
+    headers: authHeaders(userId),
+    body: JSON.stringify({ source }),
+  }),
   setExchangeRate: (userId: string, rate: string) => request<ExchangeRate>('/api/v1/admin/exchange-rate', {
     method: 'POST',
     headers: authHeaders(userId),
