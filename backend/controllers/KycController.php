@@ -38,7 +38,7 @@ final class KycController extends Controller
     {
         $userId=$this->userId();
         $case=Yii::$app->db->createCommand('SELECT id,status FROM {{%kyc_cases}} WHERE user_id=:id LIMIT 1',[':id'=>$userId])->queryOne();
-        if ($case!==false && $case['status']==='approved') throw new ForbiddenHttpException('KYC is already approved');
+        if ($case!==false && in_array($case['status'],['approved','pending_review'],true)) throw new ForbiddenHttpException('KYC documents cannot be changed while approved or awaiting review');
         $type=(string)Yii::$app->request->post('document_type','identity');
         if (!in_array($type,['identity','address','selfie'],true)) throw new UnprocessableEntityHttpException('Unsupported document type');
         $file=UploadedFile::getInstanceByName('file');
@@ -80,6 +80,9 @@ final class KycController extends Controller
         $userId=$this->userId();
         $case=Yii::$app->db->createCommand('SELECT id,status FROM {{%kyc_cases}} WHERE user_id=:id LIMIT 1',[':id'=>$userId])->queryOne();
         if ($case===false) throw new UnprocessableEntityHttpException('Upload the required documents first');
+        if (in_array($case['status'],['approved','pending_review'],true)) throw new ForbiddenHttpException('This KYC case cannot be submitted in its current state');
+        $profile=Yii::$app->db->createCommand('SELECT date_of_birth,address_line,city,residence_country_id FROM {{%user_profiles}} WHERE user_id=:id LIMIT 1',[':id'=>$userId])->queryOne();
+        if ($profile===false || empty($profile['date_of_birth']) || empty($profile['address_line']) || empty($profile['city']) || empty($profile['residence_country_id'])) throw new UnprocessableEntityHttpException('Complete your date of birth and residential address in your profile before submitting KYC');
         $types=Yii::$app->db->createCommand('SELECT DISTINCT document_type FROM {{%kyc_documents}} WHERE kyc_case_id=:id',[':id'=>$case['id']])->queryColumn();
         if (!in_array('identity',$types,true) || !in_array('address',$types,true)) throw new UnprocessableEntityHttpException('Identity and proof-of-address documents are required');
         Yii::$app->db->createCommand()->update('{{%kyc_cases}}',['status'=>'pending_review','submitted_at'=>gmdate('Y-m-d H:i:s'),'review_reason'=>null],['id'=>$case['id']])->execute();
