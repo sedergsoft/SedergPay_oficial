@@ -84,6 +84,7 @@ final class ProfileController extends Controller
                 'residence_country_id' => $residence, 'nationality_country_id' => $nationality,
                 'address_line' => $p['address_line'] ?? null, 'city' => $p['city'] ?? null, 'postal_code' => $p['postal_code'] ?? null,
             ])->execute();
+            Yii::$app->db->createCommand()->insert('{{%audit_logs}}',['actor_user_id'=>$userId,'action'=>'user.profile.updated','entity_type'=>'user_profile','entity_id'=>(string)$userId,'ip_address'=>Yii::$app->request->userIP,'user_agent'=>substr((string)Yii::$app->request->userAgent,0,500)])->execute();
             $tx->commit();
         } catch (\Throwable $e) { if ($tx->getIsActive()) $tx->rollBack(); throw $e; }
         return $this->actionView();
