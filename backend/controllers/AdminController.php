@@ -204,6 +204,27 @@ final class AdminController extends Controller
         return ['public_id'=>$publicId,'status'=>$status,'review_reason'=>$reason];
     }
 
+    public function actionKycDocuments(string $publicId): array
+    {
+        (new UserAuthenticator(Yii::$app->db))->requireRole('admin');
+        $case=Yii::$app->db->createCommand('SELECT id FROM {{%kyc_cases}} WHERE public_id=:id LIMIT 1',[':id'=>$publicId])->queryOne();
+        if ($case===false) throw new BadRequestHttpException('KYC case not found');
+        return ['documents'=>Yii::$app->db->createCommand('SELECT public_id,document_type,original_name,mime_type,file_size,created_at FROM {{%kyc_documents}} WHERE kyc_case_id=:id ORDER BY created_at',[':id'=>$case['id']])->queryAll()];
+    }
+
+    public function actionKycDocument(string $publicId)
+    {
+        (new UserAuthenticator(Yii::$app->db))->requireRole('admin');
+        $doc=Yii::$app->db->createCommand('SELECT d.storage_key,d.original_name,d.mime_type FROM {{%kyc_documents}} d WHERE d.public_id=:id LIMIT 1',[':id'=>$publicId])->queryOne();
+        if ($doc===false) throw new BadRequestHttpException('KYC document not found');
+        $root=realpath((string)getenv('SEDERG_PRIVATE_STORAGE_PATH'));
+        $path=$root===false?false:realpath($root.DIRECTORY_SEPARATOR.$doc['storage_key']);
+        if ($path===false || !str_starts_with($path,$root.DIRECTORY_SEPARATOR) || !is_file($path)) throw new BadRequestHttpException('KYC file is unavailable');
+        Yii::$app->response->headers->set('Content-Type',$doc['mime_type']);
+        Yii::$app->response->headers->set('X-Content-Type-Options','nosniff');
+        return Yii::$app->response->sendFile($path,$doc['original_name'],['inline'=>true]);
+    }
+
     public function actionSettings(): array
     {
         (new UserAuthenticator(Yii::$app->db))->requireRole('admin');
