@@ -105,3 +105,15 @@ El esquema no fuerza un límite fijo de importe por fila porque los límites dep
 - El refresco de fuentes oficiales se ejecuta con `php yii rates/update`. Instale en el servidor la tarea cron para ejecutarlo cada 12 horas: `0 */12 * * * cd /ruta/backend && php yii rates/update >> runtime/logs/rates-cron.log 2>&1`. El repositorio incluye el ejemplo en `backend/deploy/sederg-rates.cron`; la tarea debe instalarse en el host que ejecuta el backend.
 - El refresco oficial no cambia la fuente activa. Si está seleccionada la tasa manual, la cotización continúa usando esa tasa aunque se actualicen los datos oficiales.
 - Las tasas aplicadas a cotizaciones/remesas ya creadas no se reescriben; el cambio afecta a nuevas cotizaciones.
+
+
+## Perfil de usuario y KYC (rama feature/user-profile-beneficiaries-kyc)
+
+- Los usuarios pueden editar sus beneficiarios mediante `PUT /api/v1/beneficiaries/{public_id}`; la API limita cada consulta y actualización al propietario autenticado.
+- El perfil se consulta y actualiza en `GET/PUT /api/v1/profile`.
+- KYC: `GET /api/v1/kyc`, `POST /api/v1/kyc/documents` (multipart: `file`, `document_type`) y `POST /api/v1/kyc/submit`.
+- Los tipos admitidos son identidad, comprobante de domicilio y selfie opcional. La carga admite PDF/JPG/PNG de hasta 5 MB. La revisión administrativa está disponible en `GET /api/v1/admin/kyc`, descarga protegida de documentos y `POST /api/v1/admin/kyc/{public_id}/review`.
+- Ejecute `php yii migrate --migrationPath=@app/migrations` para crear las tablas `kyc_cases` y `kyc_documents` y añadir nacionalidad al perfil.
+- Configure `SEDERG_PRIVATE_STORAGE_PATH` como directorio persistente **fuera del document root**, con permisos restringidos para el usuario del proceso PHP. No exponga este directorio mediante Apache/Nginx ni backups públicos.
+- `SEDERG_KYC_REQUIRED=1` obliga a tener KYC aprobado antes de crear remesas. Fuera del modo de autenticación development, esta condición se aplica por defecto. En sandbox/desarrollo se puede probar el flujo sin bloquear remesas.
+- La política documental y los controles de KYC/AML deben validarse para cada corredor RU-CU y CU-RU con asesoría legal y los operadores autorizados. Esta implementación aporta el flujo técnico; no certifica por sí sola el cumplimiento regulatorio.
