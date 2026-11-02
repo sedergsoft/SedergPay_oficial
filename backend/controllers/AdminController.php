@@ -130,6 +130,32 @@ final class AdminController extends Controller
         }
     }
 
+    public function actionSetExchangeRateSource(): array
+    {
+        $authenticator = new UserAuthenticator(Yii::$app->db);
+        $userId = $authenticator->userId();
+        $authenticator->requireRole('admin');
+        $payload = Yii::$app->request->bodyParams;
+        if (!is_array($payload) || !is_string($payload['source'] ?? null)) {
+            throw new BadRequestHttpException('La fuente de tasa es obligatoria.');
+        }
+        try {
+            $rate = (new ExchangeRateService(Yii::$app->db))->setActiveSource($payload['source'], $userId);
+            Yii::$app->db->createCommand()->insert('{{%audit_logs}}', [
+                'actor_user_id' => $userId,
+                'action' => 'exchange_rate.source.changed',
+                'entity_type' => 'exchange_rate',
+                'entity_id' => 'RUB/CUP',
+                'ip_address' => Yii::$app->request->userIP,
+                'user_agent' => substr((string) Yii::$app->request->userAgent, 0, 500),
+                'after_data' => new JsonExpression(['source' => $payload['source'], 'rate' => $rate['rate']]),
+            ])->execute();
+            return $rate;
+        } catch (DomainException $exception) {
+            throw new UnprocessableEntityHttpException($exception->getMessage(), 0, $exception);
+        }
+    }
+
     public function actionSettings(): array
     {
         (new UserAuthenticator(Yii::$app->db))->requireRole('admin');
