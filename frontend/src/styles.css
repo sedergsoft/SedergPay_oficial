@@ -511,3 +511,8 @@ td,th { border-bottom:1px solid #E5EDF5; }
 .logo-wordmark-accessible { display:grid; }
 .logo-wordmark-accessible strong { color:#10264D; }
 .logo-wordmark-accessible b { color:#00AEEF; }
+
+.ui-icon { width:19px; height:19px; flex:0 0 19px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.nav-button { display:flex; align-items:center; gap:11px; text-align:left; }
+.nav-button .ui-icon { color:inherit; }
+.feature-icon .ui-icon { width:23px; height:23px; }
