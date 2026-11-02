@@ -19,6 +19,8 @@ services:
       SEDERG_COOKIE_KEY: ${SEDERG_COOKIE_KEY:?SEDERG_COOKIE_KEY is required}
       SEDERG_DEBUG: ${SEDERG_DEBUG:-0}
       SEDERG_PII_KEY: ${SEDERG_PII_KEY:-local-development-pii-key-2026}
+      SEDERG_PRIVATE_STORAGE_PATH: ${SEDERG_PRIVATE_STORAGE_PATH:-/var/lib/sederg-private}
+      SEDERG_KYC_REQUIRED: ${SEDERG_KYC_REQUIRED:-0}
       SEDERG_MAIL_TRANSPORT: ${SEDERG_MAIL_TRANSPORT:-smtp}
       SEDERG_MAIL_HOST: ${SEDERG_MAIL_HOST:-}
       SEDERG_MAIL_PORT: ${SEDERG_MAIL_PORT:-587}
@@ -38,6 +40,7 @@ services:
       - "8080:8080"
     volumes:
       - ./backend:/app
+      - sederg_private_data:/var/lib/sederg-private
     command: ["php", "yii", "serve", "0.0.0.0:8080", "--docroot=web"]
   rate-updater:
     build:
@@ -49,7 +52,7 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-    command: ["sh", "-c", "while true; do php yii rates/update || echo 'Exchange-rate refresh failed; retrying tomorrow.' >&2; sleep 86400; done"]
+    command: ["sh", "-c", "while true; do php yii rates/update || echo 'Exchange-rate refresh failed; retrying tomorrow.' >&2; sleep 43200; done"]
     restart: unless-stopped
 
   mysql:
@@ -79,3 +82,4 @@ services:
 volumes:
   sederg_mysql_data:
   sederg_redis_data:
+  sederg_private_data:
