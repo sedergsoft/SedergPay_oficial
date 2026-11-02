@@ -86,7 +86,13 @@ final class ExchangeRateService
         $official = $this->officialClient->fetchRubCup();
         $this->saveOfficial($official);
 
-        return $this->resolve('RUB', 'CUP');
+        return $this->format('RUB', 'CUP', [
+            'rate' => $official['rate'],
+            'source' => $official['source'],
+            'effective_date' => $official['effective_date'],
+            'source_url' => $official['source_url'],
+            'manual_override' => false,
+        ]);
     }
 
     public function saveAdminOverride(string $rate, int $userId): array
