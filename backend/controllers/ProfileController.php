@@ -52,6 +52,7 @@ final class ProfileController extends Controller
         }
         $phone = isset($p['phone_e164']) && $p['phone_e164'] !== '' ? trim((string)$p['phone_e164']) : null;
         if ($phone !== null && !preg_match('/^\+[1-9]\d{7,14}$/', $phone)) throw new UnprocessableEntityHttpException('Phone must use E.164 format');
+        if ($phone !== null && (int)Yii::$app->db->createCommand('SELECT COUNT(*) FROM {{%users}} WHERE phone_e164=:phone AND id<>:id AND deleted_at IS NULL',[':phone'=>$phone,':id'=>$userId])->queryScalar()>0) throw new UnprocessableEntityHttpException('This phone number is already registered');
         $date = $p['date_of_birth'] ?? null;
         if ($date !== null && $date !== '' && (!is_string($date) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || strtotime($date) === false || $date > gmdate('Y-m-d'))) {
             throw new UnprocessableEntityHttpException('Invalid date of birth');
