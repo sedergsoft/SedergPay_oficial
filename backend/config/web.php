@@ -45,6 +45,7 @@ return [
                 'GET api/v1/admin/settings' => 'admin/settings',
                 'PUT api/v1/admin/settings' => 'admin/update-settings',
                 'POST api/v1/admin/exchange-rate' => 'admin/set-exchange-rate',
+                'PUT api/v1/admin/exchange-rate/source' => 'admin/set-exchange-rate-source',
                 'GET api/v1/exchange-rates/current' => 'exchange-rate/current',
                 'POST api/v1/registrations' => 'registration/create',
                 'POST api/v1/beneficiaries' => 'beneficiary/create',
