@@ -67,7 +67,10 @@ jobs:
           SEDERG_DB_DSN: mysql:host=127.0.0.1;port=3306;dbname=sederg_pay
           SEDERG_DB_USER: root
           SEDERG_DB_PASSWORD: root
-        run: php yii migrate --interactive=0
+        run: |
+          php yii migrate --interactive=0
+          php yii migrate/down 1 --interactive=0
+          php yii migrate --interactive=0
       - name: Verify critical schema objects
         env:
           DB_HOST: 127.0.0.1
