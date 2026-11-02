@@ -100,7 +100,7 @@ final class BeneficiaryRepository
     {
         $current = $this->db->createCommand(
             'SELECT payout_method_code,payout_account_token,payout_account_last4,payout_card_token,payout_card_last4
-             FROM {{%beneficiaries}} WHERE public_id=:public_id AND sender_user_id=:user_id LIMIT 1',
+             FROM {{%beneficiaries}} WHERE public_id=:public_id AND sender_user_id=:user_id LIMIT 1 FOR UPDATE',
             [':public_id'=>$publicId, ':user_id'=>$userId]
         )->queryOne();
         if ($current === false) return;
