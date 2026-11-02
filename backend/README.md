@@ -95,3 +95,13 @@ usar `--ignore-platform-req` en entornos de despliegue.
 
 ## Nota sobre montos de remesa
 El esquema no fuerza un límite fijo de importe por fila porque los límites dependen del país, canal, moneda, proveedor y regulación. Si se decide aplicar el rango operativo inicialmente estudiado de 15.000 a 50.000, debe definirse explícitamente la moneda y si el límite se aplica al importe enviado, recibido o total debitado, y después implementarse en la capa de negocio y/o una restricción específica.
+
+
+## Gestión de la tasa RUB/CUP (actualización de esta rama)
+
+- La selección activa se almacena en `platform_settings` como `pricing.exchange_rate_source`: `official` o `admin_override`.
+- La API administrativa `PUT /api/v1/admin/exchange-rate/source` recibe JSON `{"source":"official"}` o `{"source":"admin_override"}`. Requiere rol administrador.
+- Al guardar una tasa manual con `POST /api/v1/admin/exchange-rate`, se activa automáticamente la fuente manual. La tasa oficial queda conservada y puede reactivarse en cualquier momento.
+- El refresco de fuentes oficiales se ejecuta con `php yii rates/update`. Instale en el servidor la tarea cron para ejecutarlo cada 12 horas: `0 */12 * * * cd /ruta/backend && php yii rates/update >> runtime/logs/rates-cron.log 2>&1`. El repositorio incluye el ejemplo en `backend/deploy/sederg-rates.cron`; la tarea debe instalarse en el host que ejecuta el backend.
+- El refresco oficial no cambia la fuente activa. Si está seleccionada la tasa manual, la cotización continúa usando esa tasa aunque se actualicen los datos oficiales.
+- Las tasas aplicadas a cotizaciones/remesas ya creadas no se reescriben; el cambio afecta a nuevas cotizaciones.

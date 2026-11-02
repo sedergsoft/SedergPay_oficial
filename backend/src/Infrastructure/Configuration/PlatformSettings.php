@@ -30,6 +30,11 @@ final class PlatformSettings
                 'type' => 'decimal', 'default' => getenv('SEDERG_MAX_SEND_AMOUNT') ?: '50000.00',
                 'min' => '0.01', 'max' => '999999999.99', 'label' => 'Importe máximo de envío', 'category' => 'pricing',
             ],
+            'pricing.exchange_rate_source' => [
+                'type' => 'enum', 'default' => 'official',
+                'options' => ['official', 'admin_override'],
+                'label' => 'Fuente de tasa de cambio', 'category' => 'pricing',
+            ],
             'pricing.quote_validity_seconds' => [
                 'type' => 'integer', 'default' => '900', 'min' => '60', 'max' => '86400',
                 'label' => 'Vigencia de cotización (segundos)', 'category' => 'pricing',
@@ -75,6 +80,7 @@ final class PlatformSettings
                 'type' => $definition['type'],
                 'label' => $definition['label'],
                 'category' => $definition['category'],
+                'options' => $definition['options'] ?? null,
                 'updated_at' => $row['updated_at'] ?? null,
             ];
         }
@@ -114,6 +120,19 @@ final class PlatformSettings
             $before[$key] = self::get($db, $key);
             $validated[$key] = $normalized;
         }
+        if (($validated['pricing.exchange_rate_source'] ?? null) === 'admin_override') {
+            $manualRateExists = (int) $db->createCommand(
+                'SELECT COUNT(*) FROM {{%exchange_rates}}
+                 WHERE base_currency = :base AND quote_currency = :quote
+                   AND source = :source AND valid_from <= UTC_TIMESTAMP()
+                   AND (valid_until IS NULL OR valid_until > UTC_TIMESTAMP())',
+                [':base' => 'RUB', ':quote' => 'CUP', ':source' => 'admin_override']
+            )->queryScalar();
+            if ($manualRateExists === 0) {
+                throw new DomainException('No hay una tasa manual guardada para activar.');
+            }
+        }
+
         $effectiveMinimum = $validated['pricing.minimum_send_amount']
             ?? self::get($db, 'pricing.minimum_send_amount');
         $effectiveMaximum = $validated['pricing.maximum_send_amount']
@@ -159,6 +178,9 @@ final class PlatformSettings
         }
 
         $string = is_int($value) || is_float($value) ? (string) $value : trim((string) $value);
+        if ($type === 'enum' && !in_array($string, $definition['options'] ?? [], true)) {
+            throw new DomainException('Invalid value for platform setting');
+        }
         if ($type === 'integer' && !preg_match('/^\d+$/', $string)) {
             throw new DomainException('Integer platform settings require a whole number');
         }
