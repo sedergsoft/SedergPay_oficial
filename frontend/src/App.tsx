@@ -15,10 +15,12 @@ export function App() {
     localStorage.setItem('sederg_language', next);
     document.documentElement.lang = next;
   };
+  useEffect(() => { document.documentElement.lang = language; }, [language]);
   return <LanguageContext.Provider value={language}><AppContent language={language} onLanguageChange={changeLanguage} /></LanguageContext.Provider>;
 }
 
 function AppContent({ language, onLanguageChange }: { language: Language; onLanguageChange: (language: Language) => void }) {
+  const t = useT();
   const [user, setUser] = useState<User | null>(null);
   const [language, setLanguage] = useState<Language>(getInitialLanguage);
   const [authReady, setAuthReady] = useState(!storedUserId);
@@ -199,6 +201,7 @@ function AuthScreen({ language, onLanguageChange, mode, setMode, busy, message, 
 }
 
 function ProfilePanel({userId,run}:{userId:string;run:(action:()=>Promise<void>)=>Promise<void>}){
+  const t = useT();
  const [profile,setProfile]=useState<any>(null);useEffect(()=>{void run(async()=>setProfile(await api.profile(userId)));},[userId]);
  if(!profile)return <section className="card"><p className="muted">Cargando perfil…</p></section>;
  return <div className="feature-view"><div className="view-heading"><div><span className="eyebrow">{t('profile.personalAccount')}</span><h2>{t('nav.profile')}</h2><p className="muted">{t('profile.description')}</p></div><span className="status-pill status-info"><Icon name="user"/> {t('nav.profile')}</span></div>
@@ -207,6 +210,7 @@ function ProfilePanel({userId,run}:{userId:string;run:(action:()=>Promise<void>)
  <div className="form-grid"><Field name="first_name" label={t('field.firstName')} defaultValue={profile.first_name}/><Field name="last_name" label={t('field.lastName')} defaultValue={profile.last_name}/><Field name="middle_name" label={t('field.middleName')} required={false} defaultValue={profile.middle_name||''}/><label>Correo electrónico<input type="email" value={profile.email} disabled /></label><Field name="phone_e164" label={t('field.phone')} type="tel" required={false} defaultValue={profile.phone_e164||''}/><Field name="date_of_birth" label={t('field.birthDate')} type="date" required={false} defaultValue={profile.date_of_birth||''}/><label>{t('field.residenceCountry')}<select name="residence_country_code" defaultValue={profile.residence_country_code||'RU'}><option value="RU">🇷🇺 Rusia</option><option value="CU">🇨🇺 Cuba</option></select></label><label>{t('field.nationality')}<select name="nationality_country_code" defaultValue={profile.nationality_country_code||'CU'}><option value="CU">🇨🇺 {t('country.cuba')}</option><option value="RU">🇷🇺 {t('country.russia')}</option></select></label><Field name="address_line" label={t('field.address')} required={false} defaultValue={profile.address_line||''}/><Field name="city" label={t('field.city')} required={false} defaultValue={profile.city||''}/><Field name="postal_code" label={t('field.postalCode')} required={false} defaultValue={profile.postal_code||''}/></div><div className="form-actions"><button><Icon name="check"/> {t('common.saveChanges')}</button></div></form></section></div>;
 }
 function KycPanel({userId,run}:{userId:string;run:(action:()=>Promise<void>)=>Promise<void>}){
+  const t = useT();
  const [kyc,setKyc]=useState<any>(null);const refresh=()=>run(async()=>setKyc(await api.kyc(userId)));useEffect(()=>{refresh();},[userId]);
  const hasIdentity=Boolean(kyc?.documents?.some((d:any)=>d.document_type==='identity'));const hasAddress=Boolean(kyc?.documents?.some((d:any)=>d.document_type==='address'));
  return <div className="feature-view"><div className="view-heading"><div><span className="eyebrow">{t('kyc.accountProtection')}</span><h2>{t('kyc.title')}</h2><p className="muted">{t('kyc.description')}</p></div><span className="status-pill status-info"><Icon name="shield"/> KYC</span></div>
@@ -217,6 +221,7 @@ function KycPanel({userId,run}:{userId:string;run:(action:()=>Promise<void>)=>Pr
  <div className="form-actions"><button disabled={!hasIdentity||!hasAddress||['approved','pending_review'].includes(kyc?.status)} onClick={()=>void run(async()=>{await api.submitKyc(userId);setKyc(await api.kyc(userId));})}>{t('kyc.submitForReview')}</button></div><p className="secure-note"><Icon name="lock"/> {t('kyc.secureStorage')}</p></section></div>;
 }
 function Summary({ userId, setView, run }: { userId: string; setView: (view: View) => void; run: (action: () => Promise<void>) => Promise<void> }) {
+  const t = useT();
   const [remittances, setRemittances] = useState<Remittance[]>([]);
   useEffect(() => { void run(async () => setRemittances(await api.remittances(userId))); }, [userId]);
   const completed = remittances.filter(item => item.status === 'completed').length;
@@ -240,6 +245,7 @@ function Summary({ userId, setView, run }: { userId: string; setView: (view: Vie
   </div>;
 }
 function Beneficiaries({ userId, run }: { userId: string; run: (action: () => Promise<void>) => Promise<void> }) {
+  const t = useT();
  const [items,setItems]=useState<Beneficiary[]>([]); const [method,setMethod]=useState('cash_pickup'); const [editing,setEditing]=useState<Beneficiary|null>(null);
  const refresh=()=>run(async()=>setItems(await api.beneficiaries(userId))); useEffect(()=>{refresh();},[userId]);
  const submit=(event:FormEvent<HTMLFormElement>)=>{event.preventDefault();const form=event.currentTarget;void run(async()=>{const d=new FormData(form);const body={country_code:d.get('country'),first_name:d.get('first_name'),last_name:d.get('last_name'),phone_e164:d.get('phone_e164'),email:d.get('email'),payout_method_code:method,payout_provider:d.get('payout_provider')||undefined,payout_account_number:d.get('payout_account_number')||undefined,payout_card_number:d.get('payout_card_number')||undefined};if(editing)await api.updateBeneficiary(userId,editing.public_id,body);else await api.createBeneficiary(userId,body);setEditing(null);setMethod('cash_pickup');form.reset();await refresh();});};
@@ -249,6 +255,7 @@ function Beneficiaries({ userId, run }: { userId: string; run: (action: () => Pr
  <section className="card beneficiary-list-card"><div className="section-heading"><div><span className="eyebrow">{t('beneficiaries.addressBook')}</span><h3>{t('beneficiaries.registeredPeople')}</h3></div><span className="section-icon"><Icon name="users"/></span></div>{items.length===0?<div className="empty-state"><span className="empty-icon"><Icon name="users"/></span><strong>{t('beneficiaries.empty')}</strong><p>{t('beneficiaries.emptyDescription')}</p></div>:<div className="beneficiary-list">{items.map(item=><article className="beneficiary-item" key={item.public_id}><div className="beneficiary-avatar">{(item.first_name?.[0]||'B').toUpperCase()}{(item.last_name?.[0]||'')[0]?.toUpperCase()}</div><div className="beneficiary-info"><strong>{item.first_name} {item.last_name}</strong><span><Icon name="globe"/> {item.country_code==='CU'?t('country.cuba'):t('country.russia')} · {item.phone_e164||item.email||t('common.noContact')}</span><small>{item.payout_method_code} {item.payout_provider??''} {item.payout_account_last4?'· cuenta ****'+item.payout_account_last4:''} {item.payout_card_last4?'· tarjeta ****'+item.payout_card_last4:''}</small></div><div className="beneficiary-actions"><StatusBadge status={item.status}/><button className="secondary compact-button" type="button" onClick={()=>{setEditing(item);setMethod(item.payout_method_code);}}><Icon name="edit"/> {t('common.edit')}</button></div></article>)}</div>}</section></div></div>;
 }
 function QuotePanel({ userId, run }: { userId: string; run: (action: () => Promise<void>) => Promise<void> }) {
+  const t = useT();
   const [quote, setQuote] = useState<Quote | null>(null); const [created, setCreated] = useState<Remittance | null>(null); const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]); const [method, setMethod] = useState('cash_pickup'); const [beneficiaryId, setBeneficiaryId] = useState('');
   useEffect(() => { void run(async () => setBeneficiaries(await api.beneficiaries(userId))); }, [userId]);
   const matchingBeneficiaries = beneficiaries.filter((item) => item.country_code === 'CU' && item.payout_method_code === method);
@@ -267,6 +274,7 @@ function QuotePanel({ userId, run }: { userId: string; run: (action: () => Promi
   </div>;
 }
 function Remittances({ userId, run }: { userId: string; run: (action: () => Promise<void>) => Promise<void> }) {
+  const t = useT();
   const [items, setItems] = useState<Remittance[]>([]); const [selected, setSelected] = useState<RemittanceDetail | null>(null); const [filter,setFilter]=useState('all'); const refresh = () => run(async () => setItems(await api.remittances(userId)));
   useEffect(() => { refresh(); }, [userId]);
   const visible=items.filter(item=>filter==='all'||(filter==='active'&&!['completed','cancelled','rejected'].includes(item.status))||(filter==='completed'&&item.status==='completed'));
@@ -276,11 +284,13 @@ function Remittances({ userId, run }: { userId: string; run: (action: () => Prom
   <div className="remittance-operations">{item.status === 'awaiting_payment' && <button className="secondary compact-button" onClick={() => void run(async () => { const deposit = await api.deposit(userId, item.public_id); alert(`Depósito sandbox: ${deposit.payment_reference}`); refresh(); })}>{t('remittances.registerDeposit')} (sandbox)</button>}{item.status === 'compliance_review' && <button onClick={() => void run(async () => { await api.review(userId, item.public_id, 'approved'); refresh(); })}>{t('common.approve')} (sandbox)</button>}{item.status === 'approved' && <button onClick={() => void run(async () => { const payout = await api.payout(userId, item.public_id); await api.completePayout(userId, payout.public_id); refresh(); })}>{t('remittances.executePayout')} (sandbox)</button>}{item.status === 'reconciliation_pending' && <button className="secondary compact-button" onClick={() => void run(async () => { await api.reconcile(userId, item.public_id); refresh(); })}>{t('remittances.reconcile')}</button>}</div></article>)}</div>}</section>{selected && <RemittanceDetails detail={selected} onClose={() => setSelected(null)} />}</div>;
 }
 function PaymentQr({ remittance }: { remittance: Remittance }) {
+  const t = useT();
   const [src, setSrc] = useState('');
   useEffect(() => { if (!remittance.payment_qr_payload) return; void QRCode.toDataURL(remittance.payment_qr_payload, { width: 220, margin: 2 }).then(setSrc); }, [remittance.payment_qr_payload]);
   return <div className="payment-panel payment-panel-modern"><div><span className="eyebrow">{t('payment.platformPayment')}</span><h3>{t('payment.transferCreated')}: {remittance.reference}</h3><p>Transfiere <strong>{remittance.payment_instructions?.amount ?? remittance.send_amount} {remittance.payment_instructions?.currency ?? remittance.send_currency}</strong> {t('payment.useReference')}</p><p className="muted">{t('payment.qrContains')} {remittance.receipt_email_sent ? t('payment.receiptSent') : t('payment.receiptInDetails')}</p></div>{src && <img className="payment-qr" src={src} alt={`QR de pago ${remittance.reference}`} />}</div>;
 }
 function RemittanceDetails({ detail, onClose }: { detail: RemittanceDetail; onClose: () => void }) {
+  const t = useT();
   const events=detail.state_events||[];
   return <div className="detail-panel card"><div className="section-heading"><div><span className="eyebrow">{t('details.receipt')}</span><h2>{detail.reference}</h2><StatusBadge status={detail.status}/></div><button className="secondary compact-button" onClick={onClose}>{t('common.close')}</button></div>
   <div className="detail-highlight"><div><span>{t('quote.beneficiaryReceives')}</span><strong>{detail.receive_amount} <small>{detail.receive_currency}</small></strong></div><div><span>{t('details.senderSends')}</span><strong>{detail.send_amount} <small>{detail.send_currency}</small></strong></div></div>
@@ -291,6 +301,7 @@ function RemittanceDetails({ detail, onClose }: { detail: RemittanceDetail; onCl
 function Detail({ label, value }: { label: string; value: string }) { return <div className="detail-item"><span>{label}</span><strong>{value}</strong></div>; }
 
 function AdminOperations({ userId, run }: { userId: string; run: (action: () => Promise<void>) => Promise<void> }) {
+  const t = useT();
   const [items, setItems] = useState<AdminOperation[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [rateHistory, setRateHistory] = useState<AdminRate[]>([]);
@@ -319,10 +330,12 @@ function AdminOperations({ userId, run }: { userId: string; run: (action: () => 
 }
 
 function SettingsGroup({ title, settings, onChange }: { title: string; settings: PlatformSetting[]; onChange: (key: string, value: string | number | boolean) => void }) {
+  const t = useT();
   return <section className="settings-group"><h3>{title}</h3>{settings.map((setting) => <label key={setting.key}>{setting.label}{setting.type === 'boolean' ? <span className="toggle-row"><input type="checkbox" checked={Boolean(setting.value)} onChange={(event) => onChange(setting.key, event.target.checked)} /><span>{setting.value ? 'Habilitado' : 'Deshabilitado'}</span></span> : setting.type === 'enum' ? <select value={String(setting.value)} onChange={(event) => onChange(setting.key, event.target.value)}>{(setting.options ?? []).map((option) => <option key={option} value={option}>{option === 'official' ? 'Tasa oficial' : option === 'admin_override' ? 'Tasa administrativa' : option}</option>)}</select> : <input type={setting.type === 'integer' ? 'number' : 'text'} inputMode={setting.type === 'integer' ? 'numeric' : 'decimal'} value={String(setting.value)} onChange={(event) => onChange(setting.key, event.target.value)} />}</label>)}</section>;
 }
 
-function StatusBadge({status}:{status:string}){const normalized=(status||'pending').toLowerCase();const tone=['completed','approved','active','verified','success','received'].includes(normalized)?'success':['rejected','failed','cancelled','error'].includes(normalized)?'danger':['pending_review','compliance_review','awaiting_payment','pending'].includes(normalized)?'warning':'info';return <span className={`status-pill status-${tone}`}>{status.replace(/_/g,' ')}</span>;}
+function StatusBadge({status}:{status:string}){const normalized=(status||'pending').toLowerCase();const tone=['completed','approved','active','verified','success','received'].includes(normalized)?'success':['rejected','failed','cancelled','error'].includes(normalized)?'danger':['pending_review','compliance_review','awaiting_payment','pending'].includes(normalized)?'warning':'info';return <span className={`status-pill status-${tone}`}>{
+  const t = useT();status.replace(/_/g,' ')}</span>;}
 function NavButton({ active, onClick, children, icon }: { active: boolean; onClick: () => void; children: string; icon?: string }) { return <button className={active ? 'nav-button active' : 'nav-button'} onClick={onClick}>{icon && <Icon name={icon} />}<span>{children}</span></button>; }
 function Logo({ language, monochrome = false }: { language: Language; monochrome?: boolean }) {
   const slogan = translate(language, 'brand.slogan');
@@ -333,6 +346,7 @@ function Logo({ language, monochrome = false }: { language: Language; monochrome
 }
 function Brand({ language }: { language: Language }) { return <Logo language={language} />; }
 function LanguageSwitch({ language, onChange }: { language: Language; onChange: (language: Language) => void }) {
+  const t = useT();
   return <div className="language-switch" role="group" aria-label="Idioma">
     {(Object.keys(languageLabels) as Language[]).map((option) => <button key={option} type="button" className={language === option ? 'language-option active' : 'language-option'} onClick={() => onChange(option)} aria-pressed={language === option}>{languageLabels[option]}</button>)}
   </div>;
@@ -341,12 +355,13 @@ function Header({ language, onLanguageChange }: { language: Language; onLanguage
   return <header><Brand language={language} /><div className="header-tools"><LanguageSwitch language={language} onChange={onLanguageChange} /><span className="sandbox"><i /> {translate(language, 'common.sandbox')}</span></div></header>;
 }
 function RateBanner() {
+  const t = useT();
   const [rate, setRate] = useState<ExchangeRate | null>(null);
   const [error, setError] = useState('');
   useEffect(() => { api.currentExchangeRate().then(setRate).catch((reason: Error) => setError(reason.message)); }, []);
-  if (error) return <p className="alert">Tasa RUB/CUP no disponible temporalmente.</p>;
-  if (!rate) return <p className="muted">Cargando tasa RUB/CUP vigente…</p>;
-  return <div className="rate-banner" role="status"><strong>Tasa vigente RUB/CUP: {rate.rate} CUP por RUB</strong><span>{rate.source_label} · {rate.effective_date}</span></div>;
+  if (error) return <p className="alert">{t('rate.unavailable')}</p>;
+  if (!rate) return <p className="muted">{t('rate.loading')}</p>;
+  return <div className="rate-banner" role="status"><strong>{t('rate.current')}: {rate.rate} CUP por RUB</strong><span>{rate.source_label} · {rate.effective_date}</span></div>;
 }
 function Alert({ text }: { text: string }) { return <p className="alert">{text}</p>; }
 function Field({ name, label, type = 'text', defaultValue, value, onChange, placeholder, inputMode, pattern, required = true }: { name: string; label: string; type?: string; defaultValue?: string; value?: string; onChange?: (event: ChangeEvent<HTMLInputElement>) => void; placeholder?: string; inputMode?: 'text' | 'numeric' | 'tel' | 'email' | 'url' | 'search'; pattern?: string; required?: boolean }) { return <label>{label}<input required={required} name={name} type={type} defaultValue={defaultValue} value={value} onChange={onChange} placeholder={placeholder} inputMode={inputMode} pattern={pattern} /></label>; }
