@@ -221,10 +221,10 @@ final class AdminController extends Controller
         $path=$root===false?false:realpath($root.DIRECTORY_SEPARATOR.$doc['storage_key']);
         if ($path===false || !str_starts_with($path,$root.DIRECTORY_SEPARATOR) || !is_file($path)) throw new BadRequestHttpException('KYC file is unavailable');
         $key=(string)(getenv('SEDERG_PII_KEY') ?: getenv('SEDERG_COOKIE_KEY'));
-        if (strlen($key)<16) throw new \\yii\\web\\ServerErrorHttpException('KYC encryption key is not configured');
+        if (strlen($key)<16) throw new \yii\web\ServerErrorHttpException('KYC encryption key is not configured');
         $encrypted=file_get_contents($path);
         $content=$encrypted===false?false:Yii::$app->security->decryptByKey($encrypted,$key);
-        if ($content===false) throw new \\yii\\web\\ServerErrorHttpException('KYC document decryption failed');
+        if ($content===false) throw new \yii\web\ServerErrorHttpException('KYC document decryption failed');
         Yii::$app->response->headers->set('X-Content-Type-Options','nosniff');
         return Yii::$app->response->sendContentAsFile($content,$doc['original_name'],['mimeType'=>$doc['mime_type'],'inline'=>true]);
     }
