@@ -52,7 +52,7 @@ services:
     volumes:
       - clamav_database:/var/lib/clamav
     healthcheck:
-      test: ["CMD-SHELL", "clamdscan --ping 3"]
+      test: ["CMD-SHELL", "clamdscan --ping=3"]
       interval: 30s
       timeout: 10s
       retries: 10
