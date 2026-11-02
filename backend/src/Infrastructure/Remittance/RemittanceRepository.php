@@ -17,7 +17,7 @@ final class RemittanceRepository
     public function findIdempotency(string $scope, string $key): ?array
     {
         $row = $this->db->createCommand(
-            'SELECT * FROM {{%idempotency_keys}} WHERE scope = :scope AND idempotency_key = :key LIMIT 1',
+            'SELECT * FROM {{%idempotency_keys}} WHERE scope = :scope AND idempotency_key = :key AND (expires_at IS NULL OR expires_at > UTC_TIMESTAMP()) LIMIT 1',
             [':scope' => $scope, ':key' => $key]
         )->queryOne();
 
@@ -62,12 +62,60 @@ final class RemittanceRepository
         return $row === false ? null : $row;
     }
 
+    /**
+     * Resuelve la dirección del corredor a partir de los códigos ISO de los países,
+     * en lugar de depender del orden numérico de las claves primarias.
+     */
+    public function findDirection(int $sourceCountryId, int $destinationCountryId): string
+    {
+        $rows = $this->db->createCommand(
+            'SELECT id, iso2 FROM {{%countries}} WHERE id IN (:source, :destination)',
+            [':source' => $sourceCountryId, ':destination' => $destinationCountryId]
+        )->queryAll();
+
+        $isoByCountry = [];
+        foreach ($rows as $row) {
+            $isoByCountry[(int) $row['id']] = strtolower((string) $row['iso2']);
+        }
+        $source = $isoByCountry[$sourceCountryId] ?? null;
+        $destination = $isoByCountry[$destinationCountryId] ?? null;
+        if ($source === null || $destination === null) {
+            throw new \DomainException('Country not found for remittance direction');
+        }
+
+        return $source . '_to_' . $destination;
+    }
+
+    /**
+     * Bloquea la cotización y la marca como consumida, evitando que la misma
+     * cotización se use para crear varias remesas (incluso en peticiones concurrentes).
+     */
+    public function consumeQuote(int $quoteId, Transaction $transaction): void
+    {
+        $quote = $this->db->createCommand(
+            'SELECT status, expires_at FROM {{%remittance_quotes}} WHERE id = :id FOR UPDATE',
+            [':id' => $quoteId]
+        )->queryOne();
+        if ($quote === false) {
+            throw new \DomainException('Quote not found');
+        }
+        if ($quote['status'] !== 'valid' || new \DateTimeImmutable($quote['expires_at']) <= new \DateTimeImmutable()) {
+            throw new \DomainException('Quote is expired or unavailable');
+        }
+        $this->db->createCommand()->update(
+            '{{%remittance_quotes}}',
+            ['status' => 'used'],
+            ['id' => $quoteId]
+        )->execute();
+    }
+
     public function save(
         int $userId,
         array $quote,
         array $beneficiary,
         string $publicId,
         string $reference,
+        string $direction,
         array $metadata,
         Transaction $transaction
     ): int {
@@ -77,7 +125,7 @@ final class RemittanceRepository
             'sender_user_id' => $userId,
             'beneficiary_id' => $beneficiary['id'],
             'quote_id' => $quote['id'],
-            'direction' => (int) $quote['source_country_id'] === 1 ? 'ru_to_cu' : 'cu_to_ru',
+            'direction' => $direction,
             'source_country_id' => $quote['source_country_id'],
             'destination_country_id' => $quote['destination_country_id'],
             'send_amount' => $quote['send_amount'],

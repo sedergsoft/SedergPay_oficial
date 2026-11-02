@@ -70,6 +70,11 @@ final class PaymentController extends Controller
             $repository->createDeposit($remittance, $depositId, $reference, $transaction);
             $repository->saveIdempotency($scope, $key, $hash, $response, $transaction);
             $transaction->commit();
+        } catch (\DomainException $exception) {
+            if ($transaction->getIsActive()) {
+                $transaction->rollBack();
+            }
+            throw new UnprocessableEntityHttpException($exception->getMessage(), 0, $exception);
         } catch (\Throwable $exception) {
             if ($transaction->getIsActive()) {
                 $transaction->rollBack();

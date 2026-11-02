@@ -30,6 +30,7 @@ final class ComplianceController extends Controller
 
     public function actionReview(string $publicId): array
     {
+        $this->requireBackOfficeAccess();
         $userId = $this->authenticatedUserId();
         $request = Yii::$app->request;
         $key = trim((string) $request->headers->get('Idempotency-Key', ''));
@@ -96,5 +97,14 @@ final class ComplianceController extends Controller
     private function authenticatedUserId(): int
     {
         return (new UserAuthenticator(Yii::$app->db))->userId();
+    }
+
+    private function requireBackOfficeAccess(): void
+    {
+        // En el sandbox local (modo development) cualquier usuario autenticado puede
+        // simular la revisión de cumplimiento. Fuera de desarrollo solo un administrador.
+        if (getenv('SEDERG_AUTH_MODE') !== 'development') {
+            (new UserAuthenticator(Yii::$app->db))->requireRole('admin');
+        }
     }
 }

@@ -37,7 +37,7 @@ final class ReconciliationRepository
     public function findIdempotency(string $scope, string $key): ?array
     {
         $row = $this->db->createCommand(
-            'SELECT * FROM {{%idempotency_keys}} WHERE scope=:scope AND idempotency_key=:key LIMIT 1',
+            'SELECT * FROM {{%idempotency_keys}} WHERE scope=:scope AND idempotency_key=:key AND (expires_at IS NULL OR expires_at > UTC_TIMESTAMP()) LIMIT 1',
             [':scope' => $scope, ':key' => $key]
         )->queryOne();
         return $row === false ? null : $row;
@@ -45,10 +45,17 @@ final class ReconciliationRepository
 
     public function complete(array $remittance, int $actorUserId, string $notes, Transaction $transaction): void
     {
+        $currentStatus = $this->db->createCommand(
+            'SELECT status FROM {{%remittances}} WHERE id = :id FOR UPDATE',
+            [':id' => $remittance['id']]
+        )->queryScalar();
+        if (!is_string($currentStatus)) {
+            throw new \DomainException('Remittance not found');
+        }
         if ($remittance['matched_transaction_id'] === null) {
             throw new \DomainException('No confirmed bank transaction is available');
         }
-        (new RemittanceStateMachine())->assertCanTransition($remittance['status'], 'completed');
+        (new RemittanceStateMachine())->assertCanTransition($currentStatus, 'completed');
         $this->db->createCommand()->insert('{{%reconciliation_cases}}', [
             'bank_transaction_id' => $remittance['matched_transaction_id'],
             'remittance_id' => $remittance['id'],
@@ -66,7 +73,7 @@ final class ReconciliationRepository
         ], ['id' => $remittance['id']])->execute();
         $this->db->createCommand()->insert('{{%remittance_state_events}}', [
             'remittance_id' => $remittance['id'],
-            'from_status' => 'reconciliation_pending',
+            'from_status' => $currentStatus,
             'to_status' => 'completed',
             'actor_user_id' => $actorUserId,
             'reason' => $notes,

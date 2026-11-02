@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\Infrastructure\Payout;
 
+use app\Domain\Ledger\DoubleEntryValidator;
 use app\Domain\Remittance\RemittanceStateMachine;
 use yii\db\Connection;
 use yii\db\JsonExpression;
@@ -38,7 +39,7 @@ final class PayoutRepository
     public function findIdempotency(string $scope, string $key): ?array
     {
         $row = $this->db->createCommand(
-            'SELECT * FROM {{%idempotency_keys}} WHERE scope=:scope AND idempotency_key=:key LIMIT 1',
+            'SELECT * FROM {{%idempotency_keys}} WHERE scope=:scope AND idempotency_key=:key AND (expires_at IS NULL OR expires_at > UTC_TIMESTAMP()) LIMIT 1',
             [':scope' => $scope, ':key' => $key]
         )->queryOne();
         return $row === false ? null : $row;
@@ -88,19 +89,18 @@ final class PayoutRepository
         if ($order['status'] !== 'pending') {
             throw new \DomainException('Payout is not pending');
         }
-        $machine = new RemittanceStateMachine();
-        $machine->assertCanTransition($remittance['status'], 'funds_confirmed');
-        $this->db->createCommand()->update('{{%remittances}}', [
-            'status' => 'funds_confirmed',
-        ], ['id' => $remittance['id']])->execute();
-        $this->db->createCommand()->insert('{{%remittance_state_events}}', [
-            'remittance_id' => $remittance['id'],
-            'from_status' => $remittance['status'],
-            'to_status' => 'funds_confirmed',
-            'actor_user_id' => null,
-            'reason' => 'Sandbox funds confirmed before payout',
-        ])->execute();
-        $machine->assertCanTransition('funds_confirmed', 'payout_pending');
+
+        $currentStatus = $this->db->createCommand(
+            'SELECT status FROM {{%remittances}} WHERE id=:id FOR UPDATE',
+            [':id' => $remittance['id']]
+        )->queryScalar();
+        if (!is_string($currentStatus)) {
+            throw new \DomainException('Remittance not found');
+        }
+
+        $this->transition((int) $remittance['id'], $currentStatus, 'funds_confirmed', 'Sandbox funds confirmed before payout');
+        $this->transition((int) $remittance['id'], 'funds_confirmed', 'payout_pending', 'Sandbox payout started');
+
         $this->db->createCommand()->update('{{%payout_orders}}', [
             'status' => 'paid',
             'provider_reference' => 'sim-payout-' . bin2hex(random_bytes(6)),
@@ -117,25 +117,23 @@ final class PayoutRepository
             'finished_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
         ])->execute();
         $this->postLedger($remittance, $order['id']);
-        $this->db->createCommand()->update('{{%remittances}}', [
-            'status' => 'payout_pending',
-        ], ['id' => $remittance['id']])->execute();
+
+        $this->transition((int) $remittance['id'], 'payout_pending', 'paid', 'Simulated payout completed', [
+            'paid_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+        ]);
+        $this->transition((int) $remittance['id'], 'paid', 'reconciliation_pending', 'Simulated payout completed; awaiting reconciliation');
+    }
+
+    private function transition(int $remittanceId, string $from, string $to, string $reason, array $extra = []): void
+    {
+        (new RemittanceStateMachine())->assertCanTransition($from, $to);
+        $this->db->createCommand()->update('{{%remittances}}', array_merge(['status' => $to], $extra), ['id' => $remittanceId])->execute();
         $this->db->createCommand()->insert('{{%remittance_state_events}}', [
-            'remittance_id' => $remittance['id'],
-            'from_status' => 'funds_confirmed',
-            'to_status' => 'payout_pending',
+            'remittance_id' => $remittanceId,
+            'from_status' => $from,
+            'to_status' => $to,
             'actor_user_id' => null,
-            'reason' => 'Sandbox payout started',
-        ])->execute();
-        $this->db->createCommand()->update('{{%remittances}}', [
-            'status' => 'reconciliation_pending',
-        ], ['id' => $remittance['id']])->execute();
-        $this->db->createCommand()->insert('{{%remittance_state_events}}', [
-            'remittance_id' => $remittance['id'],
-            'from_status' => 'payout_pending',
-            'to_status' => 'reconciliation_pending',
-            'actor_user_id' => null,
-            'reason' => 'Simulated payout completed; awaiting reconciliation',
+            'reason' => $reason,
         ])->execute();
     }
 
@@ -154,6 +152,11 @@ final class PayoutRepository
         if (count($byCode) !== 2) {
             throw new \RuntimeException('Sandbox ledger accounts are not configured');
         }
+        $amount = (string) $remittance['receive_amount'];
+        (new DoubleEntryValidator())->assertBalanced([
+            ['direction' => 'debit', 'amount' => $amount, 'currency' => $currency],
+            ['direction' => 'credit', 'amount' => $amount, 'currency' => $currency],
+        ]);
         $this->db->createCommand()->insert('{{%ledger_transactions}}', [
             'public_id' => $this->uuid(),
             'reference' => 'PAYOUT-' . $payoutOrderId,
@@ -171,7 +174,7 @@ final class PayoutRepository
                 'ledger_transaction_id' => $transactionId,
                 'ledger_account_id' => $byCode[$code],
                 'direction' => $direction,
-                'amount' => $remittance['receive_amount'],
+                'amount' => $amount,
                 'currency_code' => $currency,
                 'idempotency_key' => 'payout:' . $payoutOrderId . ':' . $direction,
             ])->execute();
