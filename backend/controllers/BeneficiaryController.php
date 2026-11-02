@@ -212,12 +212,12 @@ final class BeneficiaryController extends Controller
         if ($payload['payout_method_code'] === 'bank_account'
             && (!isset($payload['payout_provider'])
                 || trim((string) $payload['payout_provider']) === ''
-                || (isset($payload['payout_account_number']) && !preg_match('/^\d{6,34}$/', (string) $payload['payout_account_number'])))) {
+                || !isset($payload['payout_account_number'])
+                || !preg_match('/^\d{6,34}$/', (string) $payload['payout_account_number']))) {
             throw new UnprocessableEntityHttpException('Bank provider and account number are required');
         }
         if ($payload['payout_method_code'] === 'card_transfer'
-            && isset($payload['payout_card_number'])
-            && !$this->isValidCardNumber((string) $payload['payout_card_number'])) {
+            && (!isset($payload['payout_card_number']) || !$this->isValidCardNumber((string) $payload['payout_card_number']))) {
             throw new UnprocessableEntityHttpException('A valid card number is required');
         }
         $payload['country_code'] = strtoupper($payload['country_code']);
