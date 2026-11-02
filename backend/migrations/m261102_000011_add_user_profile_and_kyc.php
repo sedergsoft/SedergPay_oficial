@@ -11,6 +11,7 @@ class m261102_000011_add_user_profile_and_kyc extends Migration
     public function safeUp(): void
     {
         $this->addColumn('{{%user_profiles}}', 'nationality_country_id', $this->smallInteger()->unsigned()->null()->after('date_of_birth'));
+        $this->addForeignKey('fk_profiles_nationality_country', '{{%user_profiles}}', 'nationality_country_id', '{{%countries}}', 'id', 'SET NULL', 'CASCADE');
         $this->createTable('{{%kyc_cases}}', [
             'id' => $this->bigPrimaryKey()->unsigned(),
             'public_id' => $this->char(36)->notNull(),
@@ -50,6 +51,7 @@ class m261102_000011_add_user_profile_and_kyc extends Migration
     {
         $this->dropTable('{{%kyc_documents}}');
         $this->dropTable('{{%kyc_cases}}');
+        $this->dropForeignKey('fk_profiles_nationality_country', '{{%user_profiles}}');
         $this->dropColumn('{{%user_profiles}}', 'nationality_country_id');
     }
 }
