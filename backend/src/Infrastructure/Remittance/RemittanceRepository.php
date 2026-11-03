@@ -52,7 +52,8 @@ final class RemittanceRepository
     public function findBeneficiaryForUser(string $publicId, int $userId): ?array
     {
         $row = $this->db->createCommand(
-            'SELECT id, country_id, payout_method_code
+            'SELECT id, country_id, payout_method_code, payout_provider,
+                    payout_account_last4, payout_card_last4
              FROM {{%beneficiaries}}
              WHERE public_id = :public_id AND sender_user_id = :user_id AND status = :status
              LIMIT 1',
