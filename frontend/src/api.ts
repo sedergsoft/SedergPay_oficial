@@ -78,6 +78,7 @@ export type Remittance = {
   reference: string;
   direction: string;
   send_amount: string;
+  total_debit_amount?: string;
   send_currency: string;
   receive_amount: string;
   receive_currency: string;
@@ -94,7 +95,6 @@ export type Remittance = {
   deposit_currency?: string | null;
   deposit_expires_at?: string | null;
   payment_instructions?: Record<string, any>;
-  payment_instructions?: Record<string, string | null>;
   receipt_email_sent?: boolean;
 };
 
