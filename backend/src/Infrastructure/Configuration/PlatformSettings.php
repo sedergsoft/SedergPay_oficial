@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace app\\Infrastructure\\Configuration;
+namespace app\Infrastructure\Configuration;
 
 use DomainException;
-use yii\\db\\Connection;
+use yii\db\Connection;
 
 final class PlatformSettings
 {
@@ -181,10 +181,10 @@ final class PlatformSettings
         if ($type === 'enum' && !in_array($string, $definition['options'] ?? [], true)) {
             throw new DomainException('Invalid value for platform setting');
         }
-        if ($type === 'integer' && !preg_match('/^\\d+$/', $string)) {
+        if ($type === 'integer' && !preg_match('/^\d+$/', $string)) {
             throw new DomainException('Integer platform settings require a whole number');
         }
-        if ($type === 'decimal' && !preg_match('/^\\d+(?:\\.\\d{1,10})?$/', $string)) {
+        if ($type === 'decimal' && !preg_match('/^\d+(?:\.\d{1,10})?$/', $string)) {
             throw new DomainException('Decimal platform settings require a positive decimal');
         }
         if (isset($definition['min']) && bccomp($string, $definition['min'], 10) < 0) {
