@@ -86,7 +86,7 @@ export type Remittance = {
   compliance_status: string;
   created_at?: string;
   updated_at?: string;
-  payment_qr_payload?: string | null;
+  payment_qr_payload?: string | null;\n  payment_qr_type?: string | null;
   payment_method_code?: string | null;
   deposit_public_id?: string | null;
   deposit_status?: string | null;
@@ -301,7 +301,7 @@ export const api = {
     headers: { ...authHeaders(userId), 'Idempotency-Key': `remittance-${crypto.randomUUID()}` },
     body: JSON.stringify(body),
   }),
-  deposit: (userId: string, remittanceId: string, methodCode: string) => request<{ public_id: string; payment_reference: string; qr_payload: string | null; qr_type: string; account_mask: string; bank_name: string }>('/api/v1/remittances/' + remittanceId + '/deposit', {
+  deposit: (userId: string, remittanceId: string, methodCode: string) => request<{ public_id: string; payment_reference: string; qr_payload: string | null; qr_type: string; provider_payment_id?: string | null; account_mask: string; bank_name: string }>('/api/v1/remittances/' + remittanceId + '/deposit', {
     method: 'POST',
     headers: { ...authHeaders(userId), 'Idempotency-Key': `deposit-${remittanceId}` },
     body: JSON.stringify({ method_code: methodCode }),
