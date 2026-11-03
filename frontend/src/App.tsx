@@ -295,11 +295,55 @@ function PaymentQr({ remittance }: { remittance: Remittance }) {
 function RemittanceDetails({ detail, onClose }: { detail: RemittanceDetail; onClose: () => void }) {
   const t = useT();
   const locale = localeFor(useLanguage());
-  const events=detail.state_events||[];
-  return <div className="detail-panel card"><div className="section-heading"><div><span className="eyebrow">{t('details.receipt')}</span><h2>{detail.reference}</h2><StatusBadge status={detail.status}/></div><button className="secondary compact-button" onClick={onClose}>{t('common.close')}</button></div>
-  <div className="detail-highlight"><div><span>{t('quote.beneficiaryReceives')}</span><strong>{detail.receive_amount} <small>{detail.receive_currency}</small></strong></div><div><span>{t('details.senderSends')}</span><strong>{detail.send_amount} <small>{detail.send_currency}</small></strong></div></div>
-  <div className="detail-grid"><Detail label={t('details.compliance')} value={detail.compliance_status} /><Detail label={t('quote.fee')} value={`${detail.fee_amount} ${detail.fee_currency}`} /><Detail label={t('details.totalDebit')} value={`${detail.total_debit_amount} ${detail.send_currency}`} /><Detail label={t('quote.exchangeRate')} value={`${detail.exchange_rate} CUP por RUB`} /><Detail label={t('details.created')} value={detail.created_at ?? '—'} /><Detail label={t('field.beneficiary')} value={`${detail.beneficiary_first_name} ${detail.beneficiary_last_name}`} /><Detail label={t('field.contact')} value={detail.beneficiary_phone || detail.beneficiary_email || '—'} /><Detail label={t('field.payoutMethod')} value={`${t('payout.'+detail.payout_method_code)}${detail.payout_provider ? ` · ${detail.payout_provider}` : ''}`} /><Detail label={t('details.accountCard')} value={detail.payout_account_last4 ? `Cuenta ****${detail.payout_account_last4}` : detail.payout_card_last4 ? `Tarjeta ****${detail.payout_card_last4}` : '—'} /></div>
-  {detail.payment_qr_payload && <PaymentQr remittance={detail} />}<div className="timeline-heading"><span className="eyebrow">{t('details.traceability')}</span><h3>{t('details.statusHistory')}</h3></div>{events.length===0?<p className="muted">{t('details.noEvents')}</p>:<div className="timeline timeline-modern">{events.map((event) => <div className="timeline-item" key={`${event.to_status}-${event.created_at}`}><span className="timeline-dot"><Icon name="check"/></span><div><strong>{event.to_status}</strong><span>{event.created_at}</span><small>{event.reason}</small></div></div>)}</div>}
+  const events = detail.state_events || [];
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    document.body.style.overflow = 'hidden';
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, [onClose]);
+
+  return <div className="details-modal-backdrop" onMouseDown={(event) => {
+    if (event.target === event.currentTarget) onClose();
+  }}>
+    <section className="details-modal card" role="dialog" aria-modal="true" aria-labelledby="remittance-details-title" onKeyDown={(event) => {
+      if (event.key !== 'Tab') return;
+      const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'));
+      if (focusable.length === 0) { event.preventDefault(); return; }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }}>
+      <div className="section-heading details-modal-heading">
+        <div><span className="eyebrow">{t('details.receipt')}</span><h2 id="remittance-details-title">{detail.reference}</h2><StatusBadge status={detail.status}/></div>
+        <button className="secondary compact-button" type="button" autoFocus onClick={onClose}>{t('common.close')}</button>
+      </div>
+      <div className="detail-highlight"><div><span>{t('quote.beneficiaryReceives')}</span><strong>{detail.receive_amount} <small>{detail.receive_currency}</small></strong></div><div><span>{t('details.senderSends')}</span><strong>{detail.send_amount} <small>{detail.send_currency}</small></strong></div></div>
+      <div className="detail-grid">
+        <Detail label={t('details.compliance')} value={detail.compliance_status || '—'} />
+        <Detail label={t('quote.fee')} value={`${detail.fee_amount} ${detail.fee_currency}`} />
+        <Detail label={t('details.totalDebit')} value={`${detail.total_debit_amount} ${detail.send_currency}`} />
+        <Detail label={t('quote.exchangeRate')} value={`${detail.exchange_rate} ${detail.receive_currency} / ${detail.send_currency}`} />
+        <Detail label={t('details.created')} value={detail.created_at ? new Date(detail.created_at).toLocaleString(locale) : '—'} />
+        <Detail label={t('field.beneficiary')} value={`${detail.beneficiary_first_name} ${detail.beneficiary_last_name}`} />
+        <Detail label={t('field.contact')} value={detail.beneficiary_phone || detail.beneficiary_email || '—'} />
+        <Detail label={t('field.payoutMethod')} value={`${t('payout.' + detail.payout_method_code)}${detail.payout_provider ? ` · ${detail.payout_provider}` : ''}`} />
+        <Detail label={t('details.accountCard')} value={detail.payout_account_last4 ? `Cuenta ****${detail.payout_account_last4}` : detail.payout_card_last4 ? `Tarjeta ****${detail.payout_card_last4}` : '—'} />
+      </div>
+      {detail.payment_qr_payload && <PaymentQr remittance={detail} />}
+      <div className="timeline-heading"><span className="eyebrow">{t('details.traceability')}</span><h3>{t('details.statusHistory')}</h3></div>
+      {events.length === 0 ? <p className="muted">{t('details.noEvents')}</p> : <div className="timeline timeline-modern">{events.map((event) => <div className="timeline-item" key={`${event.to_status}-${event.created_at}`}><span className="timeline-dot"><Icon name="check"/></span><div><strong>{event.to_status}</strong><span>{event.created_at}</span><small>{event.reason}</small></div></div>)}</div>}
+    </section>
   </div>;
 }
 function Detail({ label, value }: { label: string; value: string }) { return <div className="detail-item"><span>{label}</span><strong>{value}</strong></div>; }
