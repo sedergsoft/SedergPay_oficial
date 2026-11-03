@@ -76,6 +76,7 @@ final class QuoteCalculator
             'exchange_rate' => bcadd($exchangeRate, '0', 10),
             'fee_amount' => $feeAmount,
             'fee_currency' => $feeCurrency,
+            'fee_mode' => $feeMode,
             'total_debit_amount' => $totalDebitAmount,
             'calculated_at' => ($calculatedAt ?? new DateTimeImmutable())->format(DateTimeInterface::ATOM),
         ];
