@@ -42,7 +42,13 @@ La cotización y el perfil de beneficiario ya trabajan con métodos de entrega; 
 | Rusia → Cuba | Rusia / RUB | Transferencia bancaria (`bank_transfer`) | Efectivo, abono a cuenta o transferencia a tarjeta en Cuba | Métodos de entrega en catálogo/UI; canal de fondeo en sandbox |
 | Cuba → Rusia | Cuba / CUP | No definido en el catálogo del repositorio | En la arquitectura general se prevé entrega a cuenta en Rusia, pero faltan métodos/proveedores específicos | Requiere decisión y validación operativa |
 
-## Titularidad de las cuentas receptoras\n\nDecisión confirmada por el usuario: las cuentas receptoras estarán a nombre de **SEDERG_PAY**. El sistema debe guardar literalmente el titular legal validado para cada cuenta y mostrarlo en las instrucciones de pago. El valor predeterminado funcional será `SEDERG_PAY`, pero antes de activar una cuenta real se debe comprobar que ese sea el nombre legal exacto aceptado por el banco y que SEDERG_PAY sea la entidad jurídica autorizada para recibir los fondos en el país correspondiente. No se deben utilizar cuentas personales de administradores ni de terceros.\n\nLa titularidad no sustituye la verificación legal, bancaria ni regulatoria. En Rusia y Cuba pueden existir diferencias en la forma jurídica, documentación, moneda, restricciones de recepción y requisitos de identificación del titular. Cada cuenta se habilitará por separado después de verificar esos requisitos en su jurisdicción.\n\n## Diseño propuesto
+## Titularidad de las cuentas receptoras
+
+Decisión confirmada por el usuario: las cuentas receptoras estarán a nombre de **SEDERG_PAY**. El sistema debe guardar literalmente el titular legal validado para cada cuenta y mostrarlo en las instrucciones de pago. El valor predeterminado funcional será `SEDERG_PAY`, pero antes de activar una cuenta real se debe comprobar que ese sea el nombre legal exacto aceptado por el banco y que SEDERG_PAY sea la entidad jurídica autorizada para recibir los fondos en el país correspondiente. No se deben utilizar cuentas personales de administradores ni de terceros.
+
+La titularidad no sustituye la verificación legal, bancaria ni regulatoria. En Rusia y Cuba pueden existir diferencias en la forma jurídica, documentación, moneda, restricciones de recepción y requisitos de identificación del titular. Cada cuenta se habilitará por separado después de verificar esos requisitos en su jurisdicción.
+
+## Diseño propuesto
 
 ### 1. Catálogo de métodos de fondeo
 
@@ -98,15 +104,21 @@ Cambiar la cuenta desde administración afectará solo a depósitos nuevos; las 
 - El modo sandbox seguirá separado del modo real.
 - Activar una cuenta real requerirá verificar titularidad de la entidad, contrato bancario, autorización regulatoria, AML/KYC, sanciones, límites, devoluciones y disponibilidad del canal.
 
-## Implementación realizada en esta rama\n\n- Migración MySQL única `m261103_000014_create_funding_payment_module`: catálogo de métodos de fondeo, cuentas receptoras SEDERG_PAY, relación cuenta-método e instantánea de cuenta/QR en depósitos. Se eliminó una migración duplicada con el mismo número.\n- API Yii2 para listar métodos disponibles, administrar métodos, registrar cuentas sandbox, activar/desactivar cuentas y crear instrucciones de depósito idempotentes.\n- La cuenta se cifra con `SEDERG_ACCOUNT_ENCRYPTION_KEY` y el API solo devuelve máscara. La clave se inyecta desde Docker y se documenta en `.env.example`; debe ser distinta de `SEDERG_PII_KEY`.\n- Panel React para administrar cuentas/métodos y selección del método en el paso de pago.\n- La transferencia bancaria muestra cuenta/titular/referencia y no fabrica un QR. El método QR genera únicamente un URI `sedergpay-sandbox://` para probar la UI; no es un QR interoperable ni un cobro real.\n- La cuenta de pago queda congelada en `deposit_requests.account_snapshot`; un cambio administrativo requiere registrar una cuenta nueva y desactivar la anterior.\n\n## Entregas técnicas propuestas para esta rama
+## Implementación realizada en esta rama
 
-1. Migración MySQL para catálogo de métodos de fondeo y cuentas receptoras de plataforma, con cifrado/mascarado, vigencia e índices.
-2. API de administración para CRUD lógico de cuentas receptoras y catálogo de métodos.
-3. API del cliente para listar métodos disponibles y crear instrucciones de pago.
-4. Servicio de estrategia QR por método/proveedor, con simulador de sandbox y adaptadores reales deshabilitados hasta autorización.
-5. UI administrativa para gestionar cuentas y métodos.
-6. Wizard de pago para mostrar QR/instrucciones según método seleccionado, importe, referencia, vencimiento y estado.
-7. Pruebas unitarias, integración HTTP/MySQL, idempotencia, cambio de cuenta, QR por método, rechazo de métodos deshabilitados y regresión de ambos corredores.
+- Migración MySQL única `m261103_000014_create_funding_payment_module`: catálogo de métodos de fondeo, cuentas receptoras SEDERG_PAY, relación cuenta-método e instantánea de cuenta/QR en depósitos. Se eliminó una migración duplicada con el mismo número.
+- API Yii2 para listar métodos disponibles, administrar métodos, registrar cuentas sandbox, activar/desactivar cuentas y crear instrucciones de depósito idempotentes.
+- La cuenta se cifra con `SEDERG_ACCOUNT_ENCRYPTION_KEY` y el API solo devuelve máscara. La clave se inyecta desde Docker y se documenta en `.env.example`; debe ser distinta de `SEDERG_PII_KEY`.
+- Panel React para administrar cuentas/métodos y selección del método en el paso de pago.
+- La transferencia bancaria muestra cuenta/titular/referencia y no fabrica un QR. El método QR genera únicamente un URI `sedergpay-sandbox://` para probar la UI; no es un QR interoperable ni un cobro real.
+- La cuenta de pago queda congelada en `deposit_requests.account_snapshot`; un cambio administrativo requiere registrar una cuenta nueva y desactivar la anterior.
+
+## Entregas técnicas propuestas para esta rama
+
+1. Completar adaptadores bancarios reales tras confirmar contratos y especificaciones técnicas.
+2. Añadir conciliación automática por referencia/importe y webhooks firmados.
+3. Completar auditoría y pruebas de concurrencia/rotación de cuentas.
+4. Ejecutar el flujo en Docker local con la clave de cifrado configurada.
 
 ## Decisiones pendientes antes de activar métodos reales
 
@@ -116,6 +128,10 @@ Cambiar la cuenta desde administración afectará solo a depósitos nuevos; las 
 - Confirmar bancos cubanos de destino y requisitos para abono a cuenta/tarjeta.
 - Determinar si los QR serán QR de transferencia bancaria, QR de cobro/adquirencia o deep links de aplicaciones bancarias. Son formatos distintos y no intercambiables.
 
-## Configuración local requerida\n\nDefinir `SEDERG_ACCOUNT_ENCRYPTION_KEY` como secreto aleatorio independiente (por ejemplo, `openssl rand -hex 32`) en el `.env` local antes de crear cuentas sandbox. No compartir esta clave ni subir el `.env` a Git. Si no está definida, el endpoint de alta responde 503 y no persiste la cuenta.\n\n## Restricción de alcance
+## Configuración local requerida
+
+Definir `SEDERG_ACCOUNT_ENCRYPTION_KEY` como secreto aleatorio independiente (por ejemplo, `openssl rand -hex 32`) en el `.env` local antes de crear cuentas sandbox. No compartir esta clave ni subir el `.env` a Git. Si no está definida, el endpoint de alta responde 503 y no persiste la cuenta.
+
+## Restricción de alcance
 
 El desarrollo y las pruebas iniciales se harán en Docker local/sandbox. No se habilitarán pagos reales, custodia de fondos ni despliegue productivo como consecuencia de esta rama.
