@@ -244,14 +244,16 @@ assertTrue($status === 200 && ($reused['public_id'] ?? null) === ($remittance['p
     'bank_name' => 'Banco Metropolitano (sandbox)',
     'account_holder_name' => 'SEDERG_PAY',
     'account_identifier' => '0123456789012345',
+    'routing_identifier' => '123456789',
     'environment' => 'sandbox',
     'methods' => ['cu_bank_transfer', 'cu_instant_qr'],
 ], 'ci-funding-account-create-20261103');
 assertTrue($accountStatus === 201, 'admin can create a SEDERG_PAY Cuba sandbox receiving account');
 assertTrue(($account['account_holder_name'] ?? null) === 'SEDERG_PAY', 'receiving account holder is fixed to SEDERG_PAY');
 assertTrue(($account['account_mask'] ?? '') !== '0123456789012345', 'API returns a masked account identifier');
-$accountRow = $pdo->query("SELECT account_identifier_ciphertext,account_mask FROM platform_funding_accounts WHERE public_id=" . $pdo->quote($account['public_id']))->fetch();
+$accountRow = $pdo->query("SELECT account_identifier_ciphertext,account_mask,routing_identifier_ciphertext,routing_mask FROM platform_funding_accounts WHERE public_id=" . $pdo->quote($account['public_id']))->fetch();
 assertTrue($accountRow && $accountRow['account_identifier_ciphertext'] !== '0123456789012345' && $accountRow['account_mask'] !== '0123456789012345', 'account identifier is encrypted at rest and masked');
+assertTrue($accountRow['routing_identifier_ciphertext'] !== '123456789' && $accountRow['routing_mask'] !== '123456789', 'bank routing identifier is encrypted at rest and masked');
 
 [$methodStatus] = apiPut('/api/v1/admin/funding-methods/cu_bank_transfer', ['is_active' => true]);
 assertTrue($methodStatus === 200, 'admin can activate bank transfer after account setup');
@@ -311,6 +313,7 @@ if (!$cuBeneficiaryId) {
     'bank_name' => 'Sberbank (sandbox)',
     'account_holder_name' => 'SEDERG_PAY',
     'account_identifier' => '40702810900000000001',
+    'routing_identifier' => '044525225',
     'environment' => 'sandbox',
     'methods' => ['ru_sbp_qr'],
 ], 'ci-ru-sbp-account-create-20261103');
