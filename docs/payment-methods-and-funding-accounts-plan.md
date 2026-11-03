@@ -63,7 +63,7 @@ Crear un módulo administrativo para añadir, editar, activar/desactivar y susti
 - país y moneda;
 - banco/proveedor;
 - titular legal: SEDERG_PAY (con la denominación jurídica exacta validada para la cuenta);
-- tipo y número de cuenta / IBAN / identificador bancario según el país;
+- tipo y número de cuenta / IBAN / identificador bancario según el país;\n- BIC/БИК/código de ruta o sucursal, cuando el canal lo requiera (también cifrado y enmascarado);
 - máscara para mostrar al cliente;
 - método(s) de fondeo compatibles;
 - entorno y estado;
