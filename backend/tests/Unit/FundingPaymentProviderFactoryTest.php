@@ -15,20 +15,20 @@ final class FundingPaymentProviderFactoryTest extends TestCase
     public function testResolvesOnlyKnownSandboxProviders(): void
     {
         $factory = new FundingPaymentProviderFactory();
-        self::assertInstanceOf(SbpSandboxQrProvider::class, $factory->for('sbp_c2b_sandbox', 'sandbox'));
-        self::assertInstanceOf(GenericSandboxQrProvider::class, $factory->for('sedergpay_sandbox', 'sandbox'));
+        self::assertInstanceOf(SbpSandboxQrProvider::class, $factory->create('sbp_c2b_sandbox', 'sandbox'));
+        self::assertInstanceOf(GenericSandboxQrProvider::class, $factory->create('sedergpay_sandbox', 'sandbox'));
     }
 
     public function testRejectsProductionUntilContractAdapterExists(): void
     {
         $this->expectException(DomainException::class);
-        (new FundingPaymentProviderFactory())->for('sbp_c2b_sandbox', 'production');
+        (new FundingPaymentProviderFactory())->create('sbp_c2b_sandbox', 'production');
     }
 
     public function testRejectsUnknownProvider(): void
     {
         $this->expectException(DomainException::class);
-        (new FundingPaymentProviderFactory())->for('unknown', 'sandbox');
+        (new FundingPaymentProviderFactory())->create('unknown', 'sandbox');
     }
 
     public function testCubaSandboxPayloadRemainsNonRoutable(): void
