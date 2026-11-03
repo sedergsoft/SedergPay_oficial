@@ -276,7 +276,7 @@ final class FundingController extends Controller
             'account_holder_name' => 'SEDERG_PAY', 'account_mask' => $account['account_mask'],
             'currency_code' => $remittance['send_currency'], 'amount' => $remittance['total_debit_amount'],
             'method_code' => $methodCode, 'method_name' => $account['name'], 'reference' => $reference,
-            'environment' => 'sandbox', 'qr_type' => $qrType,
+            'environment' => 'sandbox', 'qr_type' => $qrType, 'provider_payment_id' => $providerPaymentId,
         ];
         $response = [
             'public_id' => $depositId, 'provider' => 'simulator', 'status' => 'pending',
@@ -284,7 +284,7 @@ final class FundingController extends Controller
             'payment_reference' => $reference, 'expires_at' => (new \DateTimeImmutable($expires))->format(DATE_ATOM),
             'method_code' => $methodCode, 'method_name' => $account['name'], 'bank_name' => $account['bank_name'],
             'account_holder_name' => 'SEDERG_PAY', 'account_mask' => $account['account_mask'],
-            'qr_payload' => $qrPayload, 'qr_type' => $qrType,
+            'qr_payload' => $qrPayload, 'qr_type' => $qrType, 'provider_payment_id' => $providerPaymentId,
         ];
         $tx = $db->beginTransaction();
         try {
@@ -293,7 +293,7 @@ final class FundingController extends Controller
             $db->createCommand()->insert('{{%deposit_requests}}', [
                 'public_id' => $depositId, 'remittance_id' => $remittance['id'], 'bank_connection_id' => (int) $connectionId,
                 'funding_account_id' => $account['id'], 'funding_method_code' => $methodCode,
-                'account_snapshot' => new JsonExpression($snapshot), 'qr_payload' => $qrPayload, 'qr_expires_at' => $expires,
+                'account_snapshot' => new JsonExpression($snapshot), 'qr_payload' => $qrPayload, 'qr_expires_at' => $expires, 'provider_payment_id' => $providerPaymentId,
                 'expected_amount' => $remittance['total_debit_amount'], 'currency_code' => $remittance['send_currency'],
                 'payment_reference' => $reference, 'status' => 'pending', 'expires_at' => $expires,
             ])->execute();
