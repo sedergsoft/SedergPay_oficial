@@ -323,7 +323,7 @@ function RemittanceDetails({ detail, onClose }: { detail: RemittanceDetail; onCl
         <Detail label={t('details.compliance')} value={detail.compliance_status || '—'} />
         <Detail label={t('quote.fee')} value={`${detail.fee_amount} ${detail.fee_currency}`} />
         <Detail label={t('details.totalDebit')} value={`${detail.total_debit_amount} ${detail.send_currency}`} />
-        <Detail label={t('quote.exchangeRate')} value={`${detail.exchange_rate} CUP por RUB`} />
+        <Detail label={t('quote.exchangeRate')} value={`${detail.exchange_rate} ${detail.receive_currency} / ${detail.send_currency}`} />
         <Detail label={t('details.created')} value={detail.created_at ? new Date(detail.created_at).toLocaleString(locale) : '—'} />
         <Detail label={t('field.beneficiary')} value={`${detail.beneficiary_first_name} ${detail.beneficiary_last_name}`} />
         <Detail label={t('field.contact')} value={detail.beneficiary_phone || detail.beneficiary_email || '—'} />
