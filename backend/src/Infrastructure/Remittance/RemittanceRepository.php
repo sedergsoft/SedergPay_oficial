@@ -226,6 +226,8 @@ final class RemittanceRepository
         $snapshot = $this->decodeJson($row['deposit_account_snapshot'] ?? null);
         $row['payment_qr_payload'] = $row['deposit_qr_payload'] ?? ($row['metadata']['payment_qr_payload'] ?? null);
         $row['payment_instructions'] = array_merge($row['metadata'], $snapshot);
+        $row['payment_method_code'] = $snapshot['method_code'] ?? null;
+        $row['payment_qr_type'] = $snapshot['qr_type'] ?? null;
         if (!empty($row['deposit_reference_snapshot'])) {
             $row['payment_instructions']['reference'] = $row['deposit_reference_snapshot'];
         }
