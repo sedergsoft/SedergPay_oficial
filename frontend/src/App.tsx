@@ -362,7 +362,7 @@ function QuotePanel({ userId, run }: { userId: string; run: (action: () => Promi
       </div>}
       {step===1 && <div className="wizard-panel modern-form">
         <div className="wizard-route-chip"><CountryFlag country={sourceCountry}/><strong>{sendCurrency}</strong><span>→</span><CountryFlag country={destinationCountry}/><strong>{receiveCurrency}</strong></div>
-        <div className="amount-input-wrap"><Field name="wizard_amount" label={t('quote.sendAmount')} value={amount} onChange={(event:ChangeEvent<HTMLInputElement>)=>{setAmount(event.target.value);setQuote(null);}} inputMode="decimal"/><span>{sendCurrency}</span></div>
+        <div className="amount-input-wrap"><Field name="wizard_amount" label={t('quote.sendAmount')} value={amount} onChange={(event:ChangeEvent<HTMLInputElement>)=>{setAmount(event.target.value);setQuote(null);}} inputMode="numeric"/><span>{sendCurrency}</span></div>
         <label>Modalidad de comisión<select value={feeMode} onChange={event=>{setFeeMode(event.target.value as 'add_to_send'|'deduct_from_receive');setQuote(null);}}><option value="add_to_send">Añadir la comisión al pago del remitente</option><option value="deduct_from_receive">Descontar la comisión de lo que recibe el beneficiario</option></select></label>
         <div className="quote-note"><Icon name="info"/> La cotización mostrará la tasa disponible, su fuente y fecha de vigencia. La comisión inicial configurada es del 3%, sujeta a las condiciones vigentes de la plataforma.</div>
       </div>}
