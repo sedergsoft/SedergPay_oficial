@@ -173,7 +173,6 @@ final class QuoteController extends Controller
             'fee_currency' => $quote['fee_currency'],
             'total_debit_amount' => $quote['total_debit_amount'],
             'fee_mode' => $quote['fee_mode'],
-            'fee_mode' => $quote['fee_mode'],
             'payout_method_code' => $quote['payout_method_code'],
             'status' => $status,
             'expires_at' => $expiresAt->format(DATE_ATOM),
