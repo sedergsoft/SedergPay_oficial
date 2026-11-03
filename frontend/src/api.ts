@@ -86,7 +86,8 @@ export type Remittance = {
   compliance_status: string;
   created_at?: string;
   updated_at?: string;
-  payment_qr_payload?: string | null;\n  payment_qr_type?: string | null;
+  payment_qr_payload?: string | null;
+  payment_qr_type?: string | null;
   payment_method_code?: string | null;
   deposit_public_id?: string | null;
   deposit_status?: string | null;
