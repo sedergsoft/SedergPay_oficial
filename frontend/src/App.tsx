@@ -74,7 +74,7 @@ function AppContent({ language, onLanguageChange }: { language: Language; onLang
         <NavButton icon="users" active={view === 'beneficiaries'} onClick={() => setView('beneficiaries')}>{translate(language, 'nav.beneficiaries')}</NavButton>
         <NavButton icon="send" active={view === 'quote'} onClick={() => setView('quote')}>{translate(language, 'nav.quote')}</NavButton>
         <NavButton icon="history" active={view === 'remittances'} onClick={() => setView('remittances')}>{translate(language, 'nav.remittances')}</NavButton><NavButton icon="user" active={view === 'profile'} onClick={() => setView('profile')}>{t('nav.profile')}</NavButton><NavButton icon="shield" active={view === 'kyc'} onClick={() => setView('kyc')}>{t('nav.kyc')}</NavButton>
-        {user.role === 'admin' && <><NavButton icon="settings" active={view === 'admin'} onClick={() => setView('admin')}>{translate(language, 'nav.admin')}</NavButton><NavButton icon="bank" active={view === 'funding'} onClick={() => setView('funding')}>Métodos de pago</NavButton></>}
+        {user.role === 'admin' && <><NavButton icon="settings" active={view === 'admin'} onClick={() => setView('admin')}>{translate(language, 'nav.admin')}</NavButton><NavButton icon="settings" active={view === 'funding'} onClick={() => setView('funding')}>Métodos de pago</NavButton></>}
         <button className="secondary menu-exit" onClick={signOut}>{translate(language, 'nav.logout')}</button>
       </nav>
       <section className="content">
@@ -500,7 +500,7 @@ function RemittanceDetails({ detail, onClose }: { detail: RemittanceDetail; onCl
         <Detail label={t('field.payoutMethod')} value={`${t('payout.' + detail.payout_method_code)}${detail.payout_provider ? ` · ${detail.payout_provider}` : ''}`} />
         <Detail label={t('details.accountCard')} value={detail.payout_account_last4 ? `Cuenta ****${detail.payout_account_last4}` : detail.payout_card_last4 ? `Tarjeta ****${detail.payout_card_last4}` : '—'} />
       </div>
-      {detail.payment_qr_payload && <PaymentQr remittance={detail} />}
+      {detail.deposit_public_id && <PaymentQr remittance={detail} />}
       <div className="timeline-heading"><span className="eyebrow">{t('details.traceability')}</span><h3>{t('details.statusHistory')}</h3></div>
       {events.length === 0 ? <p className="muted">{t('details.noEvents')}</p> : <div className="timeline timeline-modern">{events.map((event) => <div className="timeline-item" key={`${event.to_status}-${event.created_at}`}><span className="timeline-dot"><Icon name="check"/></span><div><strong>{event.to_status}</strong><span>{event.created_at}</span><small>{event.reason}</small></div></div>)}</div>}
     </section>
