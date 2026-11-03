@@ -104,10 +104,11 @@ final class BeneficiaryRepository
             [':public_id'=>$publicId, ':user_id'=>$userId]
         )->queryOne();
         if ($current === false) return;
-        $accountToken = $payload['payout_account_token'] ?? ($current['payout_method_code'] === 'bank_account' && $payload['payout_method_code'] === 'bank_account' ? $current['payout_account_token'] : null);
-        $accountLast4 = $payload['payout_account_last4'] ?? ($current['payout_method_code'] === 'bank_account' && $payload['payout_method_code'] === 'bank_account' ? $current['payout_account_last4'] : null);
-        $cardToken = $payload['payout_card_token'] ?? ($current['payout_method_code'] === 'card_transfer' && $payload['payout_method_code'] === 'card_transfer' ? $current['payout_card_token'] : null);
-        $cardLast4 = $payload['payout_card_last4'] ?? ($current['payout_method_code'] === 'card_transfer' && $payload['payout_method_code'] === 'card_transfer' ? $current['payout_card_last4'] : null);
+        // Keep both payout instruments when the preferred method changes.
+        $accountToken = $payload['payout_account_token'] ?? $current['payout_account_token'];
+        $accountLast4 = $payload['payout_account_last4'] ?? $current['payout_account_last4'];
+        $cardToken = $payload['payout_card_token'] ?? $current['payout_card_token'];
+        $cardLast4 = $payload['payout_card_last4'] ?? $current['payout_card_last4'];
         $this->db->createCommand()->update('{{%beneficiaries}}', [
             'country_id' => $countryId,
             'first_name' => trim($payload['first_name']),
