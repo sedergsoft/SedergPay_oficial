@@ -1,6 +1,6 @@
 import { ChangeEvent, FormEvent, createContext, useContext, useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import { api, AdminDashboard, AdminOperation, AdminRate, AdminUser, Beneficiary, ExchangeRate, PlatformSetting, Quote, Remittance, RemittanceDetail, User, isDevelopmentAuth, paymentMethods } from './api';
+import { api, AdminDashboard, AdminOperation, AdminRate, AdminUser, Beneficiary, ExchangeRate, FundingAccount, FundingMethod, PlatformSetting, Quote, Remittance, RemittanceDetail, User, isDevelopmentAuth, paymentMethods } from './api';
 import { getInitialLanguage, Language, languageLabels, translate } from './i18n';
 
 const LanguageContext = createContext<Language>('es');
@@ -8,7 +8,7 @@ const useLanguage = () => useContext(LanguageContext);
 const useT = () => { const language = useLanguage(); return (key: string) => translate(language, key); };
 const localeFor = (language: Language) => language === 'ru' ? 'ru-RU' : 'es-ES';
 
-type View = 'summary' | 'beneficiaries' | 'quote' | 'remittances' | 'profile' | 'kyc' | 'admin';
+type View = 'summary' | 'beneficiaries' | 'quote' | 'remittances' | 'profile' | 'kyc' | 'admin' | 'funding';
 const storedUserId = isDevelopmentAuth ? localStorage.getItem('sederg_user') ?? '' : '';
 
 export function App() {
@@ -74,7 +74,7 @@ function AppContent({ language, onLanguageChange }: { language: Language; onLang
         <NavButton icon="users" active={view === 'beneficiaries'} onClick={() => setView('beneficiaries')}>{translate(language, 'nav.beneficiaries')}</NavButton>
         <NavButton icon="send" active={view === 'quote'} onClick={() => setView('quote')}>{translate(language, 'nav.quote')}</NavButton>
         <NavButton icon="history" active={view === 'remittances'} onClick={() => setView('remittances')}>{translate(language, 'nav.remittances')}</NavButton><NavButton icon="user" active={view === 'profile'} onClick={() => setView('profile')}>{t('nav.profile')}</NavButton><NavButton icon="shield" active={view === 'kyc'} onClick={() => setView('kyc')}>{t('nav.kyc')}</NavButton>
-        {user.role === 'admin' && <NavButton icon="settings" active={view === 'admin'} onClick={() => setView('admin')}>{translate(language, 'nav.admin')}</NavButton>}
+        {user.role === 'admin' && <><NavButton icon="settings" active={view === 'admin'} onClick={() => setView('admin')}>{translate(language, 'nav.admin')}</NavButton><NavButton icon="bank" active={view === 'funding'} onClick={() => setView('funding')}>Métodos de pago</NavButton></>}
         <button className="secondary menu-exit" onClick={signOut}>{translate(language, 'nav.logout')}</button>
       </nav>
       <section className="content">
@@ -83,7 +83,7 @@ function AppContent({ language, onLanguageChange }: { language: Language; onLang
         {view === 'beneficiaries' && <Beneficiaries userId={user.public_id} run={run} />}
         {view === 'quote' && <QuotePanel userId={user.public_id} run={run} />}
         {view === 'remittances' && <Remittances userId={user.public_id} run={run} />}{view === 'profile' && <ProfilePanel userId={user.public_id} run={run} />}{view === 'kyc' && <KycPanel userId={user.public_id} run={run} />}
-        {view === 'admin' && user.role === 'admin' && <AdminOperations userId={user.public_id} run={run} />}
+        {view === 'admin' && user.role === 'admin' && <AdminOperations userId={user.public_id} run={run} />}{view === 'funding' && user.role === 'admin' && <AdminFundingPanel userId={user.public_id} run={run} />}
         {message && <Alert text={message} />}
       </section>
     </div>
@@ -396,13 +396,42 @@ function QuotePanel({ userId, run }: { userId: string; run: (action: () => Promi
 function Remittances({ userId, run }: { userId: string; run: (action: () => Promise<void>) => Promise<void> }) {
   const t = useT();
   const locale = localeFor(useLanguage());
-  const [items, setItems] = useState<Remittance[]>([]); const [selected, setSelected] = useState<RemittanceDetail | null>(null); const [filter,setFilter]=useState('all'); const refresh = () => run(async () => setItems(await api.remittances(userId)));
+  const [items, setItems] = useState<Remittance[]>([]);
+  const [selected, setSelected] = useState<RemittanceDetail | null>(null);
+  const [filter,setFilter]=useState('all');
+  const [payingFor,setPayingFor]=useState<Remittance|null>(null);
+  const [fundingMethods,setFundingMethods]=useState<FundingMethod[]>([]);
+  const [loadingMethods,setLoadingMethods]=useState(false);
+  const refresh = () => run(async () => setItems(await api.remittances(userId)));
   useEffect(() => { refresh(); }, [userId]);
+  useEffect(() => {
+    if (!payingFor) { setFundingMethods([]); return; }
+    const country = payingFor.send_currency.toUpperCase() === 'CUP' ? 'CU' : 'RU';
+    setLoadingMethods(true);
+    void run(async () => {
+      const result = await api.fundingMethods(userId,country);
+      setFundingMethods(result.methods);
+    }).finally(() => setLoadingMethods(false));
+  }, [payingFor?.public_id,userId]);
   const visible=items.filter(item=>filter==='all'||(filter==='active'&&!['completed','cancelled','rejected'].includes(item.status))||(filter==='completed'&&item.status==='completed'));
+  const startPayment = (item:Remittance) => setPayingFor(item);
+  const chooseMethod = (method:FundingMethod) => {
+    if(!payingFor)return;
+    void run(async()=>{
+      await api.deposit(userId,payingFor.public_id,method.code);
+      const detail=await api.remittance(userId,payingFor.public_id);
+      setSelected(detail);
+      setPayingFor(null);
+      setItems(await api.remittances(userId));
+    });
+  };
   return <div className="feature-view"><div className="view-heading"><div><span className="eyebrow">{t('remittances.eyebrow')}</span><h2>{t('nav.remittances')}</h2><p className="muted">{t('remittances.description')}</p></div><span className="count-chip">{items.length} {t('common.operations')}</span></div>
   <section className="card remittances-card"><div className="filter-tabs" role="group" aria-label={t('remittances.filter')}>{[['all',t('common.all')],['active',t('common.inProgress')],['completed',t('common.completed')]].map(([value,label])=><button key={value} className={filter===value?'filter-tab active':'filter-tab'} onClick={()=>setFilter(value)}>{label}</button>)}</div>
   {visible.length===0?<div className="empty-state"><span className="empty-icon"><Icon name="history"/></span><strong>{t('remittances.empty')}</strong><p>{t('remittances.emptyDescription')}</p></div>:<div className="remittance-list">{visible.map(item=><article className="remittance-item" key={item.public_id}><span className="remittance-icon"><Icon name="transfer"/></span><div className="remittance-main"><strong>{item.reference}</strong><small>{item.created_at?new Date(item.created_at).toLocaleString(locale):'Fecha no disponible'}</small><span>{item.send_amount} {item.send_currency} <b>→</b> {item.receive_amount} {item.receive_currency}</span></div><div className="remittance-status"><StatusBadge status={item.status}/><button className="text-button" onClick={() => void run(async () => setSelected(await api.remittance(userId, item.public_id)))}>{t('common.viewDetails')} <span>→</span></button></div>
-  <div className="remittance-operations">{item.status === 'awaiting_payment' && <button className="secondary compact-button" onClick={() => void run(async () => { const deposit = await api.deposit(userId, item.public_id); alert(`Depósito sandbox: ${deposit.payment_reference}`); refresh(); })}>{t('remittances.registerDeposit')} (sandbox)</button>}{item.status === 'compliance_review' && <button onClick={() => void run(async () => { await api.review(userId, item.public_id, 'approved'); refresh(); })}>{t('common.approve')} (sandbox)</button>}{item.status === 'approved' && <button onClick={() => void run(async () => { const payout = await api.payout(userId, item.public_id); await api.completePayout(userId, payout.public_id); refresh(); })}>{t('remittances.executePayout')} (sandbox)</button>}{item.status === 'reconciliation_pending' && <button className="secondary compact-button" onClick={() => void run(async () => { await api.reconcile(userId, item.public_id); refresh(); })}>{t('remittances.reconcile')}</button>}</div></article>)}</div>}</section>{selected && <RemittanceDetails detail={selected} onClose={() => setSelected(null)} />}</div>;
+  <div className="remittance-operations">{item.status === 'awaiting_payment' && <button className="secondary compact-button" onClick={() => startPayment(item)}>{t('remittances.registerDeposit')}</button>}{item.status === 'compliance_review' && <button onClick={() => void run(async () => { await api.review(userId, item.public_id, 'approved'); refresh(); })}>{t('common.approve')} (sandbox)</button>}{item.status === 'approved' && <button onClick={() => void run(async () => { const payout = await api.payout(userId, item.public_id); await api.completePayout(userId, payout.public_id); refresh(); })}>{t('remittances.executePayout')} (sandbox)</button>}{item.status === 'reconciliation_pending' && <button className="secondary compact-button" onClick={() => void run(async () => { await api.reconcile(userId, item.public_id); refresh(); })}>{t('remittances.reconcile')}</button>}</div></article>)}</div>}</section>
+  {payingFor && <div className="details-modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setPayingFor(null);}}><section className="details-modal card" role="dialog" aria-modal="true" aria-labelledby="funding-method-title"><div className="section-heading details-modal-heading"><div><span className="eyebrow">Segundo paso · Pago</span><h2 id="funding-method-title">Selecciona cómo pagar</h2><p className="muted">{payingFor.total_debit_amount ?? payingFor.send_amount} {payingFor.send_currency}</p></div><button className="secondary compact-button" onClick={()=>setPayingFor(null)}>Cerrar</button></div>{loadingMethods?<p className="muted">Cargando métodos disponibles…</p>:fundingMethods.length===0?<div className="alert">No hay métodos de pago habilitados para esta moneda. El administrador debe configurar una cuenta receptora SEDERG_PAY y activar el método correspondiente.</div>:<div className="payment-method-options">{fundingMethods.map(method=><button key={method.code} className="payment-method-option" type="button" onClick={()=>chooseMethod(method)}><strong>{method.name}</strong><small>{method.method_type==='instant_qr'?'QR dinámico de sandbox': 'Transferencia bancaria'} · {method.provider_code||'Canal manual'}</small><span>Seleccionar →</span></button>)}</div>}<p className="muted">El QR de sandbox sirve para probar la experiencia; no inicia una transferencia bancaria real ni confirma el ingreso.</p></section></div>}
+  {selected && <RemittanceDetails detail={selected} onClose={() => setSelected(null)} />}
+  </div>;
 }
 function PaymentQr({ remittance }: { remittance: Remittance }) {
   const t = useT();
