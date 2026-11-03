@@ -91,7 +91,6 @@ final class m261103_000014_create_funding_payment_module extends Migration
             ['code', 'name', 'country_id', 'currency_code', 'method_type', 'provider_code', 'supports_dynamic_qr', 'requires_reference', 'is_active'],
             [
                 ['ru_bank_transfer', 'Transferencia bancaria en Rusia', 1, 'RUB', 'bank_transfer', null, 0, 1, 0],
-                ['ru_sbp_c2b', 'СБП · Pago por QR (C2B)', 1, 'RUB', 'instant_qr', 'sbp_c2b', 1, 1, 0],
                 ['cu_bank_transfer', 'Transferencia bancaria en Cuba', 2, 'CUP', 'bank_transfer', null, 0, 1, 0],
                 ['cu_instant_qr', 'Pago QR en Cuba (sandbox)', 2, 'CUP', 'instant_qr', 'sedergpay_sandbox', 1, 1, 0],
             ]
