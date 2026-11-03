@@ -76,6 +76,8 @@ function apiRequest(string $path, array $payload, string $key): array
             'method' => 'POST',
             'ignore_errors' => true,
             'header' => implode("\r\n", [
+                'Accept: */*',
+                'X-User-Public-Id: ' . $userPublicId,
                 'Accept: application/json',
                 'Content-Type: application/json',
                 'X-User-Public-Id: ' . $userPublicId,
