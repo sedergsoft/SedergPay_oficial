@@ -104,6 +104,7 @@ function apiGet(string $path): array
             'ignore_errors' => true,
             'header' => implode("\\r\\n", [
                 'Accept: application/json',
+                'Content-Type: application/json',
                 'X-User-Public-Id: ' . $userPublicId,
             ]),
             'timeout' => 20,
