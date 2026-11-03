@@ -173,6 +173,6 @@ assertTrue(($remittance['send_currency'] ?? null) === 'CUP' && ($remittance['rec
     'quote_public_id' => $quote['public_id'],
     'beneficiary_public_id' => $beneficiaryPublicId,
 ], 'ci-remittance-create-20261103');
-assertTrue($status === 201 && ($reused['public_id'] ?? null) === ($remittance['public_id'] ?? null), 'idempotent retry returns the same remittance');
+assertTrue($status === 200 && ($reused['public_id'] ?? null) === ($remittance['public_id'] ?? null), 'idempotent retry returns the same remittance without duplicating it');
 
 echo "All quote/remittance HTTP integration checks passed.\n";
