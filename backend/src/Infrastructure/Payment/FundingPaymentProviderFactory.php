@@ -9,7 +9,7 @@ use DomainException;
 /** Selects a payment provider explicitly by code and environment. */
 final class FundingPaymentProviderFactory
 {
-    public function for(string $providerCode, string $environment): SbpC2bQrProvider
+    public function for(string $providerCode, string $environment): DynamicQrProvider
     {
         if ($environment !== 'sandbox') {
             throw new DomainException('Production payment providers are not configured until the bank contract is validated');
