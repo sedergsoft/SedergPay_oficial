@@ -131,7 +131,7 @@ Cambiar la cuenta desde administración afectará solo a depósitos nuevos; las 
 
 ## Configuración local requerida
 
-Definir `SEDERG_ACCOUNT_ENCRYPTION_KEY` como secreto aleatorio independiente (por ejemplo, `openssl rand -hex 32`) en el `.env` local antes de crear cuentas sandbox. No compartir esta clave ni subir el `.env` a Git. Si no está definida, el endpoint de alta responde 503 y no persiste la cuenta.
+En Windows/PowerShell, ejecutar `powershell -ExecutionPolicy Bypass -File .\\scripts\\Initialize-LocalAccountEncryption.ps1` después de crear `.env`. El script genera una clave aleatoria independiente de 32 bytes si no existe una válida, conserva la clave existente para no invalidar cuentas ya cifradas y recrea únicamente el backend. La variable `SEDERG_ACCOUNT_ENCRYPTION_KEY` es obligatoria en Docker Compose. No compartir esta clave ni subir `.env` a Git. El endpoint de alta también valida la longitud de la clave y responde 503 si la configuración no es válida.
 
 ## Restricción de alcance
 
