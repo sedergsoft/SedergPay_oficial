@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace app\\Domain\\Pricing;
+namespace app\Domain\Pricing;
 
 use DomainException;
 use DateTimeImmutable;
@@ -105,7 +105,7 @@ final class QuoteCalculator
     private function decimal(string $value, string $field): string
     {
         $value = trim($value);
-        if (!preg_match('/^\\d+(?:\\.\\d{1,10})?$/', $value) || bccomp($value, '0', 10) <= 0) {
+        if (!preg_match('/^\d+(?:\.\d{1,10})?$/', $value) || bccomp($value, '0', 10) <= 0) {
             throw new DomainException("{$field} must be a positive decimal");
         }
 
