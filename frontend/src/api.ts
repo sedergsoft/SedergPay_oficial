@@ -78,6 +78,7 @@ export type Remittance = {
   reference: string;
   direction: string;
   send_amount: string;
+  total_debit_amount?: string;
   send_currency: string;
   receive_amount: string;
   receive_currency: string;
@@ -86,7 +87,15 @@ export type Remittance = {
   created_at?: string;
   updated_at?: string;
   payment_qr_payload?: string | null;
-  payment_instructions?: Record<string, string | null>;
+  payment_qr_type?: string | null;
+  payment_method_code?: string | null;
+  deposit_public_id?: string | null;
+  deposit_status?: string | null;
+  payment_reference?: string | null;
+  deposit_expected_amount?: string | null;
+  deposit_currency?: string | null;
+  deposit_expires_at?: string | null;
+  payment_instructions?: Record<string, any>;
   receipt_email_sent?: boolean;
 };
 
@@ -169,6 +178,9 @@ export type AdminDashboard = {
   total_remittances: number;
 };
 
+export type FundingMethod = { code: string; name: string; method_type: string; provider_code: string | null; supports_dynamic_qr: boolean | number; requires_reference: boolean | number; country_code?: string; currency_code?: string; is_active?: boolean | number };
+export type FundingAccount = { public_id: string; country_code: string; currency_code: string; bank_code: string; bank_name: string; account_holder_name: string; legal_entity_name: string | null; account_type: string; account_mask: string; routing_mask: string | null; environment: string; status: string; notes: string | null; methods: string | null };
+
 export type PlatformSetting = {
   key: string;
   value: string | number | boolean;
@@ -248,6 +260,12 @@ export const api = {
   remittance: (userId: string, publicId: string) => request<RemittanceDetail>('/api/v1/remittances/' + publicId, {
     headers: authHeaders(userId),
   }),
+  fundingMethods: (userId: string, countryCode: string) => request<{ methods: FundingMethod[]; environment: string }>(`/api/v1/funding-methods/${countryCode}`, { headers: authHeaders(userId) }),
+  adminFundingMethods: (userId: string) => request<{ methods: FundingMethod[] }>('/api/v1/admin/funding-methods', { headers: authHeaders(userId) }),
+  updateFundingMethod: (userId: string, code: string, isActive: boolean) => request<{ code: string; is_active: boolean }>(`/api/v1/admin/funding-methods/${code}`, { method: 'PUT', headers: authHeaders(userId), body: JSON.stringify({ is_active: isActive }) }),
+  adminFundingAccounts: (userId: string) => request<{ accounts: FundingAccount[] }>('/api/v1/admin/funding-accounts', { headers: authHeaders(userId) }),
+  createFundingAccount: (userId: string, body: Record<string, unknown>) => request<{ public_id: string; account_mask: string; routing_mask?: string | null; status: string; environment: string }>('/api/v1/admin/funding-accounts', { method: 'POST', headers: authHeaders(userId), body: JSON.stringify(body) }),
+  updateFundingAccount: (userId: string, publicId: string, status: 'active' | 'inactive') => request<{ public_id: string; status: string }>(`/api/v1/admin/funding-accounts/${publicId}`, { method: 'PUT', headers: authHeaders(userId), body: JSON.stringify({ status }) }),
   adminOperations: (userId: string) => request<AdminOperation[]>('/api/v1/admin/operations', {
     headers: authHeaders(userId),
   }),
@@ -284,10 +302,10 @@ export const api = {
     headers: { ...authHeaders(userId), 'Idempotency-Key': `remittance-${crypto.randomUUID()}` },
     body: JSON.stringify(body),
   }),
-  deposit: (userId: string, remittanceId: string) => request<{ public_id: string; payment_reference: string }>('/api/v1/remittances/' + remittanceId + '/deposit', {
+  deposit: (userId: string, remittanceId: string, methodCode: string) => request<{ public_id: string; payment_reference: string; qr_payload: string | null; qr_type: string; provider_payment_id?: string | null; account_mask: string; bank_name: string }>('/api/v1/remittances/' + remittanceId + '/deposit', {
     method: 'POST',
-    headers: { ...authHeaders(userId), 'Idempotency-Key': `deposit-${crypto.randomUUID()}` },
-    body: '{}',
+    headers: { ...authHeaders(userId), 'Idempotency-Key': `deposit-${remittanceId}` },
+    body: JSON.stringify({ method_code: methodCode }),
   }),
   confirmDeposit: (userId: string, depositId: string) => request(`/api/v1/deposits/${depositId}/simulate-confirmation`, {
     method: 'POST', headers: authHeaders(userId), body: '{}',

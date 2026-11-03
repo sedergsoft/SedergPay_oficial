@@ -1,6 +1,6 @@
 import { ChangeEvent, FormEvent, createContext, useContext, useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import { api, AdminDashboard, AdminOperation, AdminRate, AdminUser, Beneficiary, ExchangeRate, PlatformSetting, Quote, Remittance, RemittanceDetail, User, isDevelopmentAuth, paymentMethods } from './api';
+import { api, AdminDashboard, AdminOperation, AdminRate, AdminUser, Beneficiary, ExchangeRate, FundingAccount, FundingMethod, PlatformSetting, Quote, Remittance, RemittanceDetail, User, isDevelopmentAuth, paymentMethods } from './api';
 import { getInitialLanguage, Language, languageLabels, translate } from './i18n';
 
 const LanguageContext = createContext<Language>('es');
@@ -8,7 +8,7 @@ const useLanguage = () => useContext(LanguageContext);
 const useT = () => { const language = useLanguage(); return (key: string) => translate(language, key); };
 const localeFor = (language: Language) => language === 'ru' ? 'ru-RU' : 'es-ES';
 
-type View = 'summary' | 'beneficiaries' | 'quote' | 'remittances' | 'profile' | 'kyc' | 'admin';
+type View = 'summary' | 'beneficiaries' | 'quote' | 'remittances' | 'profile' | 'kyc' | 'admin' | 'funding';
 const storedUserId = isDevelopmentAuth ? localStorage.getItem('sederg_user') ?? '' : '';
 
 export function App() {
@@ -74,7 +74,7 @@ function AppContent({ language, onLanguageChange }: { language: Language; onLang
         <NavButton icon="users" active={view === 'beneficiaries'} onClick={() => setView('beneficiaries')}>{translate(language, 'nav.beneficiaries')}</NavButton>
         <NavButton icon="send" active={view === 'quote'} onClick={() => setView('quote')}>{translate(language, 'nav.quote')}</NavButton>
         <NavButton icon="history" active={view === 'remittances'} onClick={() => setView('remittances')}>{translate(language, 'nav.remittances')}</NavButton><NavButton icon="user" active={view === 'profile'} onClick={() => setView('profile')}>{t('nav.profile')}</NavButton><NavButton icon="shield" active={view === 'kyc'} onClick={() => setView('kyc')}>{t('nav.kyc')}</NavButton>
-        {user.role === 'admin' && <NavButton icon="settings" active={view === 'admin'} onClick={() => setView('admin')}>{translate(language, 'nav.admin')}</NavButton>}
+        {user.role === 'admin' && <><NavButton icon="settings" active={view === 'admin'} onClick={() => setView('admin')}>{translate(language, 'nav.admin')}</NavButton><NavButton icon="settings" active={view === 'funding'} onClick={() => setView('funding')}>Métodos de pago</NavButton></>}
         <button className="secondary menu-exit" onClick={signOut}>{translate(language, 'nav.logout')}</button>
       </nav>
       <section className="content">
@@ -83,7 +83,7 @@ function AppContent({ language, onLanguageChange }: { language: Language; onLang
         {view === 'beneficiaries' && <Beneficiaries userId={user.public_id} run={run} />}
         {view === 'quote' && <QuotePanel userId={user.public_id} run={run} />}
         {view === 'remittances' && <Remittances userId={user.public_id} run={run} />}{view === 'profile' && <ProfilePanel userId={user.public_id} run={run} />}{view === 'kyc' && <KycPanel userId={user.public_id} run={run} />}
-        {view === 'admin' && user.role === 'admin' && <AdminOperations userId={user.public_id} run={run} />}
+        {view === 'admin' && user.role === 'admin' && <AdminOperations userId={user.public_id} run={run} />}{view === 'funding' && user.role === 'admin' && <AdminFundingPanel userId={user.public_id} run={run} />}
         {message && <Alert text={message} />}
       </section>
     </div>
@@ -396,19 +396,49 @@ function QuotePanel({ userId, run }: { userId: string; run: (action: () => Promi
 function Remittances({ userId, run }: { userId: string; run: (action: () => Promise<void>) => Promise<void> }) {
   const t = useT();
   const locale = localeFor(useLanguage());
-  const [items, setItems] = useState<Remittance[]>([]); const [selected, setSelected] = useState<RemittanceDetail | null>(null); const [filter,setFilter]=useState('all'); const refresh = () => run(async () => setItems(await api.remittances(userId)));
+  const [items, setItems] = useState<Remittance[]>([]);
+  const [selected, setSelected] = useState<RemittanceDetail | null>(null);
+  const [filter,setFilter]=useState('all');
+  const [payingFor,setPayingFor]=useState<Remittance|null>(null);
+  const [fundingMethods,setFundingMethods]=useState<FundingMethod[]>([]);
+  const [loadingMethods,setLoadingMethods]=useState(false);
+  const refresh = () => run(async () => setItems(await api.remittances(userId)));
   useEffect(() => { refresh(); }, [userId]);
+  useEffect(() => {
+    if (!payingFor) { setFundingMethods([]); return; }
+    const country = payingFor.send_currency.toUpperCase() === 'CUP' ? 'CU' : 'RU';
+    setLoadingMethods(true);
+    void run(async () => {
+      const result = await api.fundingMethods(userId,country);
+      setFundingMethods(result.methods);
+    }).finally(() => setLoadingMethods(false));
+  }, [payingFor?.public_id,userId]);
   const visible=items.filter(item=>filter==='all'||(filter==='active'&&!['completed','cancelled','rejected'].includes(item.status))||(filter==='completed'&&item.status==='completed'));
+  const startPayment = (item:Remittance) => setPayingFor(item);
+  const chooseMethod = (method:FundingMethod) => {
+    if(!payingFor)return;
+    void run(async()=>{
+      await api.deposit(userId,payingFor.public_id,method.code);
+      const detail=await api.remittance(userId,payingFor.public_id);
+      setSelected(detail);
+      setPayingFor(null);
+      setItems(await api.remittances(userId));
+    });
+  };
   return <div className="feature-view"><div className="view-heading"><div><span className="eyebrow">{t('remittances.eyebrow')}</span><h2>{t('nav.remittances')}</h2><p className="muted">{t('remittances.description')}</p></div><span className="count-chip">{items.length} {t('common.operations')}</span></div>
   <section className="card remittances-card"><div className="filter-tabs" role="group" aria-label={t('remittances.filter')}>{[['all',t('common.all')],['active',t('common.inProgress')],['completed',t('common.completed')]].map(([value,label])=><button key={value} className={filter===value?'filter-tab active':'filter-tab'} onClick={()=>setFilter(value)}>{label}</button>)}</div>
   {visible.length===0?<div className="empty-state"><span className="empty-icon"><Icon name="history"/></span><strong>{t('remittances.empty')}</strong><p>{t('remittances.emptyDescription')}</p></div>:<div className="remittance-list">{visible.map(item=><article className="remittance-item" key={item.public_id}><span className="remittance-icon"><Icon name="transfer"/></span><div className="remittance-main"><strong>{item.reference}</strong><small>{item.created_at?new Date(item.created_at).toLocaleString(locale):'Fecha no disponible'}</small><span>{item.send_amount} {item.send_currency} <b>→</b> {item.receive_amount} {item.receive_currency}</span></div><div className="remittance-status"><StatusBadge status={item.status}/><button className="text-button" onClick={() => void run(async () => setSelected(await api.remittance(userId, item.public_id)))}>{t('common.viewDetails')} <span>→</span></button></div>
-  <div className="remittance-operations">{item.status === 'awaiting_payment' && <button className="secondary compact-button" onClick={() => void run(async () => { const deposit = await api.deposit(userId, item.public_id); alert(`Depósito sandbox: ${deposit.payment_reference}`); refresh(); })}>{t('remittances.registerDeposit')} (sandbox)</button>}{item.status === 'compliance_review' && <button onClick={() => void run(async () => { await api.review(userId, item.public_id, 'approved'); refresh(); })}>{t('common.approve')} (sandbox)</button>}{item.status === 'approved' && <button onClick={() => void run(async () => { const payout = await api.payout(userId, item.public_id); await api.completePayout(userId, payout.public_id); refresh(); })}>{t('remittances.executePayout')} (sandbox)</button>}{item.status === 'reconciliation_pending' && <button className="secondary compact-button" onClick={() => void run(async () => { await api.reconcile(userId, item.public_id); refresh(); })}>{t('remittances.reconcile')}</button>}</div></article>)}</div>}</section>{selected && <RemittanceDetails detail={selected} onClose={() => setSelected(null)} />}</div>;
+  <div className="remittance-operations">{item.status === 'awaiting_payment' && <button className="secondary compact-button" onClick={() => startPayment(item)}>{t('remittances.registerDeposit')}</button>}{item.status === 'compliance_review' && <button onClick={() => void run(async () => { await api.review(userId, item.public_id, 'approved'); refresh(); })}>{t('common.approve')} (sandbox)</button>}{item.status === 'approved' && <button onClick={() => void run(async () => { const payout = await api.payout(userId, item.public_id); await api.completePayout(userId, payout.public_id); refresh(); })}>{t('remittances.executePayout')} (sandbox)</button>}{item.status === 'reconciliation_pending' && <button className="secondary compact-button" onClick={() => void run(async () => { await api.reconcile(userId, item.public_id); refresh(); })}>{t('remittances.reconcile')}</button>}</div></article>)}</div>}</section>
+  {payingFor && <div className="details-modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setPayingFor(null);}}><section className="details-modal card" role="dialog" aria-modal="true" aria-labelledby="funding-method-title"><div className="section-heading details-modal-heading"><div><span className="eyebrow">Segundo paso · Pago</span><h2 id="funding-method-title">Selecciona cómo pagar</h2><p className="muted">{payingFor.total_debit_amount ?? payingFor.send_amount} {payingFor.send_currency}</p></div><button className="secondary compact-button" onClick={()=>setPayingFor(null)}>Cerrar</button></div>{loadingMethods?<p className="muted">Cargando métodos disponibles…</p>:fundingMethods.length===0?<div className="alert">No hay métodos de pago habilitados para esta moneda. El administrador debe configurar una cuenta receptora SEDERG_PAY y activar el método correspondiente.</div>:<div className="payment-method-options">{fundingMethods.map(method=><button key={method.code} className="payment-method-option" type="button" onClick={()=>chooseMethod(method)}><strong>{method.name}</strong><small>{method.code==='ru_sbp_qr'?'SBP C2B · QR dinámico de sandbox':method.method_type==='instant_qr'?'QR dinámico de sandbox':'Transferencia bancaria'} · {method.provider_code||'Canal manual'}</small><span>Seleccionar →</span></button>)}</div>}<p className="muted">El QR de sandbox sirve para probar la experiencia; no inicia una transferencia bancaria real ni confirma el ingreso.</p></section></div>}
+  {selected && <RemittanceDetails detail={selected} onClose={() => setSelected(null)} />}
+  </div>;
 }
 function PaymentQr({ remittance }: { remittance: Remittance }) {
   const t = useT();
   const [src, setSrc] = useState('');
-  useEffect(() => { if (!remittance.payment_qr_payload) return; void QRCode.toDataURL(remittance.payment_qr_payload, { width: 220, margin: 2 }).then(setSrc); }, [remittance.payment_qr_payload]);
-  return <div className="payment-panel payment-panel-modern"><div><span className="eyebrow">{t('payment.platformPayment')}</span><h3>{t('payment.transferCreated')}: {remittance.reference}</h3><p>Transfiere <strong>{remittance.payment_instructions?.amount ?? remittance.send_amount} {remittance.payment_instructions?.currency ?? remittance.send_currency}</strong> {t('payment.useReference')}</p><p className="muted">{t('payment.qrContains')} {remittance.receipt_email_sent ? t('payment.receiptSent') : t('payment.receiptInDetails')}</p></div>{src && <img className="payment-qr" src={src} alt={`QR de pago ${remittance.reference}`} />}</div>;
+  const instructions = remittance.payment_instructions ?? {};
+  useEffect(() => { setSrc(''); if (!remittance.payment_qr_payload) return; void QRCode.toDataURL(remittance.payment_qr_payload, { width: 220, margin: 2 }).then(setSrc); }, [remittance.payment_qr_payload]);
+  return <div className="payment-panel payment-panel-modern"><div><span className="eyebrow">{t('payment.platformPayment')}</span><h3>{t('payment.transferCreated')}: {remittance.reference}</h3><p>Transfiere <strong>{instructions.amount ?? remittance.deposit_expected_amount ?? remittance.send_amount} {instructions.currency_code ?? remittance.deposit_currency ?? remittance.send_currency}</strong></p><div className="payment-bank-details"><p><span>Banco</span><strong>{instructions.bank_name ?? '—'}</strong></p><p><span>Titular</span><strong>{instructions.account_holder_name ?? 'SEDERG_PAY'}</strong></p><p><span>Cuenta</span><strong>{instructions.account_mask ?? '—'}</strong></p><p><span>BIC / código de ruta</span><strong>{instructions.routing_mask ?? '—'}</strong></p><p><span>Referencia obligatoria</span><strong>{instructions.reference ?? remittance.payment_reference ?? '—'}</strong></p></div>{remittance.payment_qr_payload && <p className="sandbox-note">{remittance.payment_qr_type === 'sbp_c2b_sandbox' ? 'QR SBP C2B de sandbox.' : 'QR de prueba SEDERG_PAY.'} No es pagable ni confirma el ingreso.</p>}{!remittance.payment_qr_payload && <p className="muted">Este método utiliza transferencia bancaria con referencia; no dispone de QR.</p>}</div>{src && <img className="payment-qr" src={src} alt={`QR de pago sandbox ${remittance.reference}`} />}</div>;
 }
 function RemittanceDetails({ detail, onClose }: { detail: RemittanceDetail; onClose: () => void }) {
   const t = useT();
@@ -470,7 +500,7 @@ function RemittanceDetails({ detail, onClose }: { detail: RemittanceDetail; onCl
         <Detail label={t('field.payoutMethod')} value={`${t('payout.' + detail.payout_method_code)}${detail.payout_provider ? ` · ${detail.payout_provider}` : ''}`} />
         <Detail label={t('details.accountCard')} value={detail.payout_account_last4 ? `Cuenta ****${detail.payout_account_last4}` : detail.payout_card_last4 ? `Tarjeta ****${detail.payout_card_last4}` : '—'} />
       </div>
-      {detail.payment_qr_payload && <PaymentQr remittance={detail} />}
+      {detail.deposit_public_id && <PaymentQr remittance={detail} />}
       <div className="timeline-heading"><span className="eyebrow">{t('details.traceability')}</span><h3>{t('details.statusHistory')}</h3></div>
       {events.length === 0 ? <p className="muted">{t('details.noEvents')}</p> : <div className="timeline timeline-modern">{events.map((event) => <div className="timeline-item" key={`${event.to_status}-${event.created_at}`}><span className="timeline-dot"><Icon name="check"/></span><div><strong>{event.to_status}</strong><span>{event.created_at}</span><small>{event.reason}</small></div></div>)}</div>}
     </section>
@@ -577,3 +607,52 @@ function Field({ name, label, type = 'text', defaultValue, value, onChange, plac
   return <label className={error ? 'field-error' : undefined}>{label}<input required={required} name={name} type={type} defaultValue={mask ? formatInputMask(defaultValue ?? '', mask) : defaultValue} value={value === undefined ? undefined : (mask ? formatInputMask(value, mask) : value)} onChange={handleChange} placeholder={placeholder} inputMode={inputMode} pattern={pattern} aria-invalid={!!error} aria-describedby={error ? name + '-error' : undefined} />{error && <small className="field-error-message" id={name + '-error'} role="alert">{error}</small>}</label>;
 }
 function Stat({ label, value }: { label: string; value: string }) { return <div className="stat"><span>{label}</span><strong>{value}</strong></div>; }
+
+
+function AdminFundingPanel({ userId, run }: { userId: string; run: (action: () => Promise<void>) => Promise<void> }) {
+  const [methods,setMethods]=useState<FundingMethod[]>([]);
+  const [accounts,setAccounts]=useState<FundingAccount[]>([]);
+  const [country,setCountry]=useState<'RU'|'CU'>('RU');
+  const [bankCode,setBankCode]=useState('sberbank');
+  const [bankName,setBankName]=useState('Sberbank');
+  const [accountIdentifier,setAccountIdentifier]=useState('');
+  const [routingIdentifier,setRoutingIdentifier]=useState('');
+  const [legalEntityName,setLegalEntityName]=useState('');
+  const [notes,setNotes]=useState('');
+  const [selectedMethods,setSelectedMethods]=useState<string[]>([]);
+  const [saving,setSaving]=useState(false);
+  const reload=()=>run(async()=>{const [m,a]=await Promise.all([api.adminFundingMethods(userId),api.adminFundingAccounts(userId)]);setMethods(m.methods);setAccounts(a.accounts);});
+  useEffect(()=>{reload();},[userId]);
+  const compatible=methods.filter(m=>m.country_code===country);
+  const currency=country==='RU'?'RUB':'CUP';
+  const toggle=(code:string)=>setSelectedMethods(old=>old.includes(code)?old.filter(x=>x!==code):[...old,code]);
+  const create=()=>void run(async()=>{
+    if(!selectedMethods.length)throw new Error('Selecciona al menos un método compatible.');
+    setSaving(true);
+    try{
+      await api.createFundingAccount(userId,{country_code:country,currency_code:currency,bank_code:bankCode,bank_name:bankName,account_holder_name:'SEDERG_PAY',legal_entity_name:legalEntityName||null,account_identifier:accountIdentifier,routing_identifier:routingIdentifier,environment:'sandbox',status:'active',methods:selectedMethods,notes});
+      setAccountIdentifier('');setRoutingIdentifier('');setLegalEntityName('');setNotes('');setSelectedMethods([]);
+      await reload();
+    }finally{setSaving(false);}
+  });
+  return <div className="feature-view"><div className="view-heading"><div><span className="eyebrow">Administración financiera</span><h2>Métodos de pago y cuentas receptoras</h2><p className="muted">Las cuentas registradas pertenecen a SEDERG_PAY. Sberbank, VTB y Alfa-Bank son candidatos documentados en Rusia, no integraciones contratadas. En esta fase solo se habilita sandbox.</p></div><span className="status-pill status-info">SANDBOX</span></div>
+  <section className="card"><div className="section-heading"><div><h3>Catálogo de métodos de fondeo</h3><p className="muted">Independiente de los métodos de desembolso al beneficiario.</p></div></div>
+  {methods.map(method=><div className="funding-method-row" key={method.code}><div><strong>{method.name}</strong><small>{method.country_code} · {method.currency_code} · {method.method_type} · {method.code}</small></div><label className="switch-label"><input type="checkbox" checked={Boolean(method.is_active)} onChange={e=>void run(async()=>{await api.updateFundingMethod(userId,method.code,e.target.checked);await reload();})}/> Activo</label></div>)}</section>
+  <section className="card"><div className="section-heading"><div><h3>Registrar cuenta receptora</h3><p className="muted">El número se cifra antes de almacenarse; solo se muestra enmascarado después del alta.</p></div></div>
+  <form className="funding-account-form" onSubmit={e=>{e.preventDefault();create();}}>
+    <label>País<select value={country} onChange={e=>{setCountry(e.target.value as 'RU'|'CU');setSelectedMethods([]);if(e.target.value==='RU'){setBankCode('sberbank');setBankName('Sberbank');}else{setBankCode('');setBankName('');}}}><option value="RU">Rusia</option><option value="CU">Cuba</option></select></label>
+    <label>Moneda<input value={currency} readOnly/></label>
+    <label>Código del banco<input list="sederg-bank-codes" value={bankCode} onChange={e=>setBankCode(e.target.value)} required/><datalist id="sederg-bank-codes"><option value="sberbank"/><option value="vtb"/><option value="alfa"/></datalist></label>
+    <label>Nombre del banco<input list="sederg-bank-names" value={bankName} onChange={e=>setBankName(e.target.value)} required/><datalist id="sederg-bank-names"><option value="Sberbank"/><option value="VTB"/><option value="Alfa-Bank"/></datalist></label>
+    <label>Titular<input value="SEDERG_PAY" readOnly/></label>
+    <label>Denominación jurídica (si aplica)<input value={legalEntityName} onChange={e=>setLegalEntityName(e.target.value)} placeholder="Nombre legal validado por el banco"/></label>
+    <label className="funding-full">Número de cuenta / identificador bancario<input value={accountIdentifier} onChange={e=>setAccountIdentifier(e.target.value)} required autoComplete="off" /></label>
+    <label className="funding-full">BIC / БИК / código de ruta (si aplica)<input value={routingIdentifier} onChange={e=>setRoutingIdentifier(e.target.value)} autoComplete="off" /></label>
+    <div className="funding-full"><strong>Métodos compatibles</strong>{compatible.length===0?<p className="muted">No hay métodos definidos para este país.</p>:compatible.map(method=><label className="funding-checkbox" key={method.code}><input type="checkbox" checked={selectedMethods.includes(method.code)} onChange={()=>toggle(method.code)}/>{method.name} <small>{method.method_type==='instant_qr'?'QR sandbox':'Transferencia'}</small></label>)}</div>
+    <label className="funding-full">Notas<input value={notes} onChange={e=>setNotes(e.target.value)}/></label>
+    <button type="submit" disabled={saving||!accountIdentifier||!selectedMethods.length}>{saving?'Guardando…':'Guardar cuenta sandbox'}</button>
+  </form></section>
+  <section className="card"><div className="section-heading"><div><h3>Cuentas receptoras registradas</h3><p className="muted">Para cambiar de cuenta, registra la nueva y desactiva la anterior. Los depósitos existentes conservan su fotografía original.</p></div></div>
+  {accounts.length===0?<p className="muted">Todavía no hay cuentas configuradas.</p>:accounts.map(account=><article className="funding-account-row" key={account.public_id}><div><strong>{account.bank_name} · {account.country_code}/{account.currency_code}</strong><small>Titular: {account.account_holder_name} · Cuenta {account.account_mask}{account.routing_mask ? ` · BIC/ruta ${account.routing_mask}` : ''}</small><small>Métodos: {account.methods||'—'} · {account.environment}</small></div><div><span className={account.status==='active'?'status-pill status-success':'status-pill status-muted'}>{account.status}</span><button className="secondary compact-button" onClick={()=>void run(async()=>{await api.updateFundingAccount(userId,account.public_id,account.status==='active'?'inactive':'active');await reload();})}>{account.status==='active'?'Desactivar':'Activar'}</button></div></article>)}</section>
+  </div>;
+}

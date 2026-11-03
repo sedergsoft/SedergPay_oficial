@@ -1,0 +1,138 @@
+# Módulo de métodos de pago y cuentas receptoras de SEDERG_PAY
+
+## Objetivo
+
+Implementar la segunda etapa del flujo de remesas: presentar al remitente los métodos de pago habilitados para el país/moneda de origen, seleccionar la cuenta bancaria receptora propiedad de la plataforma y generar instrucciones/QR específicos para el método seleccionado. El ingreso solo se confirma mediante una fuente bancaria/adaptador autorizado y conciliación; la lectura o presentación de un QR no confirma el pago.
+
+## Hallazgos del repositorio (rama main, 2026-11-03)
+
+### Separación necesaria: fondeo vs. entrega
+
+Los catálogos actuales mezclan el contexto general de métodos con el uso concreto. El módulo debe distinguir explícitamente:
+
+- **Método de fondeo (inbound):** cómo paga el remitente a SEDERG_PAY en el país de origen. En Rusia se incorpora SBP C2B por QR como canal previsto, separado de transferencias C2C por teléfono.
+- **Método de entrega (outbound):** cómo recibe el dinero el beneficiario en el país de destino.
+
+La cotización y el perfil de beneficiario ya trabajan con métodos de entrega; no deben reutilizarse como método de fondeo.
+
+### Métodos de entrega actualmente definidos
+
+- Cuba: `cash_pickup` (Pago en efectivo), `bank_account` (Abono en cuenta bancaria) y `card_transfer` (Transferencia a tarjeta; añadido por migración posterior).
+- El catálogo inicial de la migración también incluía `card_or_wallet` (“Tarjeta o billetera autorizada”) inactivo. No se considera habilitado.
+- La interfaz actual ofrece los tres primeros métodos. El beneficiario registra los datos del método y puede seleccionar otro método para una remesa concreta; la preferencia del perfil no es una restricción.
+
+### Métodos de fondeo documentados
+
+- El catálogo heredado `payment_methods` contiene `bank_transfer` para RU/inbound. El nuevo catálogo `funding_payment_methods` es independiente y mantiene sus canales deshabilitados hasta configurar una cuenta SEDERG_PAY.
+- Métodos de fondeo sembrados: `ru_bank_transfer`, `ru_sbp_qr` (SBP C2B, sandbox), `cu_bank_transfer` y `cu_instant_qr` (sandbox). Todos comienzan deshabilitados. Los métodos cubanos son placeholders técnicos; no se ha acreditado un proveedor cubano contratado ni su formato QR.
+- `RemittanceController::actionCreate()` ya no genera un QR genérico. `FundingController` selecciona cuenta y método después de crear la remesa; el QR se genera mediante la estrategia asociada al método. SBP usa `SbpSandboxQrProvider`, que produce un URI ficticio no pagable.
+- `PaymentController` y `SimulatedPaymentRepository` son sandbox: generan depósitos simulados y una confirmación manual simulada. No conectan con bancos reales.
+
+### Bancos mencionados en los documentos
+
+- Rusia: Sberbank, VTB y Alfa-Bank aparecen en el alcance del modelo bancario. Se añade SBP C2B como método de fondeo por QR (sandbox), que deberá contratarse con un banco adquirente participante. `bank_connections.bank_code` admite esos códigos como candidatos; los modos previstos son `api`, `host_to_host` y `statement_import`.
+- La documentación no acredita que SEDERG_PAY tenga contrato, API habilitada, QR de comercio o permisos de recepción con ninguno de esos bancos. Se deben tratar como bancos candidatos a validar, no como integraciones activas.
+- Cuba: los documentos técnicos del repositorio no especifican bancos cubanos contratados ni un catálogo de bancos de recepción. La entrega a cuenta bancaria está prevista funcionalmente, pero no identifica los bancos admitidos.
+- No se debe presentar como disponible una integración de SBP, QR de comercio, Transfermóvil, EnZona o un banco cubano hasta validar proveedor, titularidad, contrato y disponibilidad para la entidad operadora.
+
+## Matriz funcional de partida
+
+| Corredor | País/moneda de fondeo | Método de fondeo documentado | Método de entrega documentado | Estado |
+|---|---|---|---|---|
+| Rusia → Cuba | Rusia / RUB | Transferencia bancaria (`ru_bank_transfer`) y SBP C2B QR (`ru_sbp_qr`, sandbox) | Efectivo, abono a cuenta o transferencia a tarjeta en Cuba | Métodos de entrega en catálogo/UI; canal de fondeo en sandbox |
+| Cuba → Rusia | Cuba / CUP | `cu_bank_transfer` y `cu_instant_qr` como placeholders sandbox, no confirmados con bancos cubanos | En la arquitectura general se prevé entrega a cuenta en Rusia, pero faltan métodos/proveedores específicos | Requiere decisión y validación operativa |
+
+## Titularidad de las cuentas receptoras
+
+Decisión confirmada por el usuario: las cuentas receptoras estarán a nombre de **SEDERG_PAY**. El sistema debe guardar literalmente el titular legal validado para cada cuenta y mostrarlo en las instrucciones de pago. El valor predeterminado funcional será `SEDERG_PAY`, pero antes de activar una cuenta real se debe comprobar que ese sea el nombre legal exacto aceptado por el banco y que SEDERG_PAY sea la entidad jurídica autorizada para recibir los fondos en el país correspondiente. No se deben utilizar cuentas personales de administradores ni de terceros.
+
+La titularidad no sustituye la verificación legal, bancaria ni regulatoria. En Rusia y Cuba pueden existir diferencias en la forma jurídica, documentación, moneda, restricciones de recepción y requisitos de identificación del titular. Cada cuenta se habilitará por separado después de verificar esos requisitos en su jurisdicción.
+
+## Diseño propuesto
+
+### 1. Catálogo de métodos de fondeo
+
+Cada método tendrá: código, país, moneda, tipo (bank_transfer, instant_qr, card, wallet, cash si se autoriza), proveedor/banco, estado, capacidades (QR dinámico, referencia, confirmación webhook/extracto), límites y configuración no secreta.
+
+El catálogo de métodos de entrega permanecerá separado.
+
+### 2. Cuentas receptoras propiedad de la plataforma
+
+Crear un módulo administrativo para añadir, editar, activar/desactivar y sustituir cuentas receptoras. Datos mínimos:
+
+- país y moneda;
+- banco/proveedor;
+- titular legal: SEDERG_PAY (con la denominación jurídica exacta validada para la cuenta);
+- tipo y número de cuenta / IBAN / identificador bancario según el país;
+- BIC/БИК/código de ruta o sucursal, cuando el canal lo requiera (también cifrado y enmascarado);
+- máscara para mostrar al cliente;
+- método(s) de fondeo compatibles;
+- entorno y estado;
+- fechas de vigencia y observaciones.
+
+El número completo y credenciales bancarias deben cifrarse o mantenerse en un almacén de secretos; no se devolverán al frontend sin necesidad. No se almacenarán tokens/API keys/certificados privados en claro. Las modificaciones serán auditadas. Las cuentas usadas por operaciones históricas se desactivan o sustituyen, nunca se eliminan físicamente.
+
+Debe existir una única cuenta receptora activa por combinación de país + moneda + método + proveedor, salvo que se defina explícitamente un mecanismo de selección/ruteo.
+
+### 3. QR por método de pago
+
+El backend seleccionará una estrategia/adaptador por método y proveedor:
+
+- Transferencia bancaria tradicional: mostrar datos bancarios y referencia única; generar QR solo si el estándar/formato del banco receptor lo soporta.
+- QR bancario/instantáneo: generar payload dinámico específico del proveedor, con importe, moneda, referencia, destino y expiración.
+- Tarjeta o billetera: solo generar QR si el adquirente/proveedor entrega un payload o URL de pago oficial; no codificar un JSON propio esperando que una aplicación bancaria lo interprete.
+
+El QR se genera en backend o con un payload firmado/validado por el adaptador. El cliente puede renderizarlo visualmente, pero no construye el contenido financiero. Cada depósito tendrá referencia única e idempotente. El QR expira y debe estar ligado a una sola remesa/cuenta. Nunca marcar como pagado por escanearlo o subir una captura.
+
+### 4. Datos históricos e integridad
+
+Al crear la solicitud de depósito se guarda una instantánea inmutable de:
+- método de fondeo y proveedor;
+- cuenta receptora y titular;
+- importe/moneda;
+- referencia;
+- payload/URL de QR y vencimiento;
+- identificador externo del proveedor cuando exista.
+
+Cambiar la cuenta desde administración afectará solo a depósitos nuevos; las instrucciones ya emitidas seguirán apuntando a la cuenta original hasta expirar/cancelarse. Se bloqueará la edición destructiva de cuentas con depósitos pendientes.
+
+### 5. Seguridad y operación
+
+- Endpoints administrativos protegidos por rol admin y auditoría.
+- Idempotencia en creación de instrucciones y webhooks.
+- Verificación de firma de webhooks, anti-replay y unicidad de transacción bancaria.
+- Conciliación por cuenta, moneda, importe y referencia; coincidencias ambiguas a revisión manual.
+- El modo sandbox seguirá separado del modo real.
+- Activar una cuenta real requerirá verificar titularidad de la entidad, contrato bancario, autorización regulatoria, AML/KYC, sanciones, límites, devoluciones y disponibilidad del canal.
+
+## Implementación realizada en esta rama
+
+- Migración MySQL única `m261103_000014_create_funding_payment_module`: catálogo de métodos de fondeo, cuentas receptoras SEDERG_PAY, relación cuenta-método e instantánea de cuenta/QR en depósitos. Se eliminó una migración duplicada con el mismo número.
+- API Yii2 para listar métodos disponibles, administrar métodos, registrar cuentas sandbox, activar/desactivar cuentas y crear instrucciones de depósito idempotentes.
+- La cuenta se cifra con `SEDERG_ACCOUNT_ENCRYPTION_KEY` y el API solo devuelve máscara. La clave se inyecta desde Docker y se documenta en `.env.example`; debe ser distinta de `SEDERG_PII_KEY`.
+- Panel React para administrar cuentas/métodos y selección del método en el paso de pago.
+- La transferencia bancaria muestra cuenta/titular/referencia y no fabrica un QR. El método QR genera únicamente un URI `sedergpay-sandbox://` para probar la UI; no es un QR interoperable ni un cobro real.
+- La cuenta de pago queda congelada en `deposit_requests.account_snapshot`; un cambio administrativo requiere registrar una cuenta nueva y desactivar la anterior.
+
+## Entregas técnicas propuestas para esta rama
+
+1. Completar adaptadores bancarios reales tras confirmar contratos y especificaciones técnicas.
+2. Añadir conciliación automática por referencia/importe y webhooks firmados.
+3. Completar auditoría y pruebas de concurrencia/rotación de cuentas.
+4. Ejecutar el flujo en Docker local con la clave de cifrado configurada.
+
+## Decisiones pendientes antes de activar métodos reales
+
+- Confirmar métodos de fondeo para Cuba → Rusia y para Rusia → Cuba, separados de los métodos de entrega.
+- Confirmar banco/cuenta receptora de SEDERG_PAY en cada país, denominación jurídica exacta que figura en el banco, moneda y datos bancarios requeridos.
+- Confirmar con Sberbank, VTB o Alfa-Bank qué canal contractual está disponible (transferencia a cuenta, API de movimientos, webhook, QR/adquirencia); su mención documental no equivale a disponibilidad.
+- Confirmar bancos cubanos de destino y requisitos para abono a cuenta/tarjeta.
+- Determinar si los QR serán QR de transferencia bancaria, QR de cobro/adquirencia o deep links de aplicaciones bancarias. Son formatos distintos y no intercambiables.
+
+## Configuración local requerida
+
+Definir `SEDERG_ACCOUNT_ENCRYPTION_KEY` como secreto aleatorio independiente (por ejemplo, `openssl rand -hex 32`) en el `.env` local antes de crear cuentas sandbox. No compartir esta clave ni subir el `.env` a Git. Si no está definida, el endpoint de alta responde 503 y no persiste la cuenta.
+
+## Restricción de alcance
+
+El desarrollo y las pruebas iniciales se harán en Docker local/sandbox. No se habilitarán pagos reales, custodia de fondos ni despliegue productivo como consecuencia de esta rama.
