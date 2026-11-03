@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace app\Infrastructure\Configuration;
+namespace app\\Infrastructure\\Configuration;
 
 use DomainException;
-use yii\db\Connection;
+use yii\\db\\Connection;
 
 final class PlatformSettings
 {
@@ -24,11 +24,11 @@ final class PlatformSettings
             ],
             'pricing.minimum_send_amount' => [
                 'type' => 'decimal', 'default' => getenv('SEDERG_MIN_SEND_AMOUNT') ?: '15000.00',
-                'min' => '0.01', 'max' => '999999999.99', 'label' => 'Importe mínimo de envío', 'category' => 'pricing',
+                'min' => '0.01', 'max' => '999999999.99', 'label' => 'Importe mínimo del principal (equivalente en RUB)', 'category' => 'pricing',
             ],
             'pricing.maximum_send_amount' => [
                 'type' => 'decimal', 'default' => getenv('SEDERG_MAX_SEND_AMOUNT') ?: '50000.00',
-                'min' => '0.01', 'max' => '999999999.99', 'label' => 'Importe máximo de envío', 'category' => 'pricing',
+                'min' => '0.01', 'max' => '999999999.99', 'label' => 'Importe máximo del principal (equivalente en RUB)', 'category' => 'pricing',
             ],
             'pricing.exchange_rate_source' => [
                 'type' => 'enum', 'default' => 'official',
@@ -181,10 +181,10 @@ final class PlatformSettings
         if ($type === 'enum' && !in_array($string, $definition['options'] ?? [], true)) {
             throw new DomainException('Invalid value for platform setting');
         }
-        if ($type === 'integer' && !preg_match('/^\d+$/', $string)) {
+        if ($type === 'integer' && !preg_match('/^\\d+$/', $string)) {
             throw new DomainException('Integer platform settings require a whole number');
         }
-        if ($type === 'decimal' && !preg_match('/^\d+(?:\.\d{1,10})?$/', $string)) {
+        if ($type === 'decimal' && !preg_match('/^\\d+(?:\\.\\d{1,10})?$/', $string)) {
             throw new DomainException('Decimal platform settings require a positive decimal');
         }
         if (isset($definition['min']) && bccomp($string, $definition['min'], 10) < 0) {
