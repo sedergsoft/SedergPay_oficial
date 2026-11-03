@@ -142,10 +142,20 @@ final class FundingController extends Controller
         $db = Yii::$app->db;
         $countryId = $db->createCommand('SELECT id FROM {{%countries}} WHERE iso2=:code AND is_active=1', [':code' => $countryCode])->queryScalar();
         if (!$countryId) throw new UnprocessableEntityHttpException('Country is not configured');
+        $methodParams = [':country' => $countryCode, ':currency' => $currency];
+        $methodPlaceholders = [];
+        foreach (array_values(array_unique($p['methods'])) as $index => $methodCode) {
+            if (!is_string($methodCode) || !preg_match('/^[a-z0-9_]{2,40}$/', $methodCode)) {
+                throw new BadRequestHttpException('Invalid funding method code');
+            }
+            $placeholder = ':method_' . $index;
+            $methodPlaceholders[] = $placeholder;
+            $methodParams[$placeholder] = $methodCode;
+        }
         $methodRows = $db->createCommand(
             'SELECT m.code FROM {{%funding_payment_methods}} m INNER JOIN {{%countries}} c ON c.id=m.country_id
-             WHERE c.iso2=:country AND m.currency_code=:currency AND m.code IN (' . implode(',', array_fill(0, count($p['methods']), '?')) . ')',
-            array_merge([':country' => $countryCode, ':currency' => $currency], array_values($p['methods']))
+             WHERE c.iso2=:country AND m.currency_code=:currency AND m.code IN (' . implode(',', $methodPlaceholders) . ')',
+            $methodParams
         )->queryColumn();
         if (count($methodRows) !== count(array_unique($p['methods']))) {
             throw new UnprocessableEntityHttpException('One or more methods do not match the selected country/currency');
