@@ -85,7 +85,15 @@ export type Remittance = {
   compliance_status: string;
   created_at?: string;
   updated_at?: string;
-  payment_qr_payload?: string | null;\n  payment_method_code?: string | null;\n  deposit_public_id?: string | null;\n  deposit_status?: string | null;\n  payment_reference?: string | null;\n  deposit_expected_amount?: string | null;\n  deposit_currency?: string | null;\n  deposit_expires_at?: string | null;\n  payment_instructions?: Record<string, any>;
+  payment_qr_payload?: string | null;
+  payment_method_code?: string | null;
+  deposit_public_id?: string | null;
+  deposit_status?: string | null;
+  payment_reference?: string | null;
+  deposit_expected_amount?: string | null;
+  deposit_currency?: string | null;
+  deposit_expires_at?: string | null;
+  payment_instructions?: Record<string, any>;
   payment_instructions?: Record<string, string | null>;
   receipt_email_sent?: boolean;
 };
@@ -169,7 +177,10 @@ export type AdminDashboard = {
   total_remittances: number;
 };
 
-export type FundingMethod = { code: string; name: string; method_type: string; provider_code: string | null; supports_dynamic_qr: boolean | number; requires_reference: boolean | number; country_code?: string; currency_code?: string; is_active?: boolean | number };\nexport type FundingAccount = { public_id: string; country_code: string; currency_code: string; bank_code: string; bank_name: string; account_holder_name: string; legal_entity_name: string | null; account_type: string; account_mask: string; routing_mask: string | null; environment: string; status: string; notes: string | null; methods: string | null };\n\nexport type PlatformSetting = {
+export type FundingMethod = { code: string; name: string; method_type: string; provider_code: string | null; supports_dynamic_qr: boolean | number; requires_reference: boolean | number; country_code?: string; currency_code?: string; is_active?: boolean | number };
+export type FundingAccount = { public_id: string; country_code: string; currency_code: string; bank_code: string; bank_name: string; account_holder_name: string; legal_entity_name: string | null; account_type: string; account_mask: string; routing_mask: string | null; environment: string; status: string; notes: string | null; methods: string | null };
+
+export type PlatformSetting = {
   key: string;
   value: string | number | boolean;
   type: 'decimal' | 'integer' | 'boolean' | 'enum';
