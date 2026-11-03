@@ -4,7 +4,14 @@ export const isDevelopmentAuth = authMode === 'development';
 
 function authHeaders(userId?: string): Record<string, string> {
   if (authMode === 'development') {
-    return userId ? { 'X-User-Public-Id': userId } : {};
+    // In sandbox, prefer the authenticated component identity and fall back to
+    // the same persisted public ID used to restore the session after reload.
+    // Never send an authenticated API request without an identity header.
+    const publicId = (userId ?? '').trim() || (localStorage.getItem('sederg_user') ?? '').trim();
+    if (!publicId) {
+      throw new Error('La sesión de desarrollo no contiene una identidad. Cierra sesión e inicia sesión nuevamente.');
+    }
+    return { 'X-User-Public-Id': publicId };
   }
   const token = localStorage.getItem('sederg_access_token');
   if (!token) {
