@@ -256,7 +256,7 @@ final class RemittanceRepository
     {
         return $this->db->createCommand(
             'SELECT r.public_id, r.reference, r.direction, r.send_amount, r.send_currency,
-                    r.receive_amount, r.receive_currency, r.status, r.compliance_status,
+                    r.receive_amount, r.receive_currency, r.total_debit_amount, r.status, r.compliance_status,
                     r.created_at, r.updated_at
              FROM {{%remittances}} r
              WHERE r.sender_user_id = :user_id
