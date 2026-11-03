@@ -37,4 +37,4 @@ Incorporar СБП / SBP C2B (Customer-to-Business) como método de fondeo para r
 - En Cuba se mantienen inicialmente los canales definidos: efectivo y transferencia a cuentas bancarias cubanas. La disponibilidad, liquidez y coste de cada canal deben reflejarse en límites y cotización.
 
 ## Sandbox
-Implementar un adaptador SbpSandboxAdapter que genere un payload claramente ficticio y permita simular estados. No debe producir QR pagables en producción. La activación real queda deshabilitada hasta disponer de contrato y credenciales bancarias.
+Implementar el adaptador `SbpSandboxQrProvider` que genere un payload claramente ficticio y permita simular estados. No debe producir QR pagables en producción. La activación real queda deshabilitada hasta disponer de contrato y credenciales bancarias.
