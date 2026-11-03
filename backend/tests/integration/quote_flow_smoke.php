@@ -76,8 +76,6 @@ function apiRequest(string $path, array $payload, string $key): array
             'method' => 'POST',
             'ignore_errors' => true,
             'header' => implode("\r\n", [
-                'Accept: */*',
-                'X-User-Public-Id: ' . $userPublicId,
                 'Accept: application/json',
                 'Content-Type: application/json',
                 'X-User-Public-Id: ' . $userPublicId,
@@ -97,6 +95,7 @@ function apiRequest(string $path, array $payload, string $key): array
     return [$status, is_string($body) ? json_decode($body, true) : null, $body];
 }
 
+
 function apiGet(string $path): array
 {
     global $userPublicId;
@@ -104,9 +103,8 @@ function apiGet(string $path): array
         'http' => [
             'method' => 'GET',
             'ignore_errors' => true,
-            'header' => implode("\\r\\n", [
-                'Accept: application/json',
-                'Content-Type: application/json',
+            'header' => implode("\r\n", [
+                'Accept: */*',
                 'X-User-Public-Id: ' . $userPublicId,
             ]),
             'timeout' => 20,
@@ -115,12 +113,13 @@ function apiGet(string $path): array
     $body = file_get_contents('http://127.0.0.1:8080' . $path, false, $context);
     $status = 0;
     foreach ($http_response_header ?? [] as $header) {
-        if (preg_match('/^HTTP\\/\\S+\\s+(\\d+)/', $header, $m)) {
+        if (preg_match('/^HTTP\/\S+\s+(\d+)/', $header, $m)) {
             $status = (int) $m[1];
         }
     }
     return [$status, is_string($body) ? json_decode($body, true) : null];
 }
+
 
 function quotePayload(string $amount, string $mode = 'add_to_send'): array
 {
