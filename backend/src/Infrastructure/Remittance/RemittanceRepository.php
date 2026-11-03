@@ -123,6 +123,9 @@ final class RemittanceRepository
         // Snapshot the payout method and masked destination details selected for this
         // operation. The beneficiary's preferred method may change later.
         $metadata['payout_method_code'] = $quote['payout_method_code'];
+        $metadata['fee_mode'] = $quote['fee_mode'] ?? 'add_to_send';
+        $metadata['fee_amount_snapshot'] = $quote['fee_amount'];
+        $metadata['fee_currency_snapshot'] = $quote['fee_currency'];
         $metadata['payout_provider_snapshot'] = $beneficiary['payout_provider'] ?? null;
         $metadata['payout_account_last4_snapshot'] = $quote['payout_method_code'] === 'bank_account' ? ($beneficiary['payout_account_last4'] ?? null) : null;
         $metadata['payout_card_last4_snapshot'] = $quote['payout_method_code'] === 'card_transfer' ? ($beneficiary['payout_card_last4'] ?? null) : null;
