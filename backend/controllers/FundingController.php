@@ -81,7 +81,9 @@ final class FundingController extends Controller
             $accounts = (int) $db->createCommand(
                 'SELECT COUNT(*) FROM {{%funding_account_methods}} fam
                  INNER JOIN {{%platform_funding_accounts}} a ON a.id=fam.funding_account_id
-                 WHERE fam.payment_method_code=:code AND a.status=:status AND a.environment=:env AND a.account_holder_name=:holder AND a.currency_code=m.currency_code AND a.country_id=m.country_id',
+                 INNER JOIN {{%funding_payment_methods}} m ON m.code=fam.payment_method_code
+                 WHERE fam.payment_method_code=:code AND a.status=:status AND a.environment=:env
+                   AND a.account_holder_name=:holder AND a.currency_code=m.currency_code AND a.country_id=m.country_id',
                 [':code' => $code, ':status' => 'active', ':env' => 'sandbox', ':holder' => 'SEDERG_PAY']
             )->queryScalar();
             if ($accounts < 1) {
