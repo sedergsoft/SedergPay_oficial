@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace tests\\Unit;
+namespace tests\Unit;
 
-use app\\Domain\\Pricing\\PricingPolicy;
-use app\\Domain\\Pricing\\QuoteCalculator;
+use app\Domain\Pricing\PricingPolicy;
+use app\Domain\Pricing\QuoteCalculator;
 use DomainException;
-use PHPUnit\\Framework\\TestCase;
+use PHPUnit\Framework\TestCase;
 
 final class RubCorridorLimitsTest extends TestCase
 {
