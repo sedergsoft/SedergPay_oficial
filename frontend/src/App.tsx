@@ -296,6 +296,13 @@ function RemittanceDetails({ detail, onClose }: { detail: RemittanceDetail; onCl
   const t = useT();
   const locale = localeFor(useLanguage());
   const events = detail.state_events || [];
+  const direction = (detail.direction || '').toLowerCase();
+  const isCubaToRussia = direction === 'cu_to_ru' ||
+    (!['ru_to_cu', 'cu_to_ru'].includes(direction) && detail.send_currency.toUpperCase() === 'CUP');
+  const originCountry = isCubaToRussia ? 'CU' : 'RU';
+  const destinationCountry = isCubaToRussia ? 'RU' : 'CU';
+  const countryName = (code: string) => code === 'CU' ? t('country.cuba') : t('country.russia');
+  const countryFlag = (code: string) => code === 'CU' ? '🇨🇺' : '🇷🇺';
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -327,6 +334,11 @@ function RemittanceDetails({ detail, onClose }: { detail: RemittanceDetail; onCl
       <div className="section-heading details-modal-heading">
         <div><span className="eyebrow">{t('details.receipt')}</span><h2 id="remittance-details-title">{detail.reference}</h2><StatusBadge status={detail.status}/></div>
         <button className="secondary compact-button" type="button" autoFocus onClick={onClose}>{t('common.close')}</button>
+      </div>
+      <div className="remittance-direction" aria-label={`${countryName(originCountry)} → ${countryName(destinationCountry)}`}>
+        <div className="remittance-country"><span className="remittance-country-flag" role="img" aria-label={countryName(originCountry)}>{countryFlag(originCountry)}</span><div><small>{t('details.senderSends')}</small><strong>{countryName(originCountry)}</strong></div></div>
+        <span className="remittance-direction-arrow" aria-hidden="true">→</span>
+        <div className="remittance-country"><span className="remittance-country-flag" role="img" aria-label={countryName(destinationCountry)}>{countryFlag(destinationCountry)}</span><div><small>{t('quote.beneficiaryReceives')}</small><strong>{countryName(destinationCountry)}</strong></div></div>
       </div>
       <div className="detail-highlight"><div><span>{t('quote.beneficiaryReceives')}</span><strong>{detail.receive_amount} <small>{detail.receive_currency}</small></strong></div><div><span>{t('details.senderSends')}</span><strong>{detail.send_amount} <small>{detail.send_currency}</small></strong></div></div>
       <div className="detail-grid">
