@@ -2,10 +2,25 @@
 # No modifica docker-compose.yml ni las dependencias de SEDERG_PAY.
 [CmdletBinding()]
 param(
-    [string]$InstallPath = (Join-Path (Split-Path $PSScriptRoot -Parent) ".local\ballerine")
+    [string]$InstallPath = ""
 )
 
 $ErrorActionPreference = "Stop"
+
+# Resolver la ruta después del enlace de parámetros: $PSScriptRoot puede estar
+# vacío al evaluar valores predeterminados dentro de param().
+if ([string]::IsNullOrWhiteSpace($InstallPath)) {
+    $scriptDirectory = $PSScriptRoot
+    if ([string]::IsNullOrWhiteSpace($scriptDirectory)) {
+        $invokedScript = $MyInvocation.MyCommand.Path
+        if ([string]::IsNullOrWhiteSpace($invokedScript)) {
+            throw "No se pudo determinar la ubicación del script. Ejecuta el archivo .ps1 desde su ruta completa."
+        }
+        $scriptDirectory = Split-Path -LiteralPath $invokedScript -Parent
+    }
+    $repositoryRoot = Split-Path -LiteralPath $scriptDirectory -Parent
+    $InstallPath = Join-Path $repositoryRoot ".local\ballerine"
+}
 $repoUrl = "https://github.com/ballerine-io/ballerine.git"
 
 function Require-Command([string]$Name) {
