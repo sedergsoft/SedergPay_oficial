@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace app\controllers;
 
 use app\Infrastructure\Auth\UserAuthenticator;
-use app\Infrastructure\Payment\SbpSandboxQrProvider;
+use app\Infrastructure\Payment\FundingPaymentProviderFactory;
 use Yii;
 use yii\filters\ContentNegotiator;
 use yii\web\BadRequestHttpException;
