@@ -52,7 +52,8 @@ final class RemittanceRepository
     public function findBeneficiaryForUser(string $publicId, int $userId): ?array
     {
         $row = $this->db->createCommand(
-            'SELECT id, country_id, payout_method_code
+            'SELECT id, country_id, payout_method_code, payout_provider,
+                    payout_account_last4, payout_card_last4
              FROM {{%beneficiaries}}
              WHERE public_id = :public_id AND sender_user_id = :user_id AND status = :status
              LIMIT 1',
@@ -119,6 +120,12 @@ final class RemittanceRepository
         array $metadata,
         Transaction $transaction
     ): int {
+        // Snapshot the payout method and masked destination details selected for this
+        // operation. The beneficiary's preferred method may change later.
+        $metadata['payout_method_code'] = $quote['payout_method_code'];
+        $metadata['payout_provider_snapshot'] = $beneficiary['payout_provider'] ?? null;
+        $metadata['payout_account_last4_snapshot'] = $quote['payout_method_code'] === 'bank_account' ? ($beneficiary['payout_account_last4'] ?? null) : null;
+        $metadata['payout_card_last4_snapshot'] = $quote['payout_method_code'] === 'card_transfer' ? ($beneficiary['payout_card_last4'] ?? null) : null;
         $this->db->createCommand()->insert('{{%remittances}}', [
             'public_id' => $publicId,
             'reference' => $reference,
@@ -208,6 +215,10 @@ final class RemittanceRepository
             return null;
         }
         $row['metadata'] = $this->decodeJson($row['metadata'] ?? null);
+        $row['payout_method_code'] = $row['metadata']['payout_method_code'] ?? $row['payout_method_code'];
+        $row['payout_provider'] = $row['metadata']['payout_provider_snapshot'] ?? $row['payout_provider'];
+        $row['payout_account_last4'] = $row['metadata']['payout_account_last4_snapshot'] ?? null;
+        $row['payout_card_last4'] = $row['metadata']['payout_card_last4_snapshot'] ?? null;
         $row['payment_qr_payload'] = $row['metadata']['payment_qr_payload'] ?? null;
         $row['payment_instructions'] = $row['metadata'];
         $row['state_events'] = $this->db->createCommand(

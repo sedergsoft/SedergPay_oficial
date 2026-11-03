@@ -85,9 +85,20 @@ final class RemittanceController extends Controller
         if ($beneficiary === null) {
             throw new NotFoundHttpException('Beneficiary not found');
         }
-        if ($beneficiary['country_id'] !== $quote['destination_country_id']
-            || $beneficiary['payout_method_code'] !== $quote['payout_method_code']) {
+        if ($beneficiary['country_id'] !== $quote['destination_country_id']) {
             throw new UnprocessableEntityHttpException('Beneficiary does not match quote destination');
+        }
+        // The beneficiary's preferred method is a default, not a restriction.
+        // Validate that the selected method has its required destination details.
+        if ($quote['payout_method_code'] === 'bank_account'
+            && (empty($beneficiary['payout_provider']) || empty($beneficiary['payout_account_last4']))) {
+            throw new UnprocessableEntityHttpException('Complete the beneficiary bank account details before creating this remittance');
+        }
+        if ($quote['payout_method_code'] === 'card_transfer' && empty($beneficiary['payout_card_last4'])) {
+            throw new UnprocessableEntityHttpException('Complete the beneficiary card details before creating this remittance');
+        }
+        if (!in_array($quote['payout_method_code'], ['cash_pickup', 'bank_account', 'card_transfer'], true)) {
+            throw new UnprocessableEntityHttpException('Unsupported payout method');
         }
 
         $direction = $repository->findDirection((int) $quote['source_country_id'], (int) $quote['destination_country_id']);

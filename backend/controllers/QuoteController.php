@@ -85,6 +85,29 @@ final class QuoteController extends Controller
         if (!$repository->paymentMethodExists($payload['payout_method_code'])) {
             throw new UnprocessableEntityHttpException('Unsupported payout method');
         }
+        if (isset($payload['beneficiary_public_id'])) {
+            if (!is_string($payload['beneficiary_public_id']) || !preg_match('/^[0-9a-f-]{36}$/i', $payload['beneficiary_public_id'])) {
+                throw new UnprocessableEntityHttpException('Invalid beneficiary identifier');
+            }
+            $beneficiary = Yii::$app->db->createCommand(
+                'SELECT b.payout_provider, b.payout_account_last4, b.payout_card_last4, c.iso2 AS country_code
+                 FROM {{%beneficiaries}} b
+                 INNER JOIN {{%countries}} c ON c.id = b.country_id
+                 WHERE b.public_id = :public_id AND b.sender_user_id = :user_id AND b.status = :status
+                 LIMIT 1',
+                [':public_id' => $payload['beneficiary_public_id'], ':user_id' => $userId, ':status' => 'active']
+            )->queryOne();
+            if ($beneficiary === false || strtoupper((string) $beneficiary['country_code']) !== strtoupper($payload['destination_country_code'])) {
+                throw new UnprocessableEntityHttpException('Beneficiary does not match quote destination');
+            }
+            if ($payload['payout_method_code'] === 'bank_account'
+                && (empty($beneficiary['payout_provider']) || empty($beneficiary['payout_account_last4']))) {
+                throw new UnprocessableEntityHttpException('Complete the beneficiary bank account details before quoting this method');
+            }
+            if ($payload['payout_method_code'] === 'card_transfer' && empty($beneficiary['payout_card_last4'])) {
+                throw new UnprocessableEntityHttpException('Complete the beneficiary card details before quoting this method');
+            }
+        }
 
         try {
             $exchangeRate = (new ExchangeRateService(Yii::$app->db))->resolve(

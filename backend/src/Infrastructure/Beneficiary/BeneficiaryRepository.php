@@ -68,7 +68,7 @@ final class BeneficiaryRepository
             'phone_e164' => $payload['phone_e164'] ?? null,
             'email' => isset($payload['email']) ? strtolower($payload['email']) : null,
             'payout_method_code' => $payload['payout_method_code'],
-            'payout_provider' => $payload['payout_provider'] ?? null,
+            'payout_provider' => $payload['payout_provider'] ?? $current['payout_provider'],
             'payout_account_token' => $payload['payout_account_token'] ?? null,
             'payout_account_last4' => $payload['payout_account_last4'] ?? null,
             'payout_card_token' => $payload['payout_card_token'] ?? null,
@@ -99,15 +99,16 @@ final class BeneficiaryRepository
     public function updateForUser(string $publicId, int $userId, array $payload, int $countryId): void
     {
         $current = $this->db->createCommand(
-            'SELECT payout_method_code,payout_account_token,payout_account_last4,payout_card_token,payout_card_last4
+            'SELECT payout_method_code,payout_provider,payout_account_token,payout_account_last4,payout_card_token,payout_card_last4
              FROM {{%beneficiaries}} WHERE public_id=:public_id AND sender_user_id=:user_id LIMIT 1 FOR UPDATE',
             [':public_id'=>$publicId, ':user_id'=>$userId]
         )->queryOne();
         if ($current === false) return;
-        $accountToken = $payload['payout_account_token'] ?? ($current['payout_method_code'] === 'bank_account' && $payload['payout_method_code'] === 'bank_account' ? $current['payout_account_token'] : null);
-        $accountLast4 = $payload['payout_account_last4'] ?? ($current['payout_method_code'] === 'bank_account' && $payload['payout_method_code'] === 'bank_account' ? $current['payout_account_last4'] : null);
-        $cardToken = $payload['payout_card_token'] ?? ($current['payout_method_code'] === 'card_transfer' && $payload['payout_method_code'] === 'card_transfer' ? $current['payout_card_token'] : null);
-        $cardLast4 = $payload['payout_card_last4'] ?? ($current['payout_method_code'] === 'card_transfer' && $payload['payout_method_code'] === 'card_transfer' ? $current['payout_card_last4'] : null);
+        // Keep both payout instruments when the preferred method changes.
+        $accountToken = $payload['payout_account_token'] ?? $current['payout_account_token'];
+        $accountLast4 = $payload['payout_account_last4'] ?? $current['payout_account_last4'];
+        $cardToken = $payload['payout_card_token'] ?? $current['payout_card_token'];
+        $cardLast4 = $payload['payout_card_last4'] ?? $current['payout_card_last4'];
         $this->db->createCommand()->update('{{%beneficiaries}}', [
             'country_id' => $countryId,
             'first_name' => trim($payload['first_name']),
