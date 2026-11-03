@@ -303,7 +303,7 @@ export const api = {
   }),
   deposit: (userId: string, remittanceId: string, methodCode: string) => request<{ public_id: string; payment_reference: string; qr_payload: string | null; qr_type: string; account_mask: string; bank_name: string }>('/api/v1/remittances/' + remittanceId + '/deposit', {
     method: 'POST',
-    headers: { ...authHeaders(userId), 'Idempotency-Key': `deposit-${crypto.randomUUID()}` },
+    headers: { ...authHeaders(userId), 'Idempotency-Key': `deposit-${remittanceId}` },
     body: JSON.stringify({ method_code: methodCode }),
   }),
   confirmDeposit: (userId: string, depositId: string) => request(`/api/v1/deposits/${depositId}/simulate-confirmation`, {
