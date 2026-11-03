@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace app\\Infrastructure\\Payment;
+namespace app\Infrastructure\Payment;
 
 /** Common contract for sandbox or bank-issued dynamic payment QR providers. */
 interface DynamicQrProvider
