@@ -81,6 +81,8 @@ final class m261103_000014_create_funding_payment_module extends Migration
         $this->addColumn('{{%deposit_requests}}', 'account_snapshot', $this->json()->null()->after('funding_method_code'));
         $this->addColumn('{{%deposit_requests}}', 'qr_payload', $this->text()->null()->after('account_snapshot'));
         $this->addColumn('{{%deposit_requests}}', 'qr_expires_at', $this->dateTime()->null()->after('qr_payload'));
+        $this->addColumn('{{%deposit_requests}}', 'provider_payment_id', $this->string(160)->null()->after('qr_expires_at'));
+        $this->createIndex('ux_deposit_provider_payment_id', '{{%deposit_requests}}', 'provider_payment_id', true);
         $this->createIndex('ix_deposit_funding_account', '{{%deposit_requests}}', 'funding_account_id');
         $this->addForeignKey('fk_deposit_funding_account', '{{%deposit_requests}}', 'funding_account_id', '{{%platform_funding_accounts}}', 'id', 'RESTRICT', 'CASCADE');
         $this->addForeignKey('fk_deposit_funding_method', '{{%deposit_requests}}', 'funding_method_code', '{{%funding_payment_methods}}', 'code', 'RESTRICT', 'CASCADE');
@@ -89,6 +91,7 @@ final class m261103_000014_create_funding_payment_module extends Migration
             ['code', 'name', 'country_id', 'currency_code', 'method_type', 'provider_code', 'supports_dynamic_qr', 'requires_reference', 'is_active'],
             [
                 ['ru_bank_transfer', 'Transferencia bancaria en Rusia', 1, 'RUB', 'bank_transfer', null, 0, 1, 0],
+                ['ru_sbp_c2b', 'СБП · Pago por QR (C2B)', 1, 'RUB', 'instant_qr', 'sbp_c2b', 1, 1, 0],
                 ['cu_bank_transfer', 'Transferencia bancaria en Cuba', 2, 'CUP', 'bank_transfer', null, 0, 1, 0],
                 ['cu_instant_qr', 'Pago QR en Cuba (sandbox)', 2, 'CUP', 'instant_qr', 'sedergpay_sandbox', 1, 1, 0],
             ]
@@ -126,6 +129,8 @@ final class m261103_000014_create_funding_payment_module extends Migration
         $this->dropForeignKey('fk_deposit_funding_method', '{{%deposit_requests}}');
         $this->dropForeignKey('fk_deposit_funding_account', '{{%deposit_requests}}');
         $this->dropIndex('ix_deposit_funding_account', '{{%deposit_requests}}');
+        $this->dropIndex('ux_deposit_provider_payment_id', '{{%deposit_requests}}');
+        $this->dropColumn('{{%deposit_requests}}', 'provider_payment_id');
         $this->dropColumn('{{%deposit_requests}}', 'qr_expires_at');
         $this->dropColumn('{{%deposit_requests}}', 'qr_payload');
         $this->dropColumn('{{%deposit_requests}}', 'account_snapshot');
