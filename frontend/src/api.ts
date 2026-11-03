@@ -85,7 +85,7 @@ export type Remittance = {
   compliance_status: string;
   created_at?: string;
   updated_at?: string;
-  payment_qr_payload?: string | null;
+  payment_qr_payload?: string | null;\n  payment_method_code?: string | null;\n  deposit_public_id?: string | null;\n  deposit_status?: string | null;\n  payment_reference?: string | null;\n  deposit_expected_amount?: string | null;\n  deposit_currency?: string | null;\n  deposit_expires_at?: string | null;\n  payment_instructions?: Record<string, any>;
   payment_instructions?: Record<string, string | null>;
   receipt_email_sent?: boolean;
 };
@@ -169,7 +169,7 @@ export type AdminDashboard = {
   total_remittances: number;
 };
 
-export type PlatformSetting = {
+export type FundingMethod = { code: string; name: string; method_type: string; provider_code: string | null; supports_dynamic_qr: boolean | number; requires_reference: boolean | number; country_code?: string; currency_code?: string; is_active?: boolean | number };\nexport type FundingAccount = { public_id: string; country_code: string; currency_code: string; bank_code: string; bank_name: string; account_holder_name: string; legal_entity_name: string | null; account_type: string; account_mask: string; routing_mask: string | null; environment: string; status: string; notes: string | null; methods: string | null };\n\nexport type PlatformSetting = {
   key: string;
   value: string | number | boolean;
   type: 'decimal' | 'integer' | 'boolean' | 'enum';
@@ -248,6 +248,12 @@ export const api = {
   remittance: (userId: string, publicId: string) => request<RemittanceDetail>('/api/v1/remittances/' + publicId, {
     headers: authHeaders(userId),
   }),
+  fundingMethods: (userId: string, countryCode: string) => request<{ methods: FundingMethod[]; environment: string }>(`/api/v1/funding-methods/${countryCode}`, { headers: authHeaders(userId) }),
+  adminFundingMethods: (userId: string) => request<{ methods: FundingMethod[] }>('/api/v1/admin/funding-methods', { headers: authHeaders(userId) }),
+  updateFundingMethod: (userId: string, code: string, isActive: boolean) => request<{ code: string; is_active: boolean }>(`/api/v1/admin/funding-methods/${code}`, { method: 'PUT', headers: authHeaders(userId), body: JSON.stringify({ is_active: isActive }) }),
+  adminFundingAccounts: (userId: string) => request<{ accounts: FundingAccount[] }>('/api/v1/admin/funding-accounts', { headers: authHeaders(userId) }),
+  createFundingAccount: (userId: string, body: Record<string, unknown>) => request<{ public_id: string; account_mask: string; status: string; environment: string }>('/api/v1/admin/funding-accounts', { method: 'POST', headers: authHeaders(userId), body: JSON.stringify(body) }),
+  updateFundingAccount: (userId: string, publicId: string, status: 'active' | 'inactive') => request<{ public_id: string; status: string }>(`/api/v1/admin/funding-accounts/${publicId}`, { method: 'PUT', headers: authHeaders(userId), body: JSON.stringify({ status }) }),
   adminOperations: (userId: string) => request<AdminOperation[]>('/api/v1/admin/operations', {
     headers: authHeaders(userId),
   }),
@@ -284,10 +290,10 @@ export const api = {
     headers: { ...authHeaders(userId), 'Idempotency-Key': `remittance-${crypto.randomUUID()}` },
     body: JSON.stringify(body),
   }),
-  deposit: (userId: string, remittanceId: string) => request<{ public_id: string; payment_reference: string }>('/api/v1/remittances/' + remittanceId + '/deposit', {
+  deposit: (userId: string, remittanceId: string, methodCode: string) => request<{ public_id: string; payment_reference: string; qr_payload: string | null; qr_type: string; account_mask: string; bank_name: string }>('/api/v1/remittances/' + remittanceId + '/deposit', {
     method: 'POST',
     headers: { ...authHeaders(userId), 'Idempotency-Key': `deposit-${crypto.randomUUID()}` },
-    body: '{}',
+    body: JSON.stringify({ method_code: methodCode }),
   }),
   confirmDeposit: (userId: string, depositId: string) => request(`/api/v1/deposits/${depositId}/simulate-confirmation`, {
     method: 'POST', headers: authHeaders(userId), body: '{}',
