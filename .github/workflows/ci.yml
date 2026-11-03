@@ -112,6 +112,7 @@ jobs:
           SEDERG_MYSQL_ROOT_PASSWORD: ci-test-root-password
           SEDERG_COOKIE_KEY: ci-test-cookie-key-long-enough-for-compose-validation
           SEDERG_PII_KEY: ci-test-pii-key-long-enough-for-compose-validation-0001
+          SEDERG_ACCOUNT_ENCRYPTION_KEY: ci-test-account-encryption-key-long-enough-for-compose-validation
           API_DOMAIN: sederg.example.invalid
           TLS_EMAIL: ci@example.invalid
         run: docker compose -f docker-compose.yml -f docker-compose.production.yml config --quiet
