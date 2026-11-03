@@ -8,3 +8,4 @@
 /.env.*
 !.env.example
 *.log
+SEDERG_PAY_SVG_Assets.zip
