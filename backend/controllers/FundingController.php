@@ -256,11 +256,20 @@ final class FundingController extends Controller
         $qrPayload = null;
         $qrType = 'none';
         if ((int) $account['supports_dynamic_qr'] === 1 && $account['method_type'] === 'instant_qr') {
-            $qrPayload = 'sedergpay-sandbox://pay?reference=' . rawurlencode($reference)
-                . '&amount=' . rawurlencode((string) $remittance['total_debit_amount'])
-                . '&currency=' . rawurlencode((string) $remittance['send_currency'])
-                . '&account=' . rawurlencode((string) $account['account_mask']);
-            $qrType = 'sedergpay_sandbox';
+            if ($account['provider_code'] === 'sbp_c2b_sandbox') {
+                // Deliberately non-routable sandbox payload. A real SBP QR must
+                // be returned by the contracted acquiring bank, never fabricated here.
+                $qrPayload = 'sedergpay-sandbox://sbp-c2b?reference=' . rawurlencode($reference)
+                    . '&amount=' . rawurlencode((string) $remittance['total_debit_amount'])
+                    . '&currency=RUB&merchant=SEDERG_PAY';
+                $qrType = 'sbp_c2b_sandbox';
+            } else {
+                $qrPayload = 'sedergpay-sandbox://pay?reference=' . rawurlencode($reference)
+                    . '&amount=' . rawurlencode((string) $remittance['total_debit_amount'])
+                    . '&currency=' . rawurlencode((string) $remittance['send_currency'])
+                    . '&account=' . rawurlencode((string) $account['account_mask']);
+                $qrType = 'sedergpay_sandbox';
+            }
         }
         $snapshot = [
             'platform' => 'SEDERG_PAY', 'bank_code' => $account['bank_code'], 'bank_name' => $account['bank_name'],
