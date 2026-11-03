@@ -21,7 +21,7 @@ final class SbpSandboxQrProvider implements SbpC2bQrProvider
         if ($currency !== 'RUB') {
             throw new DomainException('SBP C2B sandbox accepts RUB only');
         }
-        if (!preg_match('/^\d+(?:\.\d{1,2})?$/', $amount) || (float) $amount <= 0) {
+        if (!preg_match('/^\d+(?:\.\d{1,2})?$/', $amount) || bccomp($amount, '0', 2) <= 0) {
             throw new DomainException('SBP amount must be a positive RUB amount');
         }
         if ($paymentReference === '' || $merchantReference !== 'SEDERG_PAY') {
