@@ -7,7 +7,7 @@ namespace app\\Infrastructure\\Payment;
 use DomainException;
 
 /** Local non-routable payment URI for sandbox only; never a bank QR. */
-final class GenericSandboxQrProvider implements SbpC2bQrProvider
+final class GenericSandboxQrProvider implements DynamicQrProvider
 {
     public function createDynamicQr(string $amount, string $currency, string $paymentReference, string $expiresAt, string $merchantReference): array
     {
