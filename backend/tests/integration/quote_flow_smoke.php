@@ -147,6 +147,9 @@ assertTrue(($quote['limits']['evaluated_amount'] ?? null) === '25000.00', '25000
 assertTrue(($quote['receive_amount'] ?? null) === '25000.00', 'gross receive amount is 25000 RUB');
 assertTrue(($quote['total_debit_amount'] ?? null) === '257500.00', 'add_to_send commission is included in sender debit');
 [$viewStatus, $savedQuote] = apiGet('/api/v1/quotes/' . $quote['public_id']);
+if ($viewStatus !== 200 || ($savedQuote['fee_mode'] ?? null) !== 'add_to_send') {
+    fwrite(STDERR, 'Quote view diagnostic: HTTP ' . $viewStatus . ' body=' . json_encode($savedQuote) . "\\n");
+}
 assertTrue($viewStatus === 200 && ($savedQuote['fee_mode'] ?? null) === 'add_to_send', 'GET quote returns the persisted commission mode');
 assertTrue(($savedQuote['receive_amount'] ?? null) === '25000.00', 'GET quote returns persisted RUB receive amount');
 
