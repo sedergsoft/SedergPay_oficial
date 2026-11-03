@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace app\controllers;
 
 use app\Infrastructure\Auth\UserAuthenticator;
+use app\Infrastructure\Payment\SbpSandboxQrProvider;
 use Yii;
 use yii\filters\ContentNegotiator;
 use yii\web\BadRequestHttpException;
@@ -255,16 +256,21 @@ final class FundingController extends Controller
         $expires = (new \DateTimeImmutable('+24 hours'))->format('Y-m-d H:i:s');
         $qrPayload = null;
         $qrType = 'none';
+        $providerPaymentId = null;
         if ((int) $account['supports_dynamic_qr'] === 1 && $account['method_type'] === 'instant_qr') {
-            if ($account['provider_code'] === 'sbp_c2b_sandbox') {
-                // Deliberately non-routable sandbox payload. A real SBP QR must
-                // be returned by the contracted acquiring bank, never fabricated here.
-                $qrPayload = 'sedergpay-sandbox://sbp-c2b?reference=' . rawurlencode($reference)
-                    . '&amount=' . rawurlencode((string) $remittance['total_debit_amount'])
-                    . '&currency=RUB&merchant=SEDERG_PAY';
+            if ($account['provider_code'] === 'sbp_c2b') {
+                $issued = (new SbpSandboxQrProvider())->createDynamicQr(
+                    (string) $remittance['total_debit_amount'],
+                    (string) $remittance['send_currency'],
+                    $reference,
+                    $expires,
+                    'SEDERG_PAY'
+                );
+                $qrPayload = $issued['payload'];
+                $providerPaymentId = $issued['provider_payment_id'];
                 $qrType = 'sbp_c2b_sandbox';
             } else {
-                $qrPayload = 'sedergpay-sandbox://pay?reference=' . rawurlencode($reference)
+                $qrPayload = 'sedergpay-sandbox://cuba-instant-qr?reference=' . rawurlencode($reference)
                     . '&amount=' . rawurlencode((string) $remittance['total_debit_amount'])
                     . '&currency=' . rawurlencode((string) $remittance['send_currency'])
                     . '&account=' . rawurlencode((string) $account['account_mask']);
