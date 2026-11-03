@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace app\Domain\Pricing;
+namespace app\\Domain\\Pricing;
 
 use DomainException;
 use DateTimeImmutable;
@@ -15,10 +15,9 @@ final class QuoteCalculator
         PricingPolicy $policy,
         ?DateTimeInterface $calculatedAt = null
     ): array {
-        $policy->assertSendAmountAllowed($input['send_amount'] ?? '');
         $input['fee_rate'] = $policy->feeRatePercent();
 
-        return $this->calculate($input, $calculatedAt);
+        return $this->calculate($input, $calculatedAt, $policy);
     }
 
     /**
@@ -30,18 +29,13 @@ final class QuoteCalculator
      *   receive_currency: string,
      *   fee_currency?: string
      * } $input
-     * @return array{
-     *   send_amount: string,
-     *   receive_amount: string,
-     *   exchange_rate: string,
-     *   fee_amount: string,
-     *   fee_currency: string,
-     *   total_debit_amount: string,
-     *   calculated_at: string
-     * }
+     * @return array<string, mixed>
      */
-    public function calculate(array $input, ?DateTimeInterface $calculatedAt = null): array
-    {
+    public function calculate(
+        array $input,
+        ?DateTimeInterface $calculatedAt = null,
+        ?PricingPolicy $policy = null
+    ): array {
         $sendAmount = $this->decimal($input['send_amount'] ?? '', 'send_amount');
         $exchangeRate = $this->decimal($input['exchange_rate'] ?? '', 'exchange_rate');
         $feeRate = $this->decimal($input['fee_rate'] ?? '', 'fee_rate');
@@ -57,7 +51,19 @@ final class QuoteCalculator
             throw new DomainException('Quote currencies are required');
         }
 
-        $grossReceiveAmount = bcmul($sendAmount, $exchangeRate, 2);
+        // exchange_rate is expressed as receive currency per one send currency.
+        // Validate the principal in RUB, before applying either commission mode.
+        $grossReceiveAmount = bcmul($sendAmount, $exchangeRate, 10);
+        if ($policy !== null) {
+            $rubPrincipal = match (true) {
+                $sendCurrency === 'RUB' => $sendAmount,
+                $receiveCurrency === 'RUB' => $grossReceiveAmount,
+                default => throw new DomainException('The send limits can only be evaluated for RUB/CUP corridors'),
+            };
+            $policy->assertLimitAmountAllowed($rubPrincipal);
+        }
+
+        $grossReceiveAmount = bcadd($grossReceiveAmount, '0', 2);
         if ($feeMode === 'deduct_from_receive') {
             $feeAmount = bcmul($grossReceiveAmount, bcdiv($feeRate, '100', 10), 2);
             $receiveAmount = bcsub($grossReceiveAmount, $feeAmount, 2);
@@ -70,7 +76,7 @@ final class QuoteCalculator
             $feeCurrency = $sendCurrency;
         }
 
-        return [
+        $result = [
             'send_amount' => $sendAmount,
             'receive_amount' => $receiveAmount,
             'gross_receive_amount' => $grossReceiveAmount,
@@ -81,12 +87,25 @@ final class QuoteCalculator
             'total_debit_amount' => $totalDebitAmount,
             'calculated_at' => ($calculatedAt ?? new DateTimeImmutable())->format(DateTimeInterface::ATOM),
         ];
+
+        if ($policy !== null) {
+            $evaluatedAmount = $sendCurrency === 'RUB' ? $sendAmount : $grossReceiveAmount;
+            $result['limits'] = [
+                'currency' => 'RUB',
+                'minimum' => $policy->minimumSendAmount(),
+                'maximum' => $policy->maximumSendAmount(),
+                'evaluated_amount' => bcadd($evaluatedAmount, '0', 2),
+                'valid' => true,
+            ];
+        }
+
+        return $result;
     }
 
     private function decimal(string $value, string $field): string
     {
         $value = trim($value);
-        if (!preg_match('/^\d+(?:\.\d{1,10})?$/', $value) || bccomp($value, '0', 10) <= 0) {
+        if (!preg_match('/^\\d+(?:\\.\\d{1,10})?$/', $value) || bccomp($value, '0', 10) <= 0) {
             throw new DomainException("{$field} must be a positive decimal");
         }
 
