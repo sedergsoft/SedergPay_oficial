@@ -68,7 +68,7 @@ final class BeneficiaryRepository
             'phone_e164' => $payload['phone_e164'] ?? null,
             'email' => isset($payload['email']) ? strtolower($payload['email']) : null,
             'payout_method_code' => $payload['payout_method_code'],
-            'payout_provider' => $payload['payout_provider'] ?? null,
+            'payout_provider' => $payload['payout_provider'] ?? $current['payout_provider'],
             'payout_account_token' => $payload['payout_account_token'] ?? null,
             'payout_account_last4' => $payload['payout_account_last4'] ?? null,
             'payout_card_token' => $payload['payout_card_token'] ?? null,
@@ -99,7 +99,7 @@ final class BeneficiaryRepository
     public function updateForUser(string $publicId, int $userId, array $payload, int $countryId): void
     {
         $current = $this->db->createCommand(
-            'SELECT payout_method_code,payout_account_token,payout_account_last4,payout_card_token,payout_card_last4
+            'SELECT payout_method_code,payout_provider,payout_account_token,payout_account_last4,payout_card_token,payout_card_last4
              FROM {{%beneficiaries}} WHERE public_id=:public_id AND sender_user_id=:user_id LIMIT 1 FOR UPDATE',
             [':public_id'=>$publicId, ':user_id'=>$userId]
         )->queryOne();
