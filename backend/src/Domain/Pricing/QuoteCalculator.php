@@ -73,6 +73,7 @@ final class QuoteCalculator
         return [
             'send_amount' => $sendAmount,
             'receive_amount' => $receiveAmount,
+            'gross_receive_amount' => $grossReceiveAmount,
             'exchange_rate' => bcadd($exchangeRate, '0', 10),
             'fee_amount' => $feeAmount,
             'fee_currency' => $feeCurrency,
