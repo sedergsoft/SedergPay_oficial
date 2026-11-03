@@ -86,6 +86,20 @@ final class QuoteController extends Controller
             throw new UnprocessableEntityHttpException('Only RU-CU and CU-RU corridors are supported');
         }
 
+        // Enforce the settlement currencies of each corridor at the API boundary.
+        // This prevents a country/currency mismatch from bypassing RUB-denominated limits.
+        $expectedCurrencies = $payload['source_country_code'] === 'CU'
+            ? ['send' => 'CUP', 'receive' => 'RUB']
+            : ['send' => 'RUB', 'receive' => 'CUP'];
+        if (strtoupper($payload['send_currency']) !== $expectedCurrencies['send']
+            || strtoupper($payload['receive_currency']) !== $expectedCurrencies['receive']) {
+            throw new UnprocessableEntityHttpException(
+                'Currency pair does not match the selected remittance corridor'
+            );
+        }
+        $payload['send_currency'] = $expectedCurrencies['send'];
+        $payload['receive_currency'] = $expectedCurrencies['receive'];
+
         if (!$repository->paymentMethodExists($payload['payout_method_code'])) {
             throw new UnprocessableEntityHttpException('Unsupported payout method');
         }
