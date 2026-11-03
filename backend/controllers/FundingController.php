@@ -166,6 +166,16 @@ final class FundingController extends Controller
         $publicId = $this->uuid();
         $mask = '••••' . substr(preg_replace('/\D/', '', $identifier) ?: $identifier, -4);
         $encrypted = Yii::$app->security->encryptByKey($identifier, $key);
+        $routingIdentifier = preg_replace('/\\s+/', '', (string) ($p['routing_identifier'] ?? ''));
+        $routingCiphertext = null;
+        $routingMask = null;
+        if ($routingIdentifier !== '') {
+            if (strlen($routingIdentifier) > 160) {
+                throw new UnprocessableEntityHttpException('Invalid bank routing identifier');
+            }
+            $routingCiphertext = base64_encode(Yii::$app->security->encryptByKey($routingIdentifier, $key));
+            $routingMask = '••••' . substr(preg_replace('/\\D/', '', $routingIdentifier) ?: $routingIdentifier, -4);
+        }
         $tx = $db->beginTransaction();
         try {
             $db->createCommand()->insert('{{%platform_funding_accounts}}', [
@@ -174,7 +184,7 @@ final class FundingController extends Controller
                 'account_holder_name' => 'SEDERG_PAY', 'legal_entity_name' => trim((string) ($p['legal_entity_name'] ?? '')) ?: null,
                 'account_type' => (string) ($p['account_type'] ?? 'bank_account'),
                 'account_identifier_ciphertext' => base64_encode($encrypted), 'account_mask' => $mask,
-                'routing_identifier_ciphertext' => null, 'routing_mask' => null,
+                'routing_identifier_ciphertext' => $routingCiphertext, 'routing_mask' => $routingMask,
                 'environment' => 'sandbox', 'status' => 'active', 'notes' => trim((string) ($p['notes'] ?? '')) ?: null,
                 'created_by_user_id' => $userId, 'updated_by_user_id' => $userId,
             ])->execute();
@@ -189,7 +199,7 @@ final class FundingController extends Controller
             throw $e;
         }
         Yii::$app->response->statusCode = 201;
-        return ['public_id' => $publicId, 'account_mask' => $mask, 'account_holder_name' => 'SEDERG_PAY', 'status' => 'active', 'environment' => 'sandbox'];
+        return ['public_id' => $publicId, 'account_mask' => $mask, 'routing_mask' => $routingMask, 'account_holder_name' => 'SEDERG_PAY', 'status' => 'active', 'environment' => 'sandbox'];
     }
 
     public function actionAdminUpdateAccount(string $publicId): array
@@ -236,7 +246,7 @@ final class FundingController extends Controller
             return json_decode($existing['response_body'], true, 512, JSON_THROW_ON_ERROR);
         }
         $account = $db->createCommand(
-            'SELECT a.id,a.public_id,a.bank_code,a.bank_name,a.account_holder_name,a.account_mask,a.currency_code,a.environment,
+            'SELECT a.id,a.public_id,a.bank_code,a.bank_name,a.account_holder_name,a.account_mask,a.routing_mask,a.currency_code,a.environment,
                     m.code,m.name,m.method_type,m.supports_dynamic_qr,m.provider_code
              FROM {{%funding_payment_methods}} m
              INNER JOIN {{%funding_account_methods}} fam ON fam.payment_method_code=m.code
@@ -279,7 +289,7 @@ final class FundingController extends Controller
         }
         $snapshot = [
             'platform' => 'SEDERG_PAY', 'bank_code' => $account['bank_code'], 'bank_name' => $account['bank_name'],
-            'account_holder_name' => 'SEDERG_PAY', 'account_mask' => $account['account_mask'],
+            'account_holder_name' => 'SEDERG_PAY', 'account_mask' => $account['account_mask'], 'routing_mask' => $account['routing_mask'],
             'currency_code' => $remittance['send_currency'], 'amount' => $remittance['total_debit_amount'],
             'method_code' => $methodCode, 'method_name' => $account['name'], 'reference' => $reference,
             'environment' => 'sandbox', 'qr_type' => $qrType, 'provider_payment_id' => $providerPaymentId,
@@ -289,7 +299,7 @@ final class FundingController extends Controller
             'expected_amount' => $remittance['total_debit_amount'], 'currency_code' => $remittance['send_currency'],
             'payment_reference' => $reference, 'expires_at' => (new \DateTimeImmutable($expires))->format(DATE_ATOM),
             'method_code' => $methodCode, 'method_name' => $account['name'], 'bank_name' => $account['bank_name'],
-            'account_holder_name' => 'SEDERG_PAY', 'account_mask' => $account['account_mask'],
+            'account_holder_name' => 'SEDERG_PAY', 'account_mask' => $account['account_mask'], 'routing_mask' => $account['routing_mask'],
             'qr_payload' => $qrPayload, 'qr_type' => $qrType, 'provider_payment_id' => $providerPaymentId,
         ];
         $tx = $db->beginTransaction();
