@@ -438,7 +438,7 @@ function PaymentQr({ remittance }: { remittance: Remittance }) {
   const [src, setSrc] = useState('');
   const instructions = remittance.payment_instructions ?? {};
   useEffect(() => { setSrc(''); if (!remittance.payment_qr_payload) return; void QRCode.toDataURL(remittance.payment_qr_payload, { width: 220, margin: 2 }).then(setSrc); }, [remittance.payment_qr_payload]);
-  return <div className="payment-panel payment-panel-modern"><div><span className="eyebrow">{t('payment.platformPayment')}</span><h3>{t('payment.transferCreated')}: {remittance.reference}</h3><p>Transfiere <strong>{instructions.amount ?? remittance.deposit_expected_amount ?? remittance.send_amount} {instructions.currency_code ?? remittance.deposit_currency ?? remittance.send_currency}</strong></p><div className="payment-bank-details"><p><span>Banco</span><strong>{instructions.bank_name ?? '—'}</strong></p><p><span>Titular</span><strong>{instructions.account_holder_name ?? 'SEDERG_PAY'}</strong></p><p><span>Cuenta</span><strong>{instructions.account_mask ?? '—'}</strong></p><p><span>Referencia obligatoria</span><strong>{instructions.reference ?? remittance.payment_reference ?? '—'}</strong></p></div>{remittance.payment_qr_payload && <p className="sandbox-note">{remittance.payment_qr_type === 'sbp_c2b_sandbox' ? 'QR SBP C2B de sandbox.' : 'QR de prueba SEDERG_PAY.'} No es pagable ni confirma el ingreso.</p>}{!remittance.payment_qr_payload && <p className="muted">Este método utiliza transferencia bancaria con referencia; no dispone de QR.</p>}</div>{src && <img className="payment-qr" src={src} alt={`QR de pago sandbox ${remittance.reference}`} />}</div>;
+  return <div className="payment-panel payment-panel-modern"><div><span className="eyebrow">{t('payment.platformPayment')}</span><h3>{t('payment.transferCreated')}: {remittance.reference}</h3><p>Transfiere <strong>{instructions.amount ?? remittance.deposit_expected_amount ?? remittance.send_amount} {instructions.currency_code ?? remittance.deposit_currency ?? remittance.send_currency}</strong></p><div className="payment-bank-details"><p><span>Banco</span><strong>{instructions.bank_name ?? '—'}</strong></p><p><span>Titular</span><strong>{instructions.account_holder_name ?? 'SEDERG_PAY'}</strong></p><p><span>Cuenta</span><strong>{instructions.account_mask ?? '—'}</strong></p><p><span>BIC / código de ruta</span><strong>{instructions.routing_mask ?? '—'}</strong></p><p><span>Referencia obligatoria</span><strong>{instructions.reference ?? remittance.payment_reference ?? '—'}</strong></p></div>{remittance.payment_qr_payload && <p className="sandbox-note">{remittance.payment_qr_type === 'sbp_c2b_sandbox' ? 'QR SBP C2B de sandbox.' : 'QR de prueba SEDERG_PAY.'} No es pagable ni confirma el ingreso.</p>}{!remittance.payment_qr_payload && <p className="muted">Este método utiliza transferencia bancaria con referencia; no dispone de QR.</p>}</div>{src && <img className="payment-qr" src={src} alt={`QR de pago sandbox ${remittance.reference}`} />}</div>;
 }
 function RemittanceDetails({ detail, onClose }: { detail: RemittanceDetail; onClose: () => void }) {
   const t = useT();
@@ -616,6 +616,7 @@ function AdminFundingPanel({ userId, run }: { userId: string; run: (action: () =
   const [bankCode,setBankCode]=useState('sberbank');
   const [bankName,setBankName]=useState('Sberbank');
   const [accountIdentifier,setAccountIdentifier]=useState('');
+  const [routingIdentifier,setRoutingIdentifier]=useState('');
   const [legalEntityName,setLegalEntityName]=useState('');
   const [notes,setNotes]=useState('');
   const [selectedMethods,setSelectedMethods]=useState<string[]>([]);
@@ -629,8 +630,8 @@ function AdminFundingPanel({ userId, run }: { userId: string; run: (action: () =
     if(!selectedMethods.length)throw new Error('Selecciona al menos un método compatible.');
     setSaving(true);
     try{
-      await api.createFundingAccount(userId,{country_code:country,currency_code:currency,bank_code:bankCode,bank_name:bankName,account_holder_name:'SEDERG_PAY',legal_entity_name:legalEntityName||null,account_identifier:accountIdentifier,environment:'sandbox',status:'active',methods:selectedMethods,notes});
-      setAccountIdentifier('');setLegalEntityName('');setNotes('');setSelectedMethods([]);
+      await api.createFundingAccount(userId,{country_code:country,currency_code:currency,bank_code:bankCode,bank_name:bankName,account_holder_name:'SEDERG_PAY',legal_entity_name:legalEntityName||null,account_identifier:accountIdentifier,routing_identifier:routingIdentifier,environment:'sandbox',status:'active',methods:selectedMethods,notes});
+      setAccountIdentifier('');setRoutingIdentifier('');setLegalEntityName('');setNotes('');setSelectedMethods([]);
       await reload();
     }finally{setSaving(false);}
   });
@@ -646,11 +647,12 @@ function AdminFundingPanel({ userId, run }: { userId: string; run: (action: () =
     <label>Titular<input value="SEDERG_PAY" readOnly/></label>
     <label>Denominación jurídica (si aplica)<input value={legalEntityName} onChange={e=>setLegalEntityName(e.target.value)} placeholder="Nombre legal validado por el banco"/></label>
     <label className="funding-full">Número de cuenta / identificador bancario<input value={accountIdentifier} onChange={e=>setAccountIdentifier(e.target.value)} required autoComplete="off" /></label>
+    <label className="funding-full">BIC / БИК / código de ruta (si aplica)<input value={routingIdentifier} onChange={e=>setRoutingIdentifier(e.target.value)} autoComplete="off" /></label>
     <div className="funding-full"><strong>Métodos compatibles</strong>{compatible.length===0?<p className="muted">No hay métodos definidos para este país.</p>:compatible.map(method=><label className="funding-checkbox" key={method.code}><input type="checkbox" checked={selectedMethods.includes(method.code)} onChange={()=>toggle(method.code)}/>{method.name} <small>{method.method_type==='instant_qr'?'QR sandbox':'Transferencia'}</small></label>)}</div>
     <label className="funding-full">Notas<input value={notes} onChange={e=>setNotes(e.target.value)}/></label>
     <button type="submit" disabled={saving||!accountIdentifier||!selectedMethods.length}>{saving?'Guardando…':'Guardar cuenta sandbox'}</button>
   </form></section>
   <section className="card"><div className="section-heading"><div><h3>Cuentas receptoras registradas</h3><p className="muted">Para cambiar de cuenta, registra la nueva y desactiva la anterior. Los depósitos existentes conservan su fotografía original.</p></div></div>
-  {accounts.length===0?<p className="muted">Todavía no hay cuentas configuradas.</p>:accounts.map(account=><article className="funding-account-row" key={account.public_id}><div><strong>{account.bank_name} · {account.country_code}/{account.currency_code}</strong><small>Titular: {account.account_holder_name} · Cuenta {account.account_mask}</small><small>Métodos: {account.methods||'—'} · {account.environment}</small></div><div><span className={account.status==='active'?'status-pill status-success':'status-pill status-muted'}>{account.status}</span><button className="secondary compact-button" onClick={()=>void run(async()=>{await api.updateFundingAccount(userId,account.public_id,account.status==='active'?'inactive':'active');await reload();})}>{account.status==='active'?'Desactivar':'Activar'}</button></div></article>)}</section>
+  {accounts.length===0?<p className="muted">Todavía no hay cuentas configuradas.</p>:accounts.map(account=><article className="funding-account-row" key={account.public_id}><div><strong>{account.bank_name} · {account.country_code}/{account.currency_code}</strong><small>Titular: {account.account_holder_name} · Cuenta {account.account_mask}{account.routing_mask ? ` · BIC/ruta ${account.routing_mask}` : ''}</small><small>Métodos: {account.methods||'—'} · {account.environment}</small></div><div><span className={account.status==='active'?'status-pill status-success':'status-pill status-muted'}>{account.status}</span><button className="secondary compact-button" onClick={()=>void run(async()=>{await api.updateFundingAccount(userId,account.public_id,account.status==='active'?'inactive':'active');await reload();})}>{account.status==='active'?'Desactivar':'Activar'}</button></div></article>)}</section>
   </div>;
 }
