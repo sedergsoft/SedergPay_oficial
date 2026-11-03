@@ -270,7 +270,7 @@ final class FundingController extends Controller
                 $providerPaymentId = $issued['provider_payment_id'];
                 $qrType = 'sbp_c2b_sandbox';
             } else {
-                $qrPayload = 'sedergpay-sandbox://cuba-instant-qr?reference=' . rawurlencode($reference)
+                $qrPayload = 'sedergpay-sandbox://pay?reference=' . rawurlencode($reference)
                     . '&amount=' . rawurlencode((string) $remittance['total_debit_amount'])
                     . '&currency=' . rawurlencode((string) $remittance['send_currency'])
                     . '&account=' . rawurlencode((string) $account['account_mask']);
