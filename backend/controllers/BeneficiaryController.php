@@ -88,12 +88,12 @@ final class BeneficiaryController extends Controller
             'payout_card_last4' => $payload['payout_card_last4'] ?? null,
             'status' => 'active',
         ];
-        if ($payload['payout_method_code'] === 'bank_account') {
+        if (!empty($payload['payout_account_number'])) {
             $payload['payout_account_token'] = $this->encryptPaymentValue($payload['payout_account_number']);
             $payload['payout_account_last4'] = substr($payload['payout_account_number'], -4);
             $response['payout_account_last4'] = $payload['payout_account_last4'];
         }
-        if ($payload['payout_method_code'] === 'card_transfer') {
+        if (!empty($payload['payout_card_number'])) {
             $payload['payout_card_token'] = $this->encryptPaymentValue($payload['payout_card_number']);
             $payload['payout_card_last4'] = substr($payload['payout_card_number'], -4);
             $response['payout_card_last4'] = $payload['payout_card_last4'];
@@ -152,29 +152,21 @@ final class BeneficiaryController extends Controller
         if ($countryId === null || !$repository->paymentMethodExists($payload['payout_method_code'])) {
             throw new UnprocessableEntityHttpException('Unsupported country or payout method');
         }
-        if ($payload['payout_method_code'] === 'bank_account') {
-            if ($current['payout_method_code'] !== 'bank_account' && !isset($payload['payout_account_number'])) {
-                throw new UnprocessableEntityHttpException('A bank account number is required when changing the payout method');
-            }
-            if (isset($payload['payout_account_number'])) {
-                if (!preg_match('/^\d{6,34}$/', (string) $payload['payout_account_number'])) throw new UnprocessableEntityHttpException('A valid bank account number is required');
-                $payload['payout_account_token'] = $this->encryptPaymentValue($payload['payout_account_number']);
-                $payload['payout_account_last4'] = substr($payload['payout_account_number'], -4);
-            } elseif ($current['payout_method_code'] !== 'bank_account') {
-                throw new UnprocessableEntityHttpException('A bank account number is required when changing the payout method');
-            }
+        if (!empty($payload['payout_account_number'])) {
+            $digits = preg_replace('/\D+/', '', (string) $payload['payout_account_number']);
+            if (!preg_match('/^\d{6,34}$/', $digits)) throw new UnprocessableEntityHttpException('A valid bank account number is required');
+            $payload['payout_account_token'] = $this->encryptPaymentValue($digits);
+            $payload['payout_account_last4'] = substr($digits, -4);
+        } elseif ($payload['payout_method_code'] === 'bank_account' && empty($current['payout_account_last4'])) {
+            throw new UnprocessableEntityHttpException('A bank account number is required for the selected method');
         }
-        if ($payload['payout_method_code'] === 'card_transfer') {
-            if ($current['payout_method_code'] !== 'card_transfer' && !isset($payload['payout_card_number'])) {
-                throw new UnprocessableEntityHttpException('A card number is required when changing the payout method');
-            }
-            if (isset($payload['payout_card_number'])) {
-                if (!$this->isValidCardNumber((string) $payload['payout_card_number'])) throw new UnprocessableEntityHttpException('A valid card number is required');
-                $payload['payout_card_token'] = $this->encryptPaymentValue($payload['payout_card_number']);
-                $payload['payout_card_last4'] = substr($payload['payout_card_number'], -4);
-            } elseif ($current['payout_method_code'] !== 'card_transfer') {
-                throw new UnprocessableEntityHttpException('A card number is required when changing the payout method');
-            }
+        if (!empty($payload['payout_card_number'])) {
+            $digits = preg_replace('/\D+/', '', (string) $payload['payout_card_number']);
+            if (!$this->isValidCardNumber($digits)) throw new UnprocessableEntityHttpException('A valid card number is required');
+            $payload['payout_card_token'] = $this->encryptPaymentValue($digits);
+            $payload['payout_card_last4'] = substr($digits, -4);
+        } elseif ($payload['payout_method_code'] === 'card_transfer' && empty($current['payout_card_last4'])) {
+            throw new UnprocessableEntityHttpException('A card number is required for the selected method');
         }
         $tx = Yii::$app->db->beginTransaction();
         try {
@@ -247,16 +239,22 @@ final class BeneficiaryController extends Controller
             && (!is_string($payload['payout_account_last4']) || !preg_match('/^\d{4}$/', $payload['payout_account_last4']))) {
             throw new UnprocessableEntityHttpException('Payout account last4 must contain four digits');
         }
+        if (isset($payload['payout_account_number']) && $payload['payout_account_number'] !== ''
+            && !preg_match('/^\d{6,34}$/', preg_replace('/\D+/', '', (string) $payload['payout_account_number']))) {
+            throw new UnprocessableEntityHttpException('A valid bank account number is required');
+        }
+        if (isset($payload['payout_card_number']) && $payload['payout_card_number'] !== ''
+            && !$this->isValidCardNumber((string) $payload['payout_card_number'])) {
+            throw new UnprocessableEntityHttpException('A valid card number is required');
+        }
         if ($payload['payout_method_code'] === 'bank_account'
-            && (!isset($payload['payout_provider'])
-                || trim((string) $payload['payout_provider']) === ''
-                || ($requirePaymentDetails && !isset($payload['payout_account_number']))
-                || (isset($payload['payout_account_number']) && !preg_match('/^\d{6,34}$/', (string) $payload['payout_account_number'])))) {
-            throw new UnprocessableEntityHttpException('Bank provider and account number are required');
+            && (!isset($payload['payout_provider']) || trim((string) $payload['payout_provider']) === ''
+                || ($requirePaymentDetails && empty($payload['payout_account_number'])))) {
+            throw new UnprocessableEntityHttpException('Bank provider and account number are required for the preferred method');
         }
         if ($payload['payout_method_code'] === 'card_transfer'
-            && (($requirePaymentDetails && !isset($payload['payout_card_number'])) || (isset($payload['payout_card_number']) && !$this->isValidCardNumber((string) $payload['payout_card_number'])))) {
-            throw new UnprocessableEntityHttpException('A valid card number is required');
+            && $requirePaymentDetails && empty($payload['payout_card_number'])) {
+            throw new UnprocessableEntityHttpException('A valid card number is required for the preferred method');
         }
         $payload['country_code'] = strtoupper($payload['country_code']);
         $payload['first_name'] = trim($payload['first_name']);
