@@ -46,7 +46,7 @@ final class m261103_000014_create_funding_payment_module extends Migration
             'account_holder_name' => $this->string(160)->notNull()->defaultValue('SEDERG_PAY'),
             'legal_entity_name' => $this->string(200)->null(),
             'account_type' => $this->string(30)->notNull()->defaultValue('bank_account'),
-            'account_identifier_ciphertext' => $this->text()->null(),
+            'account_identifier_ciphertext' => $this->text()->notNull(),
             'account_mask' => $this->string(80)->notNull(),
             'routing_identifier_ciphertext' => $this->text()->null(),
             'routing_mask' => $this->string(80)->null(),
