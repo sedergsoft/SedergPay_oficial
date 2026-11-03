@@ -95,6 +95,30 @@ function apiRequest(string $path, array $payload, string $key): array
     return [$status, is_string($body) ? json_decode($body, true) : null, $body];
 }
 
+function apiGet(string $path): array
+{
+    global $userPublicId;
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'GET',
+            'ignore_errors' => true,
+            'header' => implode("\\r\\n", [
+                'Accept: application/json',
+                'X-User-Public-Id: ' . $userPublicId,
+            ]),
+            'timeout' => 20,
+        ],
+    ]);
+    $body = file_get_contents('http://127.0.0.1:8080' . $path, false, $context);
+    $status = 0;
+    foreach ($http_response_header ?? [] as $header) {
+        if (preg_match('/^HTTP\\/\\S+\\s+(\\d+)/', $header, $m)) {
+            $status = (int) $m[1];
+        }
+    }
+    return [$status, is_string($body) ? json_decode($body, true) : null];
+}
+
 function quotePayload(string $amount, string $mode = 'add_to_send'): array
 {
     global $beneficiaryPublicId;
@@ -122,6 +146,9 @@ assertTrue(($quote['limits']['currency'] ?? null) === 'RUB', 'CU→RU quote repo
 assertTrue(($quote['limits']['evaluated_amount'] ?? null) === '25000.00', '250000 CUP is evaluated as 25000 RUB');
 assertTrue(($quote['receive_amount'] ?? null) === '25000.00', 'gross receive amount is 25000 RUB');
 assertTrue(($quote['total_debit_amount'] ?? null) === '257500.00', 'add_to_send commission is included in sender debit');
+[$viewStatus, $savedQuote] = apiGet('/api/v1/quotes/' . $quote['public_id']);
+assertTrue($viewStatus === 200 && ($savedQuote['fee_mode'] ?? null) === 'add_to_send', 'GET quote returns the persisted commission mode');
+assertTrue(($savedQuote['receive_amount'] ?? null) === '25000.00', 'GET quote returns persisted RUB receive amount');
 
 [$status, $deductQuote] = $createQuote('250000.00', 'deduct_from_receive');
 assertTrue($status === 201, 'CU→RU quote with deduct_from_receive returns HTTP 201');
@@ -168,6 +195,9 @@ assertTrue(($ruToCu['limits']['evaluated_amount'] ?? null) === '25000.00', 'RU�
 assertTrue($status === 201, 'valid CU→RU quote can be converted into a remittance');
 assertTrue(($remittance['direction'] ?? null) === 'cu_to_ru', 'created remittance direction is cu_to_ru');
 assertTrue(($remittance['send_currency'] ?? null) === 'CUP' && ($remittance['receive_currency'] ?? null) === 'RUB', 'remittance persists CUP→RUB currency pair');
+[$detailStatus, $remittanceDetail] = apiGet('/api/v1/remittances/' . $remittance['public_id']);
+assertTrue($detailStatus === 200 && ($remittanceDetail['direction'] ?? null) === 'cu_to_ru', 'GET remittance detail returns the persisted corridor');
+assertTrue(($remittanceDetail['fee_amount'] ?? null) === '7500.00', 'remittance detail preserves the calculated commission snapshot');
 
 [$status, $reused] = apiRequest('/api/v1/remittances', [
     'quote_public_id' => $quote['public_id'],
