@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace app\\Infrastructure\\Payment;
+namespace app\Infrastructure\Payment;
 
 use DomainException;
 
@@ -11,7 +11,7 @@ final class GenericSandboxQrProvider implements DynamicQrProvider
 {
     public function createDynamicQr(string $amount, string $currency, string $paymentReference, string $expiresAt, string $merchantReference): array
     {
-        if (!in_array($currency, ['RUB', 'CUP'], true) || !preg_match('/^\\d+(?:\\.\\d{1,2})?$/', $amount) || bccomp($amount, '0', 2) <= 0) {
+        if (!in_array($currency, ['RUB', 'CUP'], true) || !preg_match('/^\d+(?:\.\d{1,2})?$/', $amount) || bccomp($amount, '0', 2) <= 0) {
             throw new DomainException('Sandbox QR requires a positive amount and supported currency');
         }
         if ($paymentReference === '' || $merchantReference !== 'SEDERG_PAY') {
