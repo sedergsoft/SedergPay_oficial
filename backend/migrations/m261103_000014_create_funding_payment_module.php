@@ -90,7 +90,7 @@ final class m261103_000014_create_funding_payment_module extends Migration
             [
                 ['ru_bank_transfer', 'Transferencia bancaria en Rusia', 1, 'RUB', 'bank_transfer', null, 0, 1, 0],
                 ['cu_bank_transfer', 'Transferencia bancaria en Cuba', 2, 'CUP', 'bank_transfer', null, 0, 1, 0],
-                ['cu_instant_qr', 'Pago QR en Cuba', 2, 'CUP', 'instant_qr', null, 0, 1, 0],
+                ['cu_instant_qr', 'Pago QR en Cuba (sandbox)', 2, 'CUP', 'instant_qr', 'sedergpay_sandbox', 1, 1, 0],
             ]
         );
     }
