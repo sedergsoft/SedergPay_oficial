@@ -269,7 +269,7 @@ final class FundingController extends Controller
         $providerPaymentId = null;
         if ((int) $account['supports_dynamic_qr'] === 1 && $account['method_type'] === 'instant_qr') {
             if ($account['provider_code'] === 'sbp_c2b_sandbox') {
-                $issued = (new FundingPaymentProviderFactory())->for((string) $account['provider_code'], (string) $account['environment'])->createDynamicQr(
+                $issued = (new FundingPaymentProviderFactory())->create((string) $account['provider_code'], (string) $account['environment'])->createDynamicQr(
                     (string) $remittance['total_debit_amount'],
                     (string) $remittance['send_currency'],
                     $reference,
