@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace app\\Domain\\Pricing;
+namespace app\Domain\Pricing;
 
 use DomainException;
 
@@ -33,7 +33,7 @@ final class PricingPolicy
 
     public function assertLimitAmountAllowed(string $amountInRub): void
     {
-        if (!preg_match('/^\\d+(?:\\.\\d{1,10})?$/', $amountInRub)) {
+        if (!preg_match('/^\d+(?:\.\d{1,10})?$/', $amountInRub)) {
             throw new DomainException('The RUB equivalent must be a positive decimal');
         }
 
@@ -63,7 +63,7 @@ final class PricingPolicy
 
     private function assertPositive(string $value, string $field, bool $allowZero): void
     {
-        $valid = preg_match('/^\\d+(?:\\.\\d{1,10})?$/', $value) === 1;
+        $valid = preg_match('/^\d+(?:\.\d{1,10})?$/', $value) === 1;
         $comparison = $allowZero ? bccomp($value, '0', 10) >= 0 : bccomp($value, '0', 10) > 0;
         if (!$valid || !$comparison) {
             throw new DomainException("{$field} must be a valid positive decimal");
