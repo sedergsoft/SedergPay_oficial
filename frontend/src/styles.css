@@ -678,3 +678,27 @@ td,th { border-bottom:1px solid #E5EDF5; }
 .wizard-side{position:sticky;top:20px}.wizard-side-amount{display:grid;gap:6px;margin:0 0 20px;padding:16px;border:1px solid #ffffff40;border-radius:13px;background:#ffffff12}.wizard-side-amount small{color:#D5EAFE;font-size:.75rem}.wizard-side-amount strong{font-size:1.25rem;font-variant-numeric:tabular-nums}
 @media(max-width:900px){.wizard-side{position:static;order:initial}}
 @media(max-width:640px){.remittance-wizard{padding:18px}.wizard-progress{gap:2px}.wizard-step small{font-size:.62rem}.wizard-step span{width:31px;height:31px}.wizard-step:before{top:15px}.wizard-recipient{flex-wrap:wrap}.wizard-recipient .status-pill{margin-left:55px}.wizard-confirm-grid{grid-template-columns:1fr}.wizard-actions button{flex:1;justify-content:center}.wizard-route-chip{max-width:100%}}
+
+
+/* Funding methods and platform receiving accounts */
+.payment-method-options{display:grid;gap:12px;margin:18px 0}
+.payment-method-option{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:18px;border:1px solid var(--line,#dfe6e2);border-radius:14px;background:var(--surface,#fff);color:inherit;text-align:left}
+.payment-method-option:hover{border-color:var(--accent,#138b68);background:var(--surface-soft,#f5faf7)}
+.payment-method-option small,.funding-method-row small,.funding-account-row small{display:block;color:var(--muted,#718078);font-size:.82rem;margin-top:4px}
+.payment-method-option span{color:var(--accent,#138b68);font-weight:700;margin-top:5px}
+.payment-bank-details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:16px 0}
+.payment-bank-details p{display:flex;flex-direction:column;gap:4px;padding:10px;border-radius:10px;background:var(--surface-soft,#f5f8f6);margin:0}
+.payment-bank-details span{font-size:.75rem;color:var(--muted,#718078)}
+.payment-bank-details strong{overflow-wrap:anywhere}
+.sandbox-note{font-size:.8rem;color:#8a5a12;background:#fff6df;border-radius:8px;padding:10px}
+.funding-method-row,.funding-account-row{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px 0;border-bottom:1px solid var(--line,#e6ebe8)}
+.funding-method-row:last-child,.funding-account-row:last-child{border-bottom:0}
+.funding-method-row>div,.funding-account-row>div:first-child{min-width:0}
+.switch-label{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.funding-account-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.funding-account-form label{display:flex;flex-direction:column;gap:6px;font-size:.9rem}
+.funding-account-form input,.funding-account-form select{width:100%;min-width:0}
+.funding-full{grid-column:1/-1}
+.funding-checkbox{display:inline-flex!important;flex-direction:row!important;align-items:center;gap:8px;margin:8px 16px 0 0}
+.funding-account-row>div:last-child{display:flex;align-items:center;gap:10px}
+@media(max-width:680px){.payment-bank-details,.funding-account-form{grid-template-columns:1fr}.funding-account-row,.funding-method-row{align-items:flex-start;flex-direction:column}.funding-account-row>div:last-child{width:100%;justify-content:space-between}}
