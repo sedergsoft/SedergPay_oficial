@@ -267,6 +267,18 @@ assertTrue(($deposit['qr_payload'] ?? null) === null && ($deposit['bank_name'] ?
 assertTrue($detailStatus === 200 && ($paidInstructions['payment_instructions']['account_holder_name'] ?? null) === 'SEDERG_PAY', 'remittance detail preserves SEDERG_PAY account snapshot');
 assertTrue(($paidInstructions['payment_instructions']['reference'] ?? null) === $deposit['payment_reference'], 'remittance detail exposes the unique payment reference');
 
+[$retryDepositStatus, $retryDeposit] = apiRequest('/api/v1/remittances/' . $remittance['public_id'] . '/deposit', ['method_code' => 'cu_bank_transfer'], 'ci-deposit-bank-transfer-20261103');
+assertTrue($retryDepositStatus === 200 && ($retryDeposit['public_id'] ?? null) === $deposit['public_id'], 'deposit idempotency retry returns the same payment instruction');
+
+[$deactivateStatus] = apiPut('/api/v1/admin/funding-accounts/' . $account['public_id'], ['status' => 'inactive']);
+assertTrue($deactivateStatus === 200, 'admin can deactivate an old receiving account');
+[$noMethodsStatus, $noMethods] = apiGet('/api/v1/funding-methods/CU');
+assertTrue($noMethodsStatus === 200 && count($noMethods['methods'] ?? []) === 0, 'inactive receiving account is excluded from new payment choices');
+[$historicStatus, $historicDetail] = apiGet('/api/v1/remittances/' . $remittance['public_id']);
+assertTrue($historicStatus === 200 && ($historicDetail['payment_instructions']['account_mask'] ?? null) === $account['account_mask'], 'deactivating an account does not alter historical payment instructions');
+[$reactivateStatus] = apiPut('/api/v1/admin/funding-accounts/' . $account['public_id'], ['status' => 'active']);
+assertTrue($reactivateStatus === 200, 'admin can reactivate a sandbox receiving account');
+
 [$qrQuoteStatus, $qrQuote] = $createQuote('250000.00');
 assertTrue($qrQuoteStatus === 201, 'second quote is available for QR payment test');
 [$qrRemittanceStatus, $qrRemittance] = apiRequest('/api/v1/remittances', [
