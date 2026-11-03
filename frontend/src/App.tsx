@@ -255,6 +255,22 @@ function Beneficiaries({ userId, run }: { userId: string; run: (action: () => Pr
  {method==='bank_account'&&<div className="conditional-fields"><Field name="payout_provider" label={t('field.bankProvider')} defaultValue={editing?.payout_provider??''}/><Field name="payout_account_number" label={t('field.accountNumberKeep')} inputMode="numeric" pattern="[0-9]{6,34}" required={!editing || editing.payout_method_code !== 'bank_account'}/></div>}{method==='card_transfer'&&<div className="conditional-fields"><Field name="payout_card_number" label={t('field.cardNumberKeep')} inputMode="numeric" pattern="[0-9]{12,19}" required={!editing || editing.payout_method_code !== 'card_transfer'}/></div>}{method!=='cash_pickup'&&<p className="secure-note"><Icon name="lock"/> {t('beneficiaries.encryptedData')}</p>}<div className="form-actions"><button>{editing?t('common.saveChanges'):t('beneficiaries.save')}</button>{editing&&<button type="button" className="secondary" onClick={()=>{setEditing(null);setMethod('cash_pickup');}}>{t('common.cancel')}</button>}</div></form></section>
  <section className="card beneficiary-list-card"><div className="section-heading"><div><span className="eyebrow">{t('beneficiaries.addressBook')}</span><h3>{t('beneficiaries.registeredPeople')}</h3></div><span className="section-icon"><Icon name="users"/></span></div>{items.length===0?<div className="empty-state"><span className="empty-icon"><Icon name="users"/></span><strong>{t('beneficiaries.empty')}</strong><p>{t('beneficiaries.emptyDescription')}</p></div>:<div className="beneficiary-list">{items.map(item=><article className="beneficiary-item" key={item.public_id}><div className="beneficiary-avatar">{(item.first_name?.[0]||'B').toUpperCase()}{(item.last_name?.[0]||'')[0]?.toUpperCase()}</div><div className="beneficiary-info"><strong>{item.first_name} {item.last_name}</strong><span><Icon name="globe"/> {item.country_code==='CU'?t('country.cuba'):t('country.russia')} · {item.phone_e164||item.email||t('common.noContact')}</span><small>{t('payout.'+item.payout_method_code)} {item.payout_provider??''} {item.payout_account_last4?'· cuenta ****'+item.payout_account_last4:''} {item.payout_card_last4?'· tarjeta ****'+item.payout_card_last4:''}</small></div><div className="beneficiary-actions"><StatusBadge status={item.status}/><button className="secondary compact-button" type="button" onClick={()=>{setEditing(item);setMethod(item.payout_method_code);}}><Icon name="edit"/> {t('common.edit')}</button></div></article>)}</div>}</section></div></div>;
 }
+function CountryFlag({ country, className = '' }: { country: 'CU' | 'RU'; className?: string }) {
+  if (country === 'RU') {
+    return <svg className={className} viewBox="0 0 30 20" role="img" aria-label="Bandera de Rusia" xmlns="http://www.w3.org/2000/svg">
+      <rect width="30" height="20" rx="2" fill="#fff" />
+      <path d="M0 6.67h30v6.66H0z" fill="#0039A6" />
+      <path d="M0 13.33h30V20H0z" fill="#D52B1E" />
+    </svg>;
+  }
+  return <svg className={className} viewBox="0 0 30 20" role="img" aria-label="Bandera de Cuba" xmlns="http://www.w3.org/2000/svg">
+    <rect width="30" height="20" rx="2" fill="#fff" />
+    <path d="M0 0h30v4H0zM0 8h30v4H0zM0 16h30v4H0z" fill="#002A8F" />
+    <path d="M0 0 15 10 0 20z" fill="#CF142B" />
+    <path d="m5.1 6.8 1.1 2.3 2.5.3-1.8 1.7.5 2.5-2.3-1.2-2.2 1.2.4-2.5-1.8-1.7 2.5-.3z" fill="#fff" />
+  </svg>;
+}
+
 function QuotePanel({ userId, run }: { userId: string; run: (action: () => Promise<void>) => Promise<void> }) {
   const t = useT();
   const locale = localeFor(useLanguage());
@@ -270,7 +286,7 @@ function QuotePanel({ userId, run }: { userId: string; run: (action: () => Promi
   {matchingBeneficiaries.length === 0 && <p className="muted">{t('quote.noMatchingBeneficiary')}</p>}
   <div className="amount-input-wrap"><Field name="amount" label={t('quote.sendAmount')} defaultValue="15000.00" inputMode="numeric"/><span>RUB</span></div>
   <div className="quote-note"><Icon name="info"/> {t('quote.rateDisclosure')}</div><button disabled={!beneficiaryId}><Icon name="chart"/> {t('quote.calculate')}</button></form></section>
-  <aside className="quote-side"><div className="quote-side-head"><span className="eyebrow">{t('quote.yourTransfer')}</span><h3>RUB <span>→</span> CUP</h3><p>{t('quote.russiaCuba')}</p></div><div className="quote-side-route"><span className="flag-bubble">🇷🇺</span><div><strong>Rusia</strong><small>Origen del envío</small></div><span className="route-line"></span><span className="flag-bubble">🇨🇺</span><div><strong>Cuba</strong><small>Destino de entrega</small></div></div><div className="quote-side-foot"><Icon name="lock"/> {t('quote.protectedData')}</div></aside></div>
+  <aside className="quote-side"><div className="quote-side-head"><span className="eyebrow">{t('quote.yourTransfer')}</span><h3>RUB <span>→</span> CUP</h3><p>{t('quote.russiaCuba')}</p></div><div className="quote-side-route"><span className="flag-bubble"><CountryFlag country="RU" /></span><div><strong>Rusia</strong><small>Origen del envío</small></div><span className="route-line"></span><span className="flag-bubble"><CountryFlag country="CU" /></span><div><strong>Cuba</strong><small>Destino de entrega</small></div></div><div className="quote-side-foot"><Icon name="lock"/> {t('quote.protectedData')}</div></aside></div>
   {quote && <section className="card quote-result"><div className="section-heading"><div><span className="eyebrow">{t('quote.stepTwo')}</span><h3>{t('quote.summary')}</h3></div><span className="status-pill status-success"><Icon name="check"/> {t('quote.calculated')}</span></div><div className="quote-total"><span>{t('quote.beneficiaryReceives')}</span><strong>{quote.receive_amount} <small>CUP</small></strong></div><div className="quote-breakdown"><div><span>{t('quote.amountSent')}</span><strong>{quote.send_amount} {quote.send_currency}</strong></div><div><span>{t('quote.exchangeRate')}</span><strong>{quote.exchange_rate} CUP / RUB</strong></div><div><span>{t('quote.fee')}</span><strong>{quote.fee_amount} RUB</strong></div><div><span>{t('quote.rateSource')}</span><strong>{quote.exchange_rate_source}</strong></div><div><span>{t('quote.validity')}</span><strong>{quote.exchange_rate_effective_date}</strong></div><div><span>{t('quote.expires')}</span><strong>{new Date(quote.expires_at).toLocaleString(locale)}</strong></div></div><p className="muted">{t('quote.confirmNotice')}</p><button onClick={() => void run(async () => { const remittance = await api.createRemittance(userId, { quote_public_id: quote.public_id, beneficiary_public_id: beneficiaryId }); setCreated(remittance); setQuote(null); })}>{t('quote.confirmCreate')}</button></section>}
   {created && <PaymentQr remittance={created} />}
   </div>;
@@ -296,6 +312,13 @@ function RemittanceDetails({ detail, onClose }: { detail: RemittanceDetail; onCl
   const t = useT();
   const locale = localeFor(useLanguage());
   const events = detail.state_events || [];
+  const direction = (detail.direction || '').toLowerCase();
+  const isCubaToRussia = direction === 'cu_to_ru' ||
+    (!['ru_to_cu', 'cu_to_ru'].includes(direction) && detail.send_currency.toUpperCase() === 'CUP');
+  const originCountry = isCubaToRussia ? 'CU' : 'RU';
+  const destinationCountry = isCubaToRussia ? 'RU' : 'CU';
+  const countryName = (code: string) => code === 'CU' ? t('country.cuba') : t('country.russia');
+  const countryFlag = (code: string) => code === 'CU' ? 'CU' : 'RU';
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -327,6 +350,11 @@ function RemittanceDetails({ detail, onClose }: { detail: RemittanceDetail; onCl
       <div className="section-heading details-modal-heading">
         <div><span className="eyebrow">{t('details.receipt')}</span><h2 id="remittance-details-title">{detail.reference}</h2><StatusBadge status={detail.status}/></div>
         <button className="secondary compact-button" type="button" autoFocus onClick={onClose}>{t('common.close')}</button>
+      </div>
+      <div className="remittance-direction" aria-label={`${countryName(originCountry)} → ${countryName(destinationCountry)}`}>
+        <div className="remittance-country"><span className="remittance-country-flag" role="img" aria-label={countryName(originCountry)}><CountryFlag country={countryFlag(originCountry)} /></span><div><small>{t('details.senderSends')}</small><strong>{countryName(originCountry)}</strong></div></div>
+        <span className="remittance-direction-arrow" aria-hidden="true">→</span>
+        <div className="remittance-country"><span className="remittance-country-flag" role="img" aria-label={countryName(destinationCountry)}><CountryFlag country={countryFlag(destinationCountry)} /></span><div><small>{t('quote.beneficiaryReceives')}</small><strong>{countryName(destinationCountry)}</strong></div></div>
       </div>
       <div className="detail-highlight"><div><span>{t('quote.beneficiaryReceives')}</span><strong>{detail.receive_amount} <small>{detail.receive_currency}</small></strong></div><div><span>{t('details.senderSends')}</span><strong>{detail.send_amount} <small>{detail.send_currency}</small></strong></div></div>
       <div className="detail-grid">
