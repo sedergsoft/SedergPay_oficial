@@ -635,15 +635,15 @@ function AdminFundingPanel({ userId, run }: { userId: string; run: (action: () =
       await reload();
     }finally{setSaving(false);}
   });
-  return <div className="feature-view"><div className="view-heading"><div><span className="eyebrow">Administración financiera</span><h2>Métodos de pago y cuentas receptoras</h2><p className="muted">Las cuentas registradas pertenecen a SEDERG_PAY. En esta fase solo se habilita sandbox.</p></div><span className="status-pill status-info">SANDBOX</span></div>
+  return <div className="feature-view"><div className="view-heading"><div><span className="eyebrow">Administración financiera</span><h2>Métodos de pago y cuentas receptoras</h2><p className="muted">Las cuentas registradas pertenecen a SEDERG_PAY. Sberbank, VTB y Alfa-Bank son candidatos documentados en Rusia, no integraciones contratadas. En esta fase solo se habilita sandbox.</p></div><span className="status-pill status-info">SANDBOX</span></div>
   <section className="card"><div className="section-heading"><div><h3>Catálogo de métodos de fondeo</h3><p className="muted">Independiente de los métodos de desembolso al beneficiario.</p></div></div>
   {methods.map(method=><div className="funding-method-row" key={method.code}><div><strong>{method.name}</strong><small>{method.country_code} · {method.currency_code} · {method.method_type} · {method.code}</small></div><label className="switch-label"><input type="checkbox" checked={Boolean(method.is_active)} onChange={e=>void run(async()=>{await api.updateFundingMethod(userId,method.code,e.target.checked);await reload();})}/> Activo</label></div>)}</section>
   <section className="card"><div className="section-heading"><div><h3>Registrar cuenta receptora</h3><p className="muted">El número se cifra antes de almacenarse; solo se muestra enmascarado después del alta.</p></div></div>
   <form className="funding-account-form" onSubmit={e=>{e.preventDefault();create();}}>
     <label>País<select value={country} onChange={e=>{setCountry(e.target.value as 'RU'|'CU');setSelectedMethods([]);if(e.target.value==='RU'){setBankCode('sberbank');setBankName('Sberbank');}else{setBankCode('');setBankName('');}}}><option value="RU">Rusia</option><option value="CU">Cuba</option></select></label>
     <label>Moneda<input value={currency} readOnly/></label>
-    <label>Código del banco<input value={bankCode} onChange={e=>setBankCode(e.target.value)} required/></label>
-    <label>Nombre del banco<input value={bankName} onChange={e=>setBankName(e.target.value)} required/></label>
+    <label>Código del banco<input list="sederg-bank-codes" value={bankCode} onChange={e=>setBankCode(e.target.value)} required/><datalist id="sederg-bank-codes"><option value="sberbank"/><option value="vtb"/><option value="alfa"/></datalist></label>
+    <label>Nombre del banco<input list="sederg-bank-names" value={bankName} onChange={e=>setBankName(e.target.value)} required/><datalist id="sederg-bank-names"><option value="Sberbank"/><option value="VTB"/><option value="Alfa-Bank"/></datalist></label>
     <label>Titular<input value="SEDERG_PAY" readOnly/></label>
     <label>Denominación jurídica (si aplica)<input value={legalEntityName} onChange={e=>setLegalEntityName(e.target.value)} placeholder="Nombre legal validado por el banco"/></label>
     <label className="funding-full">Número de cuenta / identificador bancario<input value={accountIdentifier} onChange={e=>setAccountIdentifier(e.target.value)} required autoComplete="off" /></label>
