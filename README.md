@@ -59,11 +59,11 @@ Requisitos: PHP 8.3+, Composer, MySQL 8.4 y Yii2.
 1. Copiar `.env.example` a `.env` y sustituir todos los valores de ejemplo.
 2. En Windows/PowerShell, inicializar la clave local de cifrado de cuentas antes de arrancar Docker:
 
-   `powershell -ExecutionPolicy Bypass -File .\\scripts\\Initialize-LocalAccountEncryption.ps1`
+   `powershell -ExecutionPolicy Bypass -File .\scripts\Initialize-LocalAccountEncryption.ps1`
 
    El script genera una clave aleatoria independiente de 32 bytes si falta o conserva la existente para no invalidar cuentas ya cifradas. La clave se guarda únicamente en `.env`; nunca la compartas ni la subas a Git. El servicio backend de Docker exige esta variable y no arranca si falta.
-2. Configurar la conexión MySQL mediante variables de entorno; no guardar secretos en el repositorio.
-3. Ejecutar la migración incluida:
+3. Configurar la conexión MySQL mediante variables de entorno; no guardar secretos en el repositorio.
+4. Ejecutar la migración incluida:
 
    `php yii migrate --migrationPath=@app/migrations`
 
