@@ -10,7 +10,7 @@ Implementar la segunda etapa del flujo de remesas: presentar al remitente los m�
 
 Los catálogos actuales mezclan el contexto general de métodos con el uso concreto. El módulo debe distinguir explícitamente:
 
-- **Método de fondeo (inbound):** cómo paga el remitente a SEDERG_PAY en el país de origen.
+- **Método de fondeo (inbound):** cómo paga el remitente a SEDERG_PAY en el país de origen. En Rusia se incorpora SBP C2B por QR como canal previsto, separado de transferencias C2C por teléfono.
 - **Método de entrega (outbound):** cómo recibe el dinero el beneficiario en el país de destino.
 
 La cotización y el perfil de beneficiario ya trabajan con métodos de entrega; no deben reutilizarse como método de fondeo.
@@ -24,13 +24,13 @@ La cotización y el perfil de beneficiario ya trabajan con métodos de entrega; 
 ### Métodos de fondeo documentados
 
 - La migración inicial contiene `bank_transfer` (“Transferencia bancaria”), país RU, dirección `inbound`, activo.
-- No se ha encontrado en el esquema/catálogos del repositorio una lista de métodos de fondeo cubanos habilitados.
+- Métodos en catálogo: transferencia bancaria RUB y SBP C2B QR (ambos inicialmente deshabilitados; SBP solo sandbox). No se ha encontrado en el esquema/catálogos del repositorio una lista de métodos de fondeo cubanos habilitados.
 - El código actual genera un payload QR genérico en `RemittanceController::actionCreate()`, seleccionando la primera `bank_connections` activa. No selecciona un adaptador QR por método y no valida que la cuenta corresponda al corredor/moneda.
 - `PaymentController` y `SimulatedPaymentRepository` son sandbox: generan depósitos simulados y una confirmación manual simulada. No conectan con bancos reales.
 
 ### Bancos mencionados en los documentos
 
-- Rusia: Sberbank, VTB y Alfa-Bank aparecen en el alcance del modelo bancario. `bank_connections.bank_code` admite esos códigos como candidatos; los modos previstos son `api`, `host_to_host` y `statement_import`.
+- Rusia: Sberbank, VTB y Alfa-Bank aparecen en el alcance del modelo bancario. Se añade SBP C2B como método de fondeo por QR (sandbox), que deberá contratarse con un banco adquirente participante. `bank_connections.bank_code` admite esos códigos como candidatos; los modos previstos son `api`, `host_to_host` y `statement_import`.
 - La documentación no acredita que SEDERG_PAY tenga contrato, API habilitada, QR de comercio o permisos de recepción con ninguno de esos bancos. Se deben tratar como bancos candidatos a validar, no como integraciones activas.
 - Cuba: los documentos técnicos del repositorio no especifican bancos cubanos contratados ni un catálogo de bancos de recepción. La entrega a cuenta bancaria está prevista funcionalmente, pero no identifica los bancos admitidos.
 - No se debe presentar como disponible una integración de SBP, QR de comercio, Transfermóvil, EnZona o un banco cubano hasta validar proveedor, titularidad, contrato y disponibilidad para la entidad operadora.
@@ -39,7 +39,7 @@ La cotización y el perfil de beneficiario ya trabajan con métodos de entrega; 
 
 | Corredor | País/moneda de fondeo | Método de fondeo documentado | Método de entrega documentado | Estado |
 |---|---|---|---|---|
-| Rusia → Cuba | Rusia / RUB | Transferencia bancaria (`bank_transfer`) | Efectivo, abono a cuenta o transferencia a tarjeta en Cuba | Métodos de entrega en catálogo/UI; canal de fondeo en sandbox |
+| Rusia → Cuba | Rusia / RUB | Transferencia bancaria (`ru_bank_transfer`) y SBP C2B QR (`ru_sbp_qr`, sandbox) | Efectivo, abono a cuenta o transferencia a tarjeta en Cuba | Métodos de entrega en catálogo/UI; canal de fondeo en sandbox |
 | Cuba → Rusia | Cuba / CUP | No definido en el catálogo del repositorio | En la arquitectura general se prevé entrega a cuenta en Rusia, pero faltan métodos/proveedores específicos | Requiere decisión y validación operativa |
 
 ## Titularidad de las cuentas receptoras
