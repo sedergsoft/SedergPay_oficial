@@ -23,9 +23,9 @@ La cotización y el perfil de beneficiario ya trabajan con métodos de entrega; 
 
 ### Métodos de fondeo documentados
 
-- La migración inicial contiene `bank_transfer` (“Transferencia bancaria”), país RU, dirección `inbound`, activo.
-- Métodos en catálogo: transferencia bancaria RUB y SBP C2B QR (ambos inicialmente deshabilitados; SBP solo sandbox). No se ha encontrado en el esquema/catálogos del repositorio una lista de métodos de fondeo cubanos habilitados.
-- El código actual genera un payload QR genérico en `RemittanceController::actionCreate()`, seleccionando la primera `bank_connections` activa. No selecciona un adaptador QR por método y no valida que la cuenta corresponda al corredor/moneda.
+- El catálogo heredado `payment_methods` contiene `bank_transfer` para RU/inbound. El nuevo catálogo `funding_payment_methods` es independiente y mantiene sus canales deshabilitados hasta configurar una cuenta SEDERG_PAY.
+- Métodos de fondeo sembrados: `ru_bank_transfer`, `ru_sbp_qr` (SBP C2B, sandbox), `cu_bank_transfer` y `cu_instant_qr` (sandbox). Todos comienzan deshabilitados. Los métodos cubanos son placeholders técnicos; no se ha acreditado un proveedor cubano contratado ni su formato QR.
+- `RemittanceController::actionCreate()` ya no genera un QR genérico. `FundingController` selecciona cuenta y método después de crear la remesa; el QR se genera mediante la estrategia asociada al método. SBP usa `SbpSandboxQrProvider`, que produce un URI ficticio no pagable.
 - `PaymentController` y `SimulatedPaymentRepository` son sandbox: generan depósitos simulados y una confirmación manual simulada. No conectan con bancos reales.
 
 ### Bancos mencionados en los documentos
@@ -40,7 +40,7 @@ La cotización y el perfil de beneficiario ya trabajan con métodos de entrega; 
 | Corredor | País/moneda de fondeo | Método de fondeo documentado | Método de entrega documentado | Estado |
 |---|---|---|---|---|
 | Rusia → Cuba | Rusia / RUB | Transferencia bancaria (`ru_bank_transfer`) y SBP C2B QR (`ru_sbp_qr`, sandbox) | Efectivo, abono a cuenta o transferencia a tarjeta en Cuba | Métodos de entrega en catálogo/UI; canal de fondeo en sandbox |
-| Cuba → Rusia | Cuba / CUP | No definido en el catálogo del repositorio | En la arquitectura general se prevé entrega a cuenta en Rusia, pero faltan métodos/proveedores específicos | Requiere decisión y validación operativa |
+| Cuba → Rusia | Cuba / CUP | `cu_bank_transfer` y `cu_instant_qr` como placeholders sandbox, no confirmados con bancos cubanos | En la arquitectura general se prevé entrega a cuenta en Rusia, pero faltan métodos/proveedores específicos | Requiere decisión y validación operativa |
 
 ## Titularidad de las cuentas receptoras
 
