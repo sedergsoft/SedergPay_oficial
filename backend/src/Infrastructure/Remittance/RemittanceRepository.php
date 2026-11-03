@@ -200,7 +200,8 @@ final class RemittanceRepository
                     d.public_id AS deposit_public_id, d.payment_reference,
                     d.expected_amount AS deposit_expected_amount, d.currency_code AS deposit_currency,
                     d.status AS deposit_status, d.expires_at AS deposit_expires_at,
-                    d.confirmed_at AS deposit_confirmed_at,
+                    d.confirmed_at AS deposit_confirmed_at, d.qr_payload AS deposit_qr_payload,
+                    d.account_snapshot AS deposit_account_snapshot, d.payment_reference AS deposit_reference_snapshot,
                     po.public_id AS payout_public_id, po.status AS payout_status,
                     po.provider_reference AS payout_provider_reference, po.paid_at AS payout_paid_at
              FROM {{%remittances}} r
@@ -222,8 +223,13 @@ final class RemittanceRepository
         $row['payout_provider'] = $row['metadata']['payout_provider_snapshot'] ?? $row['payout_provider'];
         $row['payout_account_last4'] = $row['metadata']['payout_account_last4_snapshot'] ?? null;
         $row['payout_card_last4'] = $row['metadata']['payout_card_last4_snapshot'] ?? null;
-        $row['payment_qr_payload'] = $row['metadata']['payment_qr_payload'] ?? null;
-        $row['payment_instructions'] = $row['metadata'];
+        $snapshot = $this->decodeJson($row['deposit_account_snapshot'] ?? null);
+        $row['payment_qr_payload'] = $row['deposit_qr_payload'] ?? ($row['metadata']['payment_qr_payload'] ?? null);
+        $row['payment_instructions'] = array_merge($row['metadata'], $snapshot);
+        if (!empty($row['deposit_reference_snapshot'])) {
+            $row['payment_instructions']['reference'] = $row['deposit_reference_snapshot'];
+        }
+        unset($row['deposit_account_snapshot'], $row['deposit_qr_payload'], $row['deposit_reference_snapshot']);
         $row['state_events'] = $this->db->createCommand(
             'SELECT from_status, to_status, reason, created_at
              FROM {{%remittance_state_events}} WHERE remittance_id = (
