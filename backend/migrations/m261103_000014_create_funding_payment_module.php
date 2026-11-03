@@ -93,6 +93,32 @@ final class m261103_000014_create_funding_payment_module extends Migration
                 ['cu_instant_qr', 'Pago QR en Cuba (sandbox)', 2, 'CUP', 'instant_qr', 'sedergpay_sandbox', 1, 1, 0],
             ]
         );
+
+        // SBP C2B is a Russian commercial acquiring rail, not a C2C phone transfer.
+        // It remains disabled until an acquiring contract and credentials exist.
+        $ruCountryId = (int) $this->db->createCommand(
+            "SELECT id FROM {{%countries}} WHERE iso2='RU' LIMIT 1"
+        )->queryScalar();
+        if ($ruCountryId > 0) {
+            $this->insert('{{%funding_payment_methods}}', [
+                'code' => 'ru_sbp_qr',
+                'name' => 'СБП — QR (sandbox)',
+                'country_id' => $ruCountryId,
+                'currency_code' => 'RUB',
+                'method_type' => 'instant_qr',
+                'provider_code' => 'sbp_c2b_sandbox',
+                'supports_dynamic_qr' => true,
+                'requires_reference' => true,
+                'is_active' => false,
+                'configuration' => json_encode([
+                    'rail' => 'sbp_c2b',
+                    'qr_mode' => 'dynamic',
+                    'issuer' => 'acquiring_bank',
+                    'confirmation' => 'authenticated_webhook_or_statement',
+                    'production_enabled' => false,
+                ], JSON_THROW_ON_ERROR),
+            ]);
+        }
     }
 
     public function safeDown(): void
