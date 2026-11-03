@@ -652,3 +652,29 @@ td,th { border-bottom:1px solid #E5EDF5; }
 .field-error input,.field-error select{border-color:#D92D35!important;background:#FFF9F9}
 .field-error-message{display:block;color:#B4232A;font-size:.76rem;font-weight:600;line-height:1.35}
 @media(max-width:640px){.quote-amounts{grid-template-columns:1fr}}
+
+
+/* Four-step remittance creation wizard */
+.remittance-wizard{display:grid;gap:24px;padding:clamp(20px,3vw,32px)}
+.wizard-progress{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));position:relative;gap:8px}
+.wizard-step{display:grid;justify-items:center;gap:8px;position:relative;color:#8291A4;text-align:center}
+.wizard-step:before{content:"";position:absolute;top:17px;left:0;width:100%;height:2px;background:#E4EBF2;z-index:0}
+.wizard-step:first-child:before{left:50%;width:50%}.wizard-step:last-child:before{width:50%}
+.wizard-step span{z-index:1;display:grid;place-items:center;width:36px;height:36px;border:2px solid #DCE5EE;border-radius:50%;background:#fff;font-weight:800}
+.wizard-step small{font-size:.72rem;font-weight:700}
+.wizard-step.active{color:#0B4F9C}.wizard-step.active span{border-color:#0B67B2;background:#EAF4FD;color:#0B4F9C}
+.wizard-step.completed{color:#087A40}.wizard-step.completed span{border-color:#00A85A;background:#E8F9EF;color:#087A40}
+.wizard-heading{padding-bottom:18px;border-bottom:1px solid #EAF0F6}.wizard-heading h3{margin:6px 0;color:var(--ink-900);font-size:1.35rem}.wizard-heading p{margin:0}
+.wizard-panel{display:grid;gap:18px;min-height:220px}.wizard-panel.modern-form{max-width:680px}
+.wizard-route-chip{display:flex;align-items:center;gap:12px;width:max-content;padding:10px 14px;border:1px solid #DCE8F4;border-radius:12px;background:#F7FAFD}
+.wizard-route-chip .country-flag-svg{width:28px;height:19px;object-fit:cover}.wizard-route-chip>span{color:#0B4F9C;font-weight:800}
+.wizard-calculate{width:max-content}
+.wizard-recipient,.wizard-delivery-card{display:flex;align-items:center;gap:13px;padding:16px;border:1px solid #E2EAF2;border-radius:13px;background:#FBFDFF}
+.wizard-recipient>div,.wizard-delivery-card>div{display:grid;gap:4px;flex:1}.wizard-recipient small,.wizard-delivery-card small{color:#708197;font-size:.78rem}
+.wizard-delivery-card .section-icon{flex:0 0 42px}
+.wizard-amounts{margin:0}.wizard-confirm-banner{display:flex;align-items:center;gap:13px;padding:16px;border-radius:13px;background:#EFF7FE;color:#0B4F9C}.wizard-confirm-banner>.ui-icon{width:25px;height:25px}.wizard-confirm-banner>div{display:grid;gap:4px}.wizard-confirm-banner small{color:#526B84}
+.wizard-confirm-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.wizard-confirm-grid>div{display:grid;gap:6px;padding:15px;border:1px solid #E7EEF5;border-radius:12px}.wizard-confirm-grid small{color:#708197;font-size:.75rem}.wizard-confirm-grid strong{font-size:.88rem}
+.wizard-actions{display:flex;justify-content:space-between;gap:12px;padding-top:18px;border-top:1px solid #EAF0F6}.wizard-actions button{display:inline-flex;align-items:center;gap:9px}.wizard-error{margin:0}
+.wizard-side{position:sticky;top:20px}.wizard-side-amount{display:grid;gap:6px;margin:0 0 20px;padding:16px;border:1px solid #ffffff40;border-radius:13px;background:#ffffff12}.wizard-side-amount small{color:#D5EAFE;font-size:.75rem}.wizard-side-amount strong{font-size:1.25rem;font-variant-numeric:tabular-nums}
+@media(max-width:900px){.wizard-side{position:static;order:initial}}
+@media(max-width:640px){.remittance-wizard{padding:18px}.wizard-progress{gap:2px}.wizard-step small{font-size:.62rem}.wizard-step span{width:31px;height:31px}.wizard-step:before{top:15px}.wizard-recipient{flex-wrap:wrap}.wizard-recipient .status-pill{margin-left:55px}.wizard-confirm-grid{grid-template-columns:1fr}.wizard-actions button{flex:1;justify-content:center}.wizard-route-chip{max-width:100%}}
