@@ -39,7 +39,7 @@ final class RemittanceRepository
         $row = $this->db->createCommand(
             'SELECT id, source_country_id, destination_country_id, send_amount, send_currency,
                     receive_amount, receive_currency, exchange_rate, fee_amount, fee_currency,
-                    total_debit_amount, payout_method_code, status, expires_at
+                    total_debit_amount, payout_method_code, fee_mode, status, expires_at
              FROM {{%remittance_quotes}}
              WHERE public_id = :public_id AND user_id = :user_id
              LIMIT 1',
