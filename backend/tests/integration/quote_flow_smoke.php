@@ -47,6 +47,8 @@ if (!$userId) {
     $pdo->prepare("UPDATE users SET status='active', email_verified_at=? WHERE id=?")->execute([$now, $userId]);
 }
 
+$pdo->prepare("UPDATE users SET role='admin' WHERE id=?")->execute([$userId]);
+
 $stmt = $pdo->prepare('SELECT id FROM beneficiaries WHERE public_id = ?');
 $stmt->execute([$beneficiaryPublicId]);
 $beneficiaryId = $stmt->fetchColumn();
@@ -120,6 +122,30 @@ function apiGet(string $path): array
     return [$status, is_string($body) ? json_decode($body, true) : null];
 }
 
+
+function apiPut(string $path, array $payload): array
+{
+    global $userPublicId;
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'PUT',
+            'ignore_errors' => true,
+            'header' => implode("\r\n", [
+                'Accept: application/json',
+                'Content-Type: application/json',
+                'X-User-Public-Id: ' . $userPublicId,
+            ]),
+            'content' => json_encode($payload, JSON_THROW_ON_ERROR),
+            'timeout' => 20,
+        ],
+    ]);
+    $body = file_get_contents('http://127.0.0.1:8080' . $path, false, $context);
+    $status = 0;
+    foreach ($http_response_header ?? [] as $header) {
+        if (preg_match('/^HTTP\/\S+\s+(\d+)/', $header, $m)) $status = (int) $m[1];
+    }
+    return [$status, is_string($body) ? json_decode($body, true) : null, $body];
+}
 
 function quotePayload(string $amount, string $mode = 'add_to_send'): array
 {
@@ -209,5 +235,49 @@ assertTrue(($remittanceDetail['fee_amount'] ?? null) === '7500.00', 'remittance 
     'beneficiary_public_id' => $beneficiaryPublicId,
 ], 'ci-remittance-create-20261103');
 assertTrue($status === 200 && ($reused['public_id'] ?? null) === ($remittance['public_id'] ?? null), 'idempotent retry returns the same remittance without duplicating it');
+
+
+[$accountStatus, $account] = apiRequest('/api/v1/admin/funding-accounts', [
+    'country_code' => 'CU',
+    'currency_code' => 'CUP',
+    'bank_code' => 'banco_metropolitano',
+    'bank_name' => 'Banco Metropolitano (sandbox)',
+    'account_holder_name' => 'SEDERG_PAY',
+    'account_identifier' => '0123456789012345',
+    'environment' => 'sandbox',
+    'methods' => ['cu_bank_transfer', 'cu_instant_qr'],
+], 'ci-funding-account-create-20261103');
+assertTrue($accountStatus === 201, 'admin can create a SEDERG_PAY Cuba sandbox receiving account');
+assertTrue(($account['account_holder_name'] ?? null) === 'SEDERG_PAY', 'receiving account holder is fixed to SEDERG_PAY');
+assertTrue(($account['account_mask'] ?? '') !== '0123456789012345', 'API returns a masked account identifier');
+$accountRow = $pdo->query("SELECT account_identifier_ciphertext,account_mask FROM platform_funding_accounts WHERE public_id=" . $pdo->quote($account['public_id']))->fetch();
+assertTrue($accountRow && $accountRow['account_identifier_ciphertext'] !== '0123456789012345' && $accountRow['account_mask'] !== '0123456789012345', 'account identifier is encrypted at rest and masked');
+
+[$methodStatus] = apiPut('/api/v1/admin/funding-methods/cu_bank_transfer', ['is_active' => true]);
+assertTrue($methodStatus === 200, 'admin can activate bank transfer after account setup');
+[$qrMethodStatus] = apiPut('/api/v1/admin/funding-methods/cu_instant_qr', ['is_active' => true]);
+assertTrue($qrMethodStatus === 200, 'admin can activate sandbox QR after account setup');
+[$methodsStatus, $availableMethods] = apiGet('/api/v1/funding-methods/CU');
+assertTrue($methodsStatus === 200 && count($availableMethods['methods'] ?? []) === 2, 'sender sees only enabled funding methods with an active matching account');
+
+[$depositStatus, $deposit] = apiRequest('/api/v1/remittances/' . $remittance['public_id'] . '/deposit', ['method_code' => 'cu_bank_transfer'], 'ci-deposit-bank-transfer-20261103');
+assertTrue($depositStatus === 201, 'sender can create a bank-transfer deposit instruction');
+assertTrue(($deposit['qr_payload'] ?? null) === null && ($deposit['bank_name'] ?? null) === 'Banco Metropolitano (sandbox)', 'bank transfer returns bank details without an invalid generic QR');
+[$detailStatus, $paidInstructions] = apiGet('/api/v1/remittances/' . $remittance['public_id']);
+assertTrue($detailStatus === 200 && ($paidInstructions['payment_instructions']['account_holder_name'] ?? null) === 'SEDERG_PAY', 'remittance detail preserves SEDERG_PAY account snapshot');
+assertTrue(($paidInstructions['payment_instructions']['reference'] ?? null) === $deposit['payment_reference'], 'remittance detail exposes the unique payment reference');
+
+[$qrQuoteStatus, $qrQuote] = $createQuote('250000.00');
+assertTrue($qrQuoteStatus === 201, 'second quote is available for QR payment test');
+[$qrRemittanceStatus, $qrRemittance] = apiRequest('/api/v1/remittances', [
+    'quote_public_id' => $qrQuote['public_id'],
+    'beneficiary_public_id' => $beneficiaryPublicId,
+], 'ci-remittance-qr-create-20261103');
+assertTrue($qrRemittanceStatus === 201, 'second remittance created for QR test');
+[$qrDepositStatus, $qrDeposit] = apiRequest('/api/v1/remittances/' . $qrRemittance['public_id'] . '/deposit', ['method_code' => 'cu_instant_qr'], 'ci-deposit-qr-20261103');
+assertTrue($qrDepositStatus === 201, 'sender can create QR payment instruction for the QR method');
+assertTrue(($qrDeposit['qr_type'] ?? null) === 'sedergpay_sandbox' && str_starts_with((string) ($qrDeposit['qr_payload'] ?? ''), 'sedergpay-sandbox://pay?'), 'QR payload is generated by the selected sandbox QR method only');
+[$qrDetailStatus, $qrDetail] = apiGet('/api/v1/remittances/' . $qrRemittance['public_id']);
+assertTrue($qrDetailStatus === 200 && str_starts_with((string) ($qrDetail['payment_qr_payload'] ?? ''), 'sedergpay-sandbox://pay?'), 'remittance detail returns selected method QR payload');
 
 echo "All quote/remittance HTTP integration checks passed.\n";
