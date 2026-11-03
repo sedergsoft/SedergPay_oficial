@@ -80,6 +80,26 @@ jobs:
         run: |
           php -r '$pdo=new PDO("mysql:host=".getenv("DB_HOST").";dbname=".getenv("DB_NAME"),getenv("DB_USER"),getenv("DB_PASSWORD")); $tables=["users","user_profiles","beneficiaries","kyc_cases","kyc_documents","audit_logs","remittances"]; foreach($tables as $table){$q=$pdo->prepare("SHOW TABLES LIKE ?");$q->execute([$table]);if(!$q->fetchColumn()){fwrite(STDERR,"Missing table: $table\\n");exit(1);}} echo "Critical MySQL tables verified.\\n";'
 
+      - name: Run quote and remittance HTTP integration tests
+        working-directory: backend
+        env:
+          SEDERG_DB_DSN: mysql:host=127.0.0.1;port=3306;dbname=sederg_pay
+          SEDERG_DB_USER: root
+          SEDERG_DB_PASSWORD: root
+          SEDERG_AUTH_MODE: development
+          SEDERG_COOKIE_KEY: ci-integration-cookie-key-long-enough-for-tests
+          SEDERG_MAIL_TRANSPORT: array
+        run: |
+          php yii serve 127.0.0.1:8080 --docroot=web > /tmp/sederg-yii-server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:8080/health >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --silent --fail http://127.0.0.1:8080/health >/dev/null || { cat /tmp/sederg-yii-server.log; exit 1; }
+          php tests/integration/quote_flow_smoke.php
+
   deployment-config:
     name: Docker Compose production configuration
     runs-on: ubuntu-latest
