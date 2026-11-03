@@ -19,7 +19,7 @@ final class PlatformSettings
     {
         return [
             'pricing.fee_rate_percent' => [
-                'type' => 'decimal', 'default' => getenv('SEDERG_FEE_RATE_PERCENT') ?: '2.50',
+                'type' => 'decimal', 'default' => getenv('SEDERG_FEE_RATE_PERCENT') ?: '3.00',
                 'min' => '0', 'max' => '100', 'label' => 'Comisión (%)', 'category' => 'pricing',
             ],
             'pricing.minimum_send_amount' => [

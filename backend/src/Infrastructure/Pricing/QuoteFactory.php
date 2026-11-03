@@ -14,7 +14,7 @@ final class QuoteFactory
 {
     public static function create(?Connection $db = null): QuoteService
     {
-        $feeRate = getenv('SEDERG_FEE_RATE_PERCENT') ?: '2.50';
+        $feeRate = getenv('SEDERG_FEE_RATE_PERCENT') ?: '3.00';
         $minimum = getenv('SEDERG_MIN_SEND_AMOUNT') ?: '15000.00';
         $maximum = getenv('SEDERG_MAX_SEND_AMOUNT') ?: '50000.00';
         $validitySeconds = 900;

@@ -47,22 +47,37 @@ final class QuoteCalculator
         $feeRate = $this->decimal($input['fee_rate'] ?? '', 'fee_rate');
         $sendCurrency = strtoupper(trim($input['send_currency'] ?? ''));
         $receiveCurrency = strtoupper(trim($input['receive_currency'] ?? ''));
-        $feeCurrency = strtoupper(trim($input['fee_currency'] ?? $sendCurrency));
+        $feeMode = trim((string) ($input['fee_mode'] ?? 'add_to_send'));
+        if (!in_array($feeMode, ['add_to_send', 'deduct_from_receive'], true)) {
+            throw new DomainException('fee_mode must be add_to_send or deduct_from_receive');
+        }
+        $feeCurrency = strtoupper(trim($input['fee_currency'] ?? ($feeMode === 'deduct_from_receive' ? $receiveCurrency : $sendCurrency)));
 
         if ($sendCurrency === '' || $receiveCurrency === '' || $feeCurrency === '') {
             throw new DomainException('Quote currencies are required');
         }
 
-        $receiveAmount = bcmul($sendAmount, $exchangeRate, 2);
-        $feeAmount = bcmul($sendAmount, bcdiv($feeRate, '100', 10), 2);
-        $totalDebitAmount = bcadd($sendAmount, $feeAmount, 2);
+        $grossReceiveAmount = bcmul($sendAmount, $exchangeRate, 2);
+        if ($feeMode === 'deduct_from_receive') {
+            $feeAmount = bcmul($grossReceiveAmount, bcdiv($feeRate, '100', 10), 2);
+            $receiveAmount = bcsub($grossReceiveAmount, $feeAmount, 2);
+            $totalDebitAmount = $sendAmount;
+            $feeCurrency = $receiveCurrency;
+        } else {
+            $feeAmount = bcmul($sendAmount, bcdiv($feeRate, '100', 10), 2);
+            $receiveAmount = $grossReceiveAmount;
+            $totalDebitAmount = bcadd($sendAmount, $feeAmount, 2);
+            $feeCurrency = $sendCurrency;
+        }
 
         return [
             'send_amount' => $sendAmount,
             'receive_amount' => $receiveAmount,
+            'gross_receive_amount' => $grossReceiveAmount,
             'exchange_rate' => bcadd($exchangeRate, '0', 10),
             'fee_amount' => $feeAmount,
             'fee_currency' => $feeCurrency,
+            'fee_mode' => $feeMode,
             'total_debit_amount' => $totalDebitAmount,
             'calculated_at' => ($calculatedAt ?? new DateTimeImmutable())->format(DateTimeInterface::ATOM),
         ];

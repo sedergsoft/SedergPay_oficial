@@ -50,6 +50,10 @@ final class QuoteController extends Controller
         if (!is_array($payload)) {
             throw new BadRequestHttpException('JSON object body is required');
         }
+        $payload['fee_mode'] = $payload['fee_mode'] ?? 'add_to_send';
+        if (!in_array($payload['fee_mode'], ['add_to_send', 'deduct_from_receive'], true)) {
+            throw new UnprocessableEntityHttpException('Unsupported commission mode');
+        }
 
         $repository = new QuoteRepository(Yii::$app->db);
         $userId = (new UserAuthenticator(Yii::$app->db))->userId();
@@ -168,6 +172,7 @@ final class QuoteController extends Controller
             'fee_amount' => $quote['fee_amount'],
             'fee_currency' => $quote['fee_currency'],
             'total_debit_amount' => $quote['total_debit_amount'],
+            'fee_mode' => $quote['fee_mode'],
             'payout_method_code' => $quote['payout_method_code'],
             'status' => $status,
             'expires_at' => $expiresAt->format(DATE_ATOM),

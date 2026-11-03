@@ -642,3 +642,13 @@ td,th { border-bottom:1px solid #E5EDF5; }
 .flag-bubble .country-flag-svg{display:block;width:30px;height:20px;border-radius:2px;object-fit:cover;box-shadow:0 1px 3px #001b3626}
 .remittance-country-flag .country-flag-svg{display:block;width:38px;height:26px;border-radius:3px;object-fit:cover;box-shadow:0 2px 6px #17324d24}
 @media(max-width:520px){.remittance-country-flag .country-flag-svg{width:32px;height:22px}}
+
+/* Quote payment totals and inline field validation */
+.quote-amounts{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0}
+.quote-amounts .quote-total{margin:0;min-width:0}
+.quote-total-pay{background:#E8F9EF;border:1px solid #BCE8CD}
+.quote-total-pay>span{color:#276749}
+.quote-total-pay>strong{color:#087A40}
+.field-error input,.field-error select{border-color:#D92D35!important;background:#FFF9F9}
+.field-error-message{display:block;color:#B4232A;font-size:.76rem;font-weight:600;line-height:1.35}
+@media(max-width:640px){.quote-amounts{grid-template-columns:1fr}}

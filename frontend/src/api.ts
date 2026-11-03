@@ -51,6 +51,8 @@ export type Quote = {
   receive_currency: string;
   exchange_rate: string;
   fee_amount: string;
+  fee_currency?: string;
+  fee_mode?: 'add_to_send' | 'deduct_from_receive';
   total_debit_amount: string;
   payout_method_code: string;
   status: string;

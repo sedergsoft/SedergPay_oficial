@@ -57,7 +57,7 @@ final class QuoteRepository
         $row = $this->db->createCommand(
             'SELECT public_id, send_amount, send_currency, receive_amount, receive_currency,
                     exchange_rate, fee_amount, fee_currency, total_debit_amount,
-                    payout_method_code, status, expires_at
+                    payout_method_code, fee_mode, status, expires_at
              FROM {{%remittance_quotes}}
              WHERE public_id = :public_id AND user_id = :user_id
              LIMIT 1',
@@ -92,6 +92,7 @@ final class QuoteRepository
             'exchange_rate' => $calculated['exchange_rate'],
             'fee_amount' => $calculated['fee_amount'],
             'fee_currency' => $calculated['fee_currency'],
+            'fee_mode' => $calculated['fee_mode'] ?? ($request['fee_mode'] ?? 'add_to_send'),
             'total_debit_amount' => $calculated['total_debit_amount'],
             'payout_method_code' => $request['payout_method_code'],
             'status' => $calculated['status'],
