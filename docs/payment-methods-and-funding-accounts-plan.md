@@ -42,7 +42,7 @@ La cotización y el perfil de beneficiario ya trabajan con métodos de entrega; 
 | Rusia → Cuba | Rusia / RUB | Transferencia bancaria (`bank_transfer`) | Efectivo, abono a cuenta o transferencia a tarjeta en Cuba | Métodos de entrega en catálogo/UI; canal de fondeo en sandbox |
 | Cuba → Rusia | Cuba / CUP | No definido en el catálogo del repositorio | En la arquitectura general se prevé entrega a cuenta en Rusia, pero faltan métodos/proveedores específicos | Requiere decisión y validación operativa |
 
-## Diseño propuesto
+## Titularidad de las cuentas receptoras\n\nDecisión confirmada por el usuario: las cuentas receptoras estarán a nombre de **SEDERG_PAY**. El sistema debe guardar literalmente el titular legal validado para cada cuenta y mostrarlo en las instrucciones de pago. El valor predeterminado funcional será `SEDERG_PAY`, pero antes de activar una cuenta real se debe comprobar que ese sea el nombre legal exacto aceptado por el banco y que SEDERG_PAY sea la entidad jurídica autorizada para recibir los fondos en el país correspondiente. No se deben utilizar cuentas personales de administradores ni de terceros.\n\nLa titularidad no sustituye la verificación legal, bancaria ni regulatoria. En Rusia y Cuba pueden existir diferencias en la forma jurídica, documentación, moneda, restricciones de recepción y requisitos de identificación del titular. Cada cuenta se habilitará por separado después de verificar esos requisitos en su jurisdicción.\n\n## Diseño propuesto
 
 ### 1. Catálogo de métodos de fondeo
 
@@ -56,7 +56,7 @@ Crear un módulo administrativo para añadir, editar, activar/desactivar y susti
 
 - país y moneda;
 - banco/proveedor;
-- titular legal (debe ser la entidad operadora de SEDERG_PAY);
+- titular legal: SEDERG_PAY (con la denominación jurídica exacta validada para la cuenta);
 - tipo y número de cuenta / IBAN / identificador bancario según el país;
 - máscara para mostrar al cliente;
 - método(s) de fondeo compatibles;
@@ -111,7 +111,7 @@ Cambiar la cuenta desde administración afectará solo a depósitos nuevos; las 
 ## Decisiones pendientes antes de activar métodos reales
 
 - Confirmar métodos de fondeo para Cuba → Rusia y para Rusia → Cuba, separados de los métodos de entrega.
-- Confirmar banco/cuenta receptora de la entidad operadora en cada país, titular legal exacto, moneda y datos bancarios requeridos.
+- Confirmar banco/cuenta receptora de SEDERG_PAY en cada país, denominación jurídica exacta que figura en el banco, moneda y datos bancarios requeridos.
 - Confirmar con Sberbank, VTB o Alfa-Bank qué canal contractual está disponible (transferencia a cuenta, API de movimientos, webhook, QR/adquirencia); su mención documental no equivale a disponibilidad.
 - Confirmar bancos cubanos de destino y requisitos para abono a cuenta/tarjeta.
 - Determinar si los QR serán QR de transferencia bancaria, QR de cobro/adquirencia o deep links de aplicaciones bancarias. Son formatos distintos y no intercambiables.
