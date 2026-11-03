@@ -1,10 +1,34 @@
 #requires -Version 5.1
 [CmdletBinding()]
 param(
-    [string]$ProjectRoot = (Split-Path -Parent $PSScriptRoot)
+    [string]$ProjectRoot
 )
 
 $ErrorActionPreference = 'Stop'
+
+# No calcular PSScriptRoot en el valor predeterminado del parámetro:
+# durante el enlace de parámetros puede llegar vacío en algunas formas de invocación.
+if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
+    $scriptFile = $PSCommandPath
+    if ([string]::IsNullOrWhiteSpace($scriptFile)) {
+        $scriptFile = $MyInvocation.MyCommand.Path
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($scriptFile)) {
+        $scriptDirectory = Split-Path -Parent $scriptFile
+        $ProjectRoot = Split-Path -Parent $scriptDirectory
+    }
+    else {
+        # Último recurso para ejecución desde una sesión interactiva.
+        $ProjectRoot = (Get-Location).Path
+    }
+}
+
+if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
+    throw 'No se pudo determinar la raíz del proyecto. Ejecuta el script desde su ubicación o indica -ProjectRoot.'
+}
+
+$ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
 $envPath = Join-Path $ProjectRoot '.env'
 
 if (-not (Test-Path -LiteralPath $envPath)) {
