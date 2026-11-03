@@ -436,8 +436,9 @@ function Remittances({ userId, run }: { userId: string; run: (action: () => Prom
 function PaymentQr({ remittance }: { remittance: Remittance }) {
   const t = useT();
   const [src, setSrc] = useState('');
-  useEffect(() => { if (!remittance.payment_qr_payload) return; void QRCode.toDataURL(remittance.payment_qr_payload, { width: 220, margin: 2 }).then(setSrc); }, [remittance.payment_qr_payload]);
-  return <div className="payment-panel payment-panel-modern"><div><span className="eyebrow">{t('payment.platformPayment')}</span><h3>{t('payment.transferCreated')}: {remittance.reference}</h3><p>Transfiere <strong>{remittance.payment_instructions?.amount ?? remittance.send_amount} {remittance.payment_instructions?.currency ?? remittance.send_currency}</strong> {t('payment.useReference')}</p><p className="muted">{t('payment.qrContains')} {remittance.receipt_email_sent ? t('payment.receiptSent') : t('payment.receiptInDetails')}</p></div>{src && <img className="payment-qr" src={src} alt={`QR de pago ${remittance.reference}`} />}</div>;
+  const instructions = remittance.payment_instructions ?? {};
+  useEffect(() => { setSrc(''); if (!remittance.payment_qr_payload) return; void QRCode.toDataURL(remittance.payment_qr_payload, { width: 220, margin: 2 }).then(setSrc); }, [remittance.payment_qr_payload]);
+  return <div className="payment-panel payment-panel-modern"><div><span className="eyebrow">{t('payment.platformPayment')}</span><h3>{t('payment.transferCreated')}: {remittance.reference}</h3><p>Transfiere <strong>{instructions.amount ?? remittance.deposit_expected_amount ?? remittance.send_amount} {instructions.currency_code ?? remittance.deposit_currency ?? remittance.send_currency}</strong></p><div className="payment-bank-details"><p><span>Banco</span><strong>{instructions.bank_name ?? '—'}</strong></p><p><span>Titular</span><strong>{instructions.account_holder_name ?? 'SEDERG_PAY'}</strong></p><p><span>Cuenta</span><strong>{instructions.account_mask ?? '—'}</strong></p><p><span>Referencia obligatoria</span><strong>{instructions.reference ?? remittance.payment_reference ?? '—'}</strong></p></div>{remittance.payment_qr_payload && <p className="sandbox-note">QR de prueba SEDERG_PAY. No es un QR bancario interoperable ni acredita el pago.</p>}{!remittance.payment_qr_payload && <p className="muted">Este método utiliza transferencia bancaria con referencia; no dispone de QR.</p>}</div>{src && <img className="payment-qr" src={src} alt={`QR de pago sandbox ${remittance.reference}`} />}</div>;
 }
 function RemittanceDetails({ detail, onClose }: { detail: RemittanceDetail; onClose: () => void }) {
   const t = useT();
@@ -606,3 +607,50 @@ function Field({ name, label, type = 'text', defaultValue, value, onChange, plac
   return <label className={error ? 'field-error' : undefined}>{label}<input required={required} name={name} type={type} defaultValue={mask ? formatInputMask(defaultValue ?? '', mask) : defaultValue} value={value === undefined ? undefined : (mask ? formatInputMask(value, mask) : value)} onChange={handleChange} placeholder={placeholder} inputMode={inputMode} pattern={pattern} aria-invalid={!!error} aria-describedby={error ? name + '-error' : undefined} />{error && <small className="field-error-message" id={name + '-error'} role="alert">{error}</small>}</label>;
 }
 function Stat({ label, value }: { label: string; value: string }) { return <div className="stat"><span>{label}</span><strong>{value}</strong></div>; }
+
+
+function AdminFundingPanel({ userId, run }: { userId: string; run: (action: () => Promise<void>) => Promise<void> }) {
+  const [methods,setMethods]=useState<FundingMethod[]>([]);
+  const [accounts,setAccounts]=useState<FundingAccount[]>([]);
+  const [country,setCountry]=useState<'RU'|'CU'>('RU');
+  const [bankCode,setBankCode]=useState('sberbank');
+  const [bankName,setBankName]=useState('Sberbank');
+  const [accountIdentifier,setAccountIdentifier]=useState('');
+  const [legalEntityName,setLegalEntityName]=useState('');
+  const [notes,setNotes]=useState('');
+  const [selectedMethods,setSelectedMethods]=useState<string[]>([]);
+  const [saving,setSaving]=useState(false);
+  const reload=()=>run(async()=>{const [m,a]=await Promise.all([api.adminFundingMethods(userId),api.adminFundingAccounts(userId)]);setMethods(m.methods);setAccounts(a.accounts);});
+  useEffect(()=>{reload();},[userId]);
+  const compatible=methods.filter(m=>m.country_code===country);
+  const currency=country==='RU'?'RUB':'CUP';
+  const toggle=(code:string)=>setSelectedMethods(old=>old.includes(code)?old.filter(x=>x!==code):[...old,code]);
+  const create=()=>void run(async()=>{
+    if(!selectedMethods.length)throw new Error('Selecciona al menos un método compatible.');
+    setSaving(true);
+    try{
+      await api.createFundingAccount(userId,{country_code:country,currency_code:currency,bank_code:bankCode,bank_name:bankName,account_holder_name:'SEDERG_PAY',legal_entity_name:legalEntityName||null,account_identifier:accountIdentifier,environment:'sandbox',status:'active',methods:selectedMethods,notes});
+      setAccountIdentifier('');setLegalEntityName('');setNotes('');setSelectedMethods([]);
+      await reload();
+    }finally{setSaving(false);}
+  });
+  return <div className="feature-view"><div className="view-heading"><div><span className="eyebrow">Administración financiera</span><h2>Métodos de pago y cuentas receptoras</h2><p className="muted">Las cuentas registradas pertenecen a SEDERG_PAY. En esta fase solo se habilita sandbox.</p></div><span className="status-pill status-info">SANDBOX</span></div>
+  <section className="card"><div className="section-heading"><div><h3>Catálogo de métodos de fondeo</h3><p className="muted">Independiente de los métodos de desembolso al beneficiario.</p></div></div>
+  {methods.map(method=><div className="funding-method-row" key={method.code}><div><strong>{method.name}</strong><small>{method.country_code} · {method.currency_code} · {method.method_type} · {method.code}</small></div><label className="switch-label"><input type="checkbox" checked={Boolean(method.is_active)} onChange={e=>void run(async()=>{await api.updateFundingMethod(userId,method.code,e.target.checked);await reload();})}/> Activo</label></div>)}</section>
+  <section className="card"><div className="section-heading"><div><h3>Registrar cuenta receptora</h3><p className="muted">El número se cifra antes de almacenarse; solo se muestra enmascarado después del alta.</p></div></div>
+  <form className="funding-account-form" onSubmit={e=>{e.preventDefault();create();}}>
+    <label>País<select value={country} onChange={e=>{setCountry(e.target.value as 'RU'|'CU');setSelectedMethods([]);if(e.target.value==='RU'){setBankCode('sberbank');setBankName('Sberbank');}else{setBankCode('banco_metropolitano');setBankName('Banco Metropolitano');}}}><option value="RU">Rusia</option><option value="CU">Cuba</option></select></label>
+    <label>Moneda<input value={currency} readOnly/></label>
+    <label>Código del banco<input value={bankCode} onChange={e=>setBankCode(e.target.value)} required/></label>
+    <label>Nombre del banco<input value={bankName} onChange={e=>setBankName(e.target.value)} required/></label>
+    <label>Titular<input value="SEDERG_PAY" readOnly/></label>
+    <label>Denominación jurídica (si aplica)<input value={legalEntityName} onChange={e=>setLegalEntityName(e.target.value)} placeholder="Nombre legal validado por el banco"/></label>
+    <label className="funding-full">Número de cuenta / identificador bancario<input value={accountIdentifier} onChange={e=>setAccountIdentifier(e.target.value)} required autoComplete="off" /></label>
+    <div className="funding-full"><strong>Métodos compatibles</strong>{compatible.length===0?<p className="muted">No hay métodos definidos para este país.</p>:compatible.map(method=><label className="funding-checkbox" key={method.code}><input type="checkbox" checked={selectedMethods.includes(method.code)} onChange={()=>toggle(method.code)}/>{method.name} <small>{method.method_type==='instant_qr'?'QR sandbox':'Transferencia'}</small></label>)}</div>
+    <label className="funding-full">Notas<input value={notes} onChange={e=>setNotes(e.target.value)}/></label>
+    <button type="submit" disabled={saving||!accountIdentifier||!selectedMethods.length}>{saving?'Guardando…':'Guardar cuenta sandbox'}</button>
+  </form></section>
+  <section className="card"><div className="section-heading"><div><h3>Cuentas receptoras registradas</h3><p className="muted">Para cambiar de cuenta, registra la nueva y desactiva la anterior. Los depósitos existentes conservan su fotografía original.</p></div></div>
+  {accounts.length===0?<p className="muted">Todavía no hay cuentas configuradas.</p>:accounts.map(account=><article className="funding-account-row" key={account.public_id}><div><strong>{account.bank_name} · {account.country_code}/{account.currency_code}</strong><small>Titular: {account.account_holder_name} · Cuenta {account.account_mask}</small><small>Métodos: {account.methods||'—'} · {account.environment}</small></div><div><span className={account.status==='active'?'status-pill status-success':'status-pill status-muted'}>{account.status}</span><button className="secondary compact-button" onClick={()=>void run(async()=>{await api.updateFundingAccount(userId,account.public_id,account.status==='active'?'inactive':'active');await reload();})}>{account.status==='active'?'Desactivar':'Activar'}</button></div></article>)}</section>
+  </div>;
+}
