@@ -89,6 +89,7 @@ jobs:
           SEDERG_AUTH_MODE: development
           SEDERG_COOKIE_KEY: ci-integration-cookie-key-long-enough-for-tests
           SEDERG_MAIL_TRANSPORT: array
+          SEDERG_ACCOUNT_ENCRYPTION_KEY: ci-account-encryption-key-at-least-32-characters-long
         run: |
           php yii serve 127.0.0.1:8080 --docroot=web > /tmp/sederg-yii-server.log 2>&1 &
           SERVER_PID=$!
