@@ -54,6 +54,7 @@ export type Quote = {
   fee_currency?: string;
   fee_mode?: 'add_to_send' | 'deduct_from_receive';
   total_debit_amount: string;
+  limits?: { currency: 'RUB'; minimum: string; maximum: string; evaluated_amount: string; valid: boolean };
   payout_method_code: string;
   status: string;
   expires_at: string;

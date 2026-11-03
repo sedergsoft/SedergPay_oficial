@@ -24,11 +24,11 @@ final class PlatformSettings
             ],
             'pricing.minimum_send_amount' => [
                 'type' => 'decimal', 'default' => getenv('SEDERG_MIN_SEND_AMOUNT') ?: '15000.00',
-                'min' => '0.01', 'max' => '999999999.99', 'label' => 'Importe mínimo de envío', 'category' => 'pricing',
+                'min' => '0.01', 'max' => '999999999.99', 'label' => 'Importe mínimo del principal (equivalente en RUB)', 'category' => 'pricing',
             ],
             'pricing.maximum_send_amount' => [
                 'type' => 'decimal', 'default' => getenv('SEDERG_MAX_SEND_AMOUNT') ?: '50000.00',
-                'min' => '0.01', 'max' => '999999999.99', 'label' => 'Importe máximo de envío', 'category' => 'pricing',
+                'min' => '0.01', 'max' => '999999999.99', 'label' => 'Importe máximo del principal (equivalente en RUB)', 'category' => 'pricing',
             ],
             'pricing.exchange_rate_source' => [
                 'type' => 'enum', 'default' => 'official',

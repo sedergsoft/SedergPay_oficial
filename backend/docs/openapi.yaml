@@ -338,7 +338,18 @@ components:
             public_id: { type: string, format: uuid }
             exchange_rate: { type: string }
             fee_amount: { type: string }
+            fee_mode: { type: string, enum: [add_to_send, deduct_from_receive] }
             total_debit_amount: { type: string }
+            limits:
+              type: object
+              description: Límites configurados en RUB, aplicados al principal antes de comisión.
+              required: [currency, minimum, maximum, evaluated_amount, valid]
+              properties:
+                currency: { type: string, const: RUB }
+                minimum: { type: string }
+                maximum: { type: string }
+                evaluated_amount: { type: string }
+                valid: { type: boolean }
             expires_at: { type: string, format: date-time }
     RemittanceInput:
       type: object
