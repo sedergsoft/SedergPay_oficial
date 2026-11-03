@@ -87,6 +87,9 @@ final class PaymentController extends Controller
 
     public function actionSimulateConfirm(string $publicId): array
     {
+        if (getenv('SEDERG_AUTH_MODE') !== 'development') {
+            throw new ForbiddenHttpException('Simulated payment confirmation is available only in development/sandbox.');
+        }
         $userId = $this->authenticatedUserId();
         $repository = new SimulatedPaymentRepository(Yii::$app->db);
         $deposit = $repository->findDeposit($publicId, $userId);
