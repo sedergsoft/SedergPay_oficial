@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use yii\\db\\Migration;
+use yii\db\Migration;
 
 /**
  * Payment collection methods and platform-owned receiving accounts.
