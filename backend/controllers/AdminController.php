@@ -6,6 +6,7 @@ namespace app\controllers;
 
 use app\Infrastructure\Auth\UserAuthenticator;
 use app\Infrastructure\Configuration\PlatformSettings;
+use app\Infrastructure\Kyc\Provider\BallerineConfig;
 use app\Infrastructure\Pricing\ExchangeRateService;
 use DomainException;
 use Yii;
@@ -161,15 +162,91 @@ final class AdminController extends Controller
         (new UserAuthenticator(Yii::$app->db))->requireRole('admin');
         return ['cases' => Yii::$app->db->createCommand(
             'SELECT k.public_id, k.status, k.submitted_at, k.reviewed_at, k.review_reason,
+                    k.provider_name, k.provider_status, k.provider_last_event_at,
                     u.public_id AS user_public_id, u.email,
                     p.first_name, p.last_name,
                     (SELECT COUNT(*) FROM {{%kyc_documents}} d WHERE d.kyc_case_id=k.id) AS document_count
              FROM {{%kyc_cases}} k
              INNER JOIN {{%users}} u ON u.id=k.user_id
              LEFT JOIN {{%user_profiles}} p ON p.user_id=u.id
-             ORDER BY FIELD(k.status, "pending_review", "draft", "rejected", "approved"), k.updated_at DESC
+             ORDER BY FIELD(k.status, "pending_review", "pending_verification", "manual_review",
+                            "resubmission_required", "draft", "in_progress", "rejected", "approved"),
+                      k.updated_at DESC
              LIMIT 300'
         )->queryAll()];
+    }
+
+    public function actionKycProvider(): array
+    {
+        (new UserAuthenticator(Yii::$app->db))->requireRole('admin');
+
+        $state = [
+            'configured' => false,
+            'enabled' => false,
+            'session_configured' => false,
+            'webhook_configured' => false,
+            'configuration_error' => false,
+            'events_available' => false,
+        ];
+        try {
+            $config = BallerineConfig::fromEnvironment();
+            $state['enabled'] = $config->enabled;
+            $state['session_configured'] = $config->isSessionConfigured();
+            $state['webhook_configured'] = $config->isWebhookConfigured();
+            $state['configured'] = $state['session_configured'] && $state['webhook_configured'];
+        } catch (\InvalidArgumentException | \yii\base\InvalidConfigException) {
+            // Never echo configuration values or secrets to the admin client.
+            $state['configuration_error'] = true;
+        }
+
+        $events = [];
+        $lastEventAt = null;
+        $pendingReviewCases = 0;
+        try {
+            $events = Yii::$app->db->createCommand(
+                'SELECT outcome, COUNT(*) AS event_count
+                 FROM {{%kyc_provider_events}}
+                 WHERE provider_name = :provider AND received_at >= :cutoff
+                 GROUP BY outcome ORDER BY outcome',
+                [
+                    ':provider' => 'ballerine',
+                    ':cutoff' => gmdate('Y-m-d H:i:s', time() - 86400),
+                ]
+            )->queryAll();
+            $lastEventAt = Yii::$app->db->createCommand(
+                'SELECT MAX(received_at) FROM {{%kyc_provider_events}} WHERE provider_name = :provider',
+                [':provider' => 'ballerine']
+            )->queryScalar();
+            $pendingReviewCases = (int) Yii::$app->db->createCommand(
+                'SELECT COUNT(*) FROM {{%kyc_cases}}
+                 WHERE provider_name = :provider
+                   AND status IN (:pending, :manual)',
+                [
+                    ':provider' => 'ballerine',
+                    ':pending' => 'pending_verification',
+                    ':manual' => 'manual_review',
+                ]
+            )->queryScalar();
+            $state['events_available'] = true;
+        } catch (\Throwable $exception) {
+            // The endpoint still reports configuration health before the
+            // migration is applied or when the events table is unavailable.
+            Yii::warning($exception->getMessage(), __METHOD__);
+        }
+
+        return [
+            'provider' => $state,
+            'last_event_at' => $lastEventAt === false ? null : $lastEventAt,
+            'events_last_24h' => array_map(
+                static fn (array $row): array => [
+                    'outcome' => (string) $row['outcome'],
+                    'count' => (int) $row['event_count'],
+                ],
+                $events
+            ),
+            'pending_review_cases' => $pendingReviewCases,
+            'webhook_path' => '/api/v1/kyc/webhooks/ballerine',
+        ];
     }
 
     public function actionKycReview(string $publicId): array
@@ -195,10 +272,11 @@ final class AdminController extends Controller
         $tx = $db->beginTransaction();
         try {
             $case = $db->createCommand(
-                'SELECT id,user_id,status FROM {{%kyc_cases}} WHERE public_id=:id LIMIT 1 FOR UPDATE',
+                'SELECT id,user_id,status,provider_name,provider_session_id,provider_status
+                 FROM {{%kyc_cases}} WHERE public_id=:id LIMIT 1 FOR UPDATE',
                 [':id' => $publicId]
             )->queryOne();
-            if ($case === false || $case['status'] !== 'pending_review') {
+            if ($case === false || !in_array($case['status'], ['pending_review', 'pending_verification', 'manual_review'], true)) {
                 throw new UnprocessableEntityHttpException('KYC case is not awaiting review');
             }
 
@@ -211,9 +289,13 @@ final class AdminController extends Controller
                     'SELECT DISTINCT document_type FROM {{%kyc_documents}} WHERE kyc_case_id=:id',
                     [':id' => $case['id']]
                 )->queryColumn();
+                $hasLocalDocuments = in_array('identity', $types, true) && in_array('address', $types, true);
+                $hasProviderEvidence = $case['provider_name'] === 'ballerine'
+                    && !empty($case['provider_session_id'])
+                    && strtolower((string) $case['provider_status']) === 'approved';
                 if ($profile === false || empty($profile['date_of_birth']) || empty($profile['address_line'])
                     || empty($profile['city']) || empty($profile['residence_country_id'])
-                    || !in_array('identity', $types, true) || !in_array('address', $types, true)) {
+                    || (!$hasLocalDocuments && !$hasProviderEvidence)) {
                     throw new UnprocessableEntityHttpException('KYC requirements are incomplete; approval is blocked');
                 }
             }
@@ -224,7 +306,7 @@ final class AdminController extends Controller
                 'reviewed_at' => gmdate('Y-m-d H:i:s'),
                 'reviewed_by_user_id' => $reviewerId,
                 'review_reason' => $reason !== '' ? $reason : null,
-            ], ['id' => $case['id'], 'status' => 'pending_review'])->execute();
+            ], ['id' => $case['id'], 'status' => $case['status']])->execute();
 
             $db->createCommand()->insert('{{%audit_logs}}', [
                 'actor_user_id' => $reviewerId,
@@ -233,7 +315,11 @@ final class AdminController extends Controller
                 'entity_id' => $publicId,
                 'ip_address' => Yii::$app->request->userIP,
                 'user_agent' => substr((string) Yii::$app->request->userAgent, 0, 500),
-                'after_data' => new JsonExpression(['status' => $status, 'reason' => $reason]),
+                'after_data' => new JsonExpression([
+                    'status' => $status,
+                    'reason' => $reason,
+                    'provider_status' => $case['provider_status'],
+                ]),
             ])->execute();
             $tx->commit();
         } catch (\Throwable $exception) {

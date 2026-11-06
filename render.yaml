@@ -27,3 +27,29 @@ services:
         sync: false
       - key: SEDERG_OIDC_PUBLIC_KEY
         sync: false
+      - key: SEDERG_BALLERINE_ENABLED
+        sync: false
+      - key: SEDERG_BALLERINE_BASE_URL
+        sync: false
+      - key: SEDERG_BALLERINE_API_KEY
+        sync: false
+      - key: SEDERG_BALLERINE_WORKFLOW_ID
+        sync: false
+      - key: SEDERG_BALLERINE_COLLECTION_URL
+        sync: false
+      - key: SEDERG_BALLERINE_COLLECTION_URL_TEMPLATE
+        sync: false
+      - key: SEDERG_BALLERINE_AUTH_HEADER
+        value: Authorization
+      - key: SEDERG_BALLERINE_AUTH_SCHEME
+        value: Api-Key
+      - key: SEDERG_BALLERINE_WEBHOOK_SECRET
+        sync: false
+      - key: SEDERG_BALLERINE_RETURN_URL
+        sync: false
+      - key: SEDERG_BALLERINE_TIMEOUT_SECONDS
+        value: "15"
+      - key: SEDERG_BALLERINE_WEBHOOK_TOLERANCE_SECONDS
+        value: "300"
+      - key: SEDERG_BALLERINE_SESSION_TTL_SECONDS
+        value: "3600"

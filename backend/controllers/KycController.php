@@ -6,6 +6,10 @@ namespace app\controllers;
 
 use app\Infrastructure\Auth\UserAuthenticator;
 use app\Infrastructure\Kyc\KycDocumentSecurity;
+use app\Infrastructure\Kyc\KycSessionService;
+use app\Infrastructure\Kyc\Provider\BallerineConfig;
+use app\Infrastructure\Kyc\Provider\BallerineKycProvider;
+use app\Infrastructure\Kyc\Provider\StreamBallerineTransport;
 use Yii;
 use yii\filters\ContentNegotiator;
 use yii\web\Controller;
@@ -41,17 +45,44 @@ final class KycController extends Controller
         return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($bytes), 4));
     }
 
+    private static function iniBytes(string $value): int
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return 0;
+        }
+        $unit = strtolower(substr($value, -1));
+        $number = (float) $value;
+        return (int) match ($unit) {
+            'g' => $number * 1024 * 1024 * 1024,
+            'm' => $number * 1024 * 1024,
+            'k' => $number * 1024,
+            default => $number,
+        };
+    }
+
     public function actionView(): array
     {
         $userId = $this->userId();
+        $provider = [
+            'name' => 'ballerine',
+            'enabled' => $this->isBallerineSessionEnabled(),
+            'status' => null,
+            'collection_url' => null,
+            'expires_at' => null,
+            'last_event_at' => null,
+        ];
+
         $case = Yii::$app->db->createCommand(
-            'SELECT public_id,status,submitted_at,reviewed_at,review_reason,created_at,updated_at
+            'SELECT public_id,status,submitted_at,reviewed_at,review_reason,created_at,updated_at,
+                    provider_name,provider_status,provider_collection_url,provider_session_expires_at,
+                    provider_last_event_at
              FROM {{%kyc_cases}} WHERE user_id=:id LIMIT 1',
             [':id' => $userId]
         )->queryOne();
 
         if ($case === false) {
-            return ['status' => 'not_started', 'documents' => []];
+            return ['status' => 'not_started', 'documents' => [], 'provider' => $provider];
         }
 
         $case['documents'] = Yii::$app->db->createCommand(
@@ -62,7 +93,65 @@ final class KycController extends Controller
             [':id' => $userId]
         )->queryAll();
 
+        if ($case['provider_name'] !== null) {
+            $provider['name'] = (string) $case['provider_name'];
+            $provider['status'] = $case['provider_status'];
+            $provider['collection_url'] = $case['provider_collection_url'];
+            $provider['expires_at'] = $case['provider_session_expires_at'];
+            $provider['last_event_at'] = $case['provider_last_event_at'];
+        }
+        unset(
+            $case['provider_name'],
+            $case['provider_status'],
+            $case['provider_collection_url'],
+            $case['provider_session_expires_at'],
+            $case['provider_last_event_at']
+        );
+        $case['provider'] = $provider;
+
         return $case;
+    }
+
+    public function actionCreateSession(): array
+    {
+        $userId = $this->userId();
+        try {
+            $config = BallerineConfig::fromEnvironment();
+            $config->assertSessionConfigured();
+        } catch (\InvalidArgumentException | \yii\base\InvalidConfigException $exception) {
+            throw new \yii\web\ServiceUnavailableHttpException(
+                'Ballerine KYC is not available on this deployment',
+                0,
+                $exception
+            );
+        }
+
+        $payload = Yii::$app->request->bodyParams;
+        $locale = is_array($payload) && is_string($payload['locale'] ?? null) ? $payload['locale'] : 'es';
+        $provider = new BallerineKycProvider($config, new StreamBallerineTransport());
+        $service = new KycSessionService(Yii::$app->db, $provider);
+
+        try {
+            return $service->createForUser(
+                $userId,
+                $locale,
+                $config->appReturnUrl,
+                Yii::$app->request->userIP,
+                Yii::$app->request->userAgent
+            );
+        } catch (\RuntimeException $exception) {
+            Yii::error($exception, __METHOD__);
+            throw new \yii\web\HttpException(502, 'The identity verification provider is temporarily unavailable', 0, $exception);
+        }
+    }
+
+    private function isBallerineSessionEnabled(): bool
+    {
+        try {
+            return BallerineConfig::fromEnvironment()->isSessionConfigured();
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     public function actionUploadDocument(): array
@@ -74,8 +163,22 @@ final class KycController extends Controller
         }
 
         $file = UploadedFile::getInstanceByName('file');
-        if ($file === null || $file->error !== UPLOAD_ERR_OK || !is_file($file->tempName)) {
-            throw new UnprocessableEntityHttpException('A valid document upload is required');
+        if ($file === null) {
+            $contentLength = (int) Yii::$app->request->headers->get('Content-Length', 0);
+            $postMax = self::iniBytes((string) ini_get('post_max_size'));
+            if ($contentLength > 0 && $postMax > 0 && $contentLength > $postMax) {
+                throw new \yii\web\HttpException(
+                    413,
+                    'The document exceeds the maximum upload size of 5 MB'
+                );
+            }
+            throw new UnprocessableEntityHttpException('Select a document to upload');
+        }
+        if ($file->error === UPLOAD_ERR_INI_SIZE || $file->error === UPLOAD_ERR_FORM_SIZE) {
+            throw new UnprocessableEntityHttpException('The document exceeds the maximum upload size of 5 MB');
+        }
+        if ($file->error !== UPLOAD_ERR_OK || !is_file($file->tempName)) {
+            throw new UnprocessableEntityHttpException('The document upload did not complete; select the file again');
         }
 
         $finfo = new \finfo(FILEINFO_MIME_TYPE);

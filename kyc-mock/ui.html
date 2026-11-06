@@ -1,0 +1,699 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Ballerine KYC Mock · SEDERG_PAY</title>
+  <style>
+    :root {
+      --blue: #0b4f9c;
+      --blue-soft: #e8f1fb;
+      --night: #10264d;
+      --cyan: #00aeef;
+      --green: #00b34a;
+      --green-soft: #e6f7ee;
+      --red: #d32f2f;
+      --red-soft: #fdecec;
+      --amber: #b26a00;
+      --amber-soft: #fff4e0;
+      --ink: #172033;
+      --muted: #5b6779;
+      --line: #d9e1ec;
+      --bg: #f4f6f9;
+      --card: #ffffff;
+      --radius: 12px;
+      --shadow: 0 10px 30px rgba(16, 38, 77, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at 10% -10%, #e4eefb 0, var(--bg) 45%) no-repeat;
+      color: var(--ink);
+      font: 15px/1.5 "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+      min-height: 100vh;
+    }
+    header {
+      background: linear-gradient(120deg, var(--night), var(--blue));
+      color: #fff;
+      padding: 22px 20px;
+      box-shadow: var(--shadow);
+    }
+    .wrap { max-width: 1040px; margin: 0 auto; }
+    .brand { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .brand-mark {
+      width: 38px; height: 38px; border-radius: 10px;
+      background: rgba(255, 255, 255, 0.14);
+      display: grid; place-items: center; font-size: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+    }
+    header h1 { margin: 0; font-size: 1.15rem; font-weight: 650; letter-spacing: 0.2px; }
+    header p { margin: 4px 0 0; color: #c9d9ee; font-size: 0.86rem; }
+    .tag {
+      margin-left: auto; background: var(--cyan); color: #04263d;
+      font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em;
+      padding: 5px 10px; border-radius: 999px; text-transform: uppercase;
+    }
+    main { padding: 26px 20px 40px; }
+    .card {
+      background: var(--card); border: 1px solid var(--line);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+      padding: 20px; margin-bottom: 18px;
+    }
+    .card h2 { margin: 0 0 4px; font-size: 1.05rem; }
+    .card h3 { margin: 0 0 10px; font-size: 0.95rem; }
+    .muted { color: var(--muted); }
+    .small { font-size: 0.82rem; }
+    .banner {
+      display: flex; gap: 10px; align-items: flex-start;
+      border-radius: 10px; padding: 12px 14px; margin-bottom: 16px;
+      background: var(--amber-soft); color: var(--amber);
+      border: 1px solid #f0d49b; font-size: 0.87rem;
+    }
+    .banner.error { background: var(--red-soft); color: var(--red); border-color: #f3c2c2; }
+    .banner.info { background: var(--blue-soft); color: var(--blue); border-color: #c8ddf5; }
+    .banner strong { display: block; }
+    .grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+    .field {
+      border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+      background: #fbfcfe; min-width: 0;
+    }
+    .field span { display: block; font-size: 0.7rem; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
+    .field code, .field b { display: block; margin-top: 3px; font-size: 0.86rem; word-break: break-all; font-weight: 600; }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+    button {
+      font: inherit; font-weight: 600; border-radius: 9px; cursor: pointer;
+      border: 1px solid transparent; padding: 9px 13px; transition: filter 0.15s, transform 0.05s;
+    }
+    button:active { transform: translateY(1px); }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+    .btn-primary { background: var(--blue); color: #fff; }
+    .btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
+    .btn-green { background: var(--green); color: #fff; }
+    .btn-red { background: var(--red); color: #fff; }
+    .btn-amber { background: #e08a00; color: #fff; }
+    .btn-ghost { background: #fff; color: var(--ink); border-color: var(--line); }
+    .btn-ghost:hover:not(:disabled) { background: #f4f7fb; }
+    .actions { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+    .action {
+      text-align: left; padding: 13px 14px; border-radius: 10px;
+      border: 1px solid var(--line); background: #fff; color: var(--ink);
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .action:hover:not(:disabled) { border-color: var(--blue); background: var(--blue-soft); }
+    .action b { font-size: 0.92rem; }
+    .action small { color: var(--muted); font-weight: 500; }
+    .separator { height: 1px; background: var(--line); margin: 18px 0; border: 0; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px; border-radius: 999px;
+      padding: 3px 10px; font-size: 0.76rem; font-weight: 700;
+      background: #eef2f7; color: #44536b; white-space: nowrap;
+    }
+    .pill.ok { background: var(--green-soft); color: var(--green); }
+    .pill.bad { background: var(--red-soft); color: var(--red); }
+    .pill.info { background: var(--blue-soft); color: var(--blue); }
+    .pill.warn { background: var(--amber-soft); color: var(--amber); }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); font-size: 0.86rem; vertical-align: middle; }
+    th { color: var(--muted); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; }
+    tbody tr:last-child td { border-bottom: 0; }
+    a { color: var(--blue); }
+    .timeline { display: flex; flex-direction: column; gap: 10px; }
+    .event {
+      border: 1px solid var(--line); border-left: 4px solid var(--line);
+      border-radius: 8px; padding: 10px 12px; background: #fcfdff;
+    }
+    .event.ok { border-left-color: var(--green); }
+    .event.bad { border-left-color: var(--red); }
+    .event-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .event-head b { font-size: 0.88rem; }
+    .event-meta { color: var(--muted); font-size: 0.76rem; margin-left: auto; }
+    pre {
+      margin: 8px 0 0; padding: 9px 10px; border-radius: 8px;
+      background: #0f1c30; color: #d7e5f7; font-size: 0.76rem;
+      overflow-x: auto; white-space: pre-wrap; word-break: break-word;
+    }
+    details summary { cursor: pointer; color: var(--muted); font-size: 0.8rem; margin-top: 6px; }
+    .empty { text-align: center; padding: 26px; color: var(--muted); }
+    .hidden { display: none !important; }
+    footer { max-width: 1040px; margin: 0 auto; padding: 0 20px 30px; color: var(--muted); font-size: 0.78rem; }
+    .spinner {
+      width: 15px; height: 15px; border-radius: 50%; display: inline-block;
+      border: 2px solid rgba(255, 255, 255, 0.4); border-top-color: #fff;
+      animation: spin 0.7s linear infinite; vertical-align: -2px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap brand">
+      <span class="brand-mark" aria-hidden="true">K</span>
+      <div>
+        <h1>Ballerine KYC Mock</h1>
+        <p>Simulador local del proveedor para probar sesiones, webhooks y revisión manual.</p>
+      </div>
+      <span class="tag">Solo desarrollo</span>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div id="global-banner"></div>
+
+    <section id="loading" class="card">
+      <p class="muted">Cargando simulador…</p>
+    </section>
+
+    <section id="home" class="hidden">
+      <div class="card">
+        <h2>Sesiones de verificación</h2>
+        <p class="muted small">
+          El backend crea una sesión cuando el usuario pulsa <b>Iniciar verificación</b>.
+          Abre su enlace de colección para emitir eventos firmados hacia SEDERG_PAY.
+        </p>
+        <div id="sessions-table"></div>
+        <div class="toolbar">
+          <button class="btn-primary" type="button" id="create-demo">Crear sesión de demostración</button>
+          <button class="btn-ghost" type="button" id="refresh-home">Actualizar</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Abrir una sesión existente</h2>
+        <p class="muted small">Pega el <code>workflowRuntimeId</code> si el contenedor se reinició y perdió el estado en memoria.</p>
+        <div class="toolbar">
+          <input id="manual-id" type="text" placeholder="workflowRuntimeId"
+                 style="flex:1; min-width:220px; padding:9px 12px; border:1px solid var(--line); border-radius:9px; font:inherit" />
+          <button class="btn-primary" type="button" id="open-manual">Abrir</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="session" class="hidden">
+      <div class="card">
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+          <h2 style="margin:0">Sesión <span id="session-state" class="pill">created</span></h2>
+          <div class="toolbar" style="margin:0 0 0 auto">
+            <button class="btn-ghost" type="button" id="back-home">← Sesiones</button>
+            <a class="btn-ghost" id="return-app" href="#" style="text-decoration:none; padding:9px 13px; border:1px solid var(--line); border-radius:9px">Volver a SEDERG_PAY</a>
+          </div>
+        </div>
+
+        <p class="muted small" id="session-subtitle" style="margin-top:8px"></p>
+
+        <div class="grid" style="margin-top:14px">
+          <div class="field"><span>workflowRuntimeId</span><code id="f-runtime"></code></div>
+          <div class="field"><span>ballerineEntityId</span><code id="f-entity"></code></div>
+          <div class="field"><span>Expediente SEDERG</span><code id="f-case"></code></div>
+          <div class="field"><span>Solicitante</span><b id="f-applicant"></b></div>
+          <div class="field"><span>País / idioma</span><b id="f-country"></b></div>
+          <div class="field"><span>Creada</span><b id="f-created"></b></div>
+        </div>
+
+        <div class="toolbar">
+          <button class="btn-ghost" type="button" id="copy-link">Copiar enlace de colección</button>
+          <button class="btn-ghost" type="button" id="refresh-session">Actualizar</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Emitir evento del proveedor</h3>
+        <p class="muted small">
+          Cada botón envía un webhook firmado al backend real. El proveedor nunca aprueba el
+          expediente: <code>approved</code> y <code>rejected</code> solo lo dejan en
+          <code>pending_verification</code> para la decisión final del administrador.
+        </p>
+        <div class="actions" id="primary-actions"></div>
+        <hr class="separator" />
+        <h3>Casos límite</h3>
+        <div class="actions" id="edge-actions"></div>
+        <div class="toolbar">
+          <button class="btn-ghost" type="button" id="resend">Reenviar último evento (idempotencia)</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Último resultado</h3>
+        <div id="result"><p class="muted small">Todavía no se ha enviado ningún evento.</p></div>
+      </div>
+
+      <div class="card">
+        <h3>Eventos enviados</h3>
+        <div id="events"><p class="muted small">Sin eventos.</p></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    Simulador local sin validez productiva. No introduzcas documentos, identidades ni datos reales.
+    Este servicio no forma parte del despliegue de producción.
+  </footer>
+
+  <script>
+    const ACTIONS = {
+      pending_documents: 'Documentos solicitados',
+      in_progress: 'Verificación en curso',
+      pending_review: 'Enviar a revisión',
+      approved: 'Proveedor aprueba',
+      rejected: 'Proveedor rechaza',
+      revision: 'Solicitar nueva documentación',
+      expired: 'Marcar expirada',
+      failed: 'Marcar error',
+      unknown_state: 'Estado desconocido',
+    };
+
+    const PRIMARY = [
+      ['pending_documents', 'Solicita documentos al usuario', 'Estado interno: pending_documents'],
+      ['in_progress', 'Verificación en curso', 'Estado interno: in_progress'],
+      ['pending_review', 'Envía el caso a revisión', 'Estado interno: pending_verification'],
+      ['approved', 'Señal de aprobación del proveedor', 'Sigue en revisión manual; no cierra el caso'],
+      ['rejected', 'Señal de rechazo del proveedor', 'Sigue en revisión manual; no cierra el caso'],
+      ['revision', 'Pide nueva documentación', 'Estado interno: resubmission_required'],
+    ];
+
+    const EDGE = [
+      ['expired', 'Expirar la sesión', 'Estado interno: expired'],
+      ['failed', 'Provocar un error', 'Estado interno: error'],
+      ['unknown_state', 'Enviar estado no soportado', 'Queda en cuarentena como observación'],
+    ];
+
+    const $ = (id) => document.getElementById(id);
+    const state = { session: null, health: null, busy: false };
+
+    document.addEventListener('DOMContentLoaded', init);
+
+    async function init() {
+      bindStaticHandlers();
+      try {
+        state.health = await api('/api/health');
+      } catch (error) {
+        renderGlobalBanner('No se pudo contactar con el simulador: ' + error.message, 'error');
+      }
+
+      if (state.health && !state.health.webhook_secret_configured) {
+        renderGlobalBanner(
+          'El secreto del webhook no está configurado en el mock. Ejecuta scripts/Enable-BallerineMock.ps1 y recrea el servicio.',
+          'error'
+        );
+      }
+
+      const params = new URLSearchParams(window.location.search);
+      const runtimeId = params.get('workflowRuntimeId') || params.get('id');
+
+      if (runtimeId) {
+        await openSession(runtimeId, true);
+      } else {
+        await showHome();
+      }
+    }
+
+    function bindStaticHandlers() {
+      $('refresh-home').addEventListener('click', showHome);
+      $('create-demo').addEventListener('click', async () => {
+        await guard(async () => {
+          const result = await api('/api/sessions/demo', { method: 'POST' });
+          navigate(result.session.runtime_id);
+        });
+      });
+      $('open-manual').addEventListener('click', async () => {
+        const id = $('manual-id').value.trim();
+        if (!id) return;
+        await openSession(id, true);
+      });
+      $('manual-id').addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') $('open-manual').click();
+      });
+      $('back-home').addEventListener('click', () => {
+        window.history.replaceState({}, '', '/');
+        showHome();
+      });
+      $('refresh-session').addEventListener('click', () => state.session && openSession(state.session.runtime_id, false));
+      $('copy-link').addEventListener('click', async () => {
+        if (!state.session) return;
+        try {
+          await navigator.clipboard.writeText(state.session.collection_url);
+          flashResult('Enlace copiado al portapapeles.', null, true);
+        } catch {
+          flashResult(state.session.collection_url, null, true);
+        }
+      });
+      $('return-app').addEventListener('click', (event) => {
+        if (!state.session) return;
+        event.preventDefault();
+        window.location.assign(state.session.return_url);
+      });
+      $('resend').addEventListener('click', () => sendAction('resend_last'));
+    }
+
+    async function showHome() {
+      show('home');
+      renderGlobalBanner('', null);
+      try {
+        const data = await api('/api/sessions');
+        renderSessions(data.sessions || []);
+      } catch (error) {
+        renderGlobalBanner(error.message, 'error');
+      }
+    }
+
+    async function openSession(runtimeId, pushUrl) {
+      try {
+        let data;
+        try {
+          data = await api('/api/sessions/' + encodeURIComponent(runtimeId));
+        } catch (error) {
+          if (error.status === 404) {
+            data = await api('/api/sessions/' + encodeURIComponent(runtimeId) + '/adopt', { method: 'POST' });
+          } else {
+            throw error;
+          }
+        }
+        state.session = data.session;
+        if (pushUrl) {
+          window.history.replaceState({}, '', '/?workflowRuntimeId=' + encodeURIComponent(runtimeId));
+        }
+        show('session');
+        renderSession();
+      } catch (error) {
+        show('home');
+        renderGlobalBanner(
+          'No se pudo abrir la sesión: ' + error.message + '. Puedes registrarla manualmente desde el formulario.',
+          'error'
+        );
+        await showHomeTableOnly();
+      }
+    }
+
+    async function showHomeTableOnly() {
+      try {
+        const data = await api('/api/sessions');
+        renderSessions(data.sessions || []);
+      } catch { /* ignore */ }
+    }
+
+    function renderSession() {
+      const session = state.session;
+      if (!session) return;
+
+      $('session-state').textContent = session.status;
+      $('session-state').className = 'pill ' + stateClass(session.status);
+      $('session-subtitle').textContent = session.adopted
+        ? 'Sesión registrada manualmente en el simulador (el estado en memoria se perdió o no existía).'
+        : 'Sesión creada por el backend de SEDERG_PAY a través del endpoint de workflows.';
+
+      $('f-runtime').textContent = session.runtime_id;
+      $('f-entity').textContent = session.entity_id;
+      $('f-case').textContent = session.case_public_id || '—';
+      $('f-applicant').textContent = session.applicant_name;
+      $('f-country').textContent = (session.country_code || '—') + ' · ' + session.locale;
+      $('f-created').textContent = formatDate(session.created_at);
+      $('return-app').href = session.return_url || '#';
+
+      renderActions($('primary-actions'), PRIMARY);
+      renderActions($('edge-actions'), EDGE);
+
+      $('resend').disabled = state.busy || session.events.length === 0;
+      renderEvents(session.events);
+    }
+
+    function renderActions(container, definitions) {
+      container.innerHTML = '';
+      for (const [action, title, description] of definitions) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'action';
+        button.dataset.action = action;
+        button.innerHTML = '<b></b><small></small>';
+        button.querySelector('b').textContent = title;
+        button.querySelector('small').textContent = description;
+        button.addEventListener('click', () => sendAction(action));
+        button.disabled = state.busy;
+        container.appendChild(button);
+      }
+    }
+
+    async function sendAction(action) {
+      if (!state.session) return;
+      await guard(async () => {
+        setBusy(true);
+        const label = action === 'resend_last' ? 'Reenviando último evento' : ACTIONS[action] || action;
+        flashResult('Enviando: ' + label + '…', null, true);
+        try {
+          const result = await api(
+            '/api/sessions/' + encodeURIComponent(state.session.runtime_id) + '/events',
+            { method: 'POST', body: JSON.stringify({ action }) }
+          );
+          state.session = result.session;
+          renderSession();
+          renderDelivery(result.event);
+        } catch (error) {
+          flashResult('No se pudo enviar el evento: ' + error.message, error.payload || null, false);
+          throw error;
+        } finally {
+          setBusy(false);
+        }
+      });
+    }
+
+    function renderDelivery(event) {
+      if (!event) {
+        flashResult('Sin resultado del webhook.', null, false);
+        return;
+      }
+      const delivery = event.delivery || {};
+      const ok = delivery.ok === true;
+      const title = ok
+        ? (delivery.body && delivery.body.duplicate ? 'Evento duplicado: idempotencia confirmada' : 'Webhook entregado')
+        : 'El webhook fue rechazado o no se pudo entregar';
+
+      const container = $('result');
+      container.innerHTML = '';
+      const head = document.createElement('div');
+      head.className = 'event-head';
+      const titleEl = document.createElement('b');
+      titleEl.textContent = title;
+      const pill = document.createElement('span');
+      pill.className = 'pill ' + (ok ? 'ok' : 'bad');
+      pill.textContent = delivery.http_status ? 'HTTP ' + delivery.http_status : 'sin respuesta';
+      const when = document.createElement('span');
+      when.className = 'event-meta';
+      when.textContent = formatDate(delivery.sent_at);
+      head.append(titleEl, pill, when);
+      container.appendChild(head);
+
+      if (delivery.error) {
+        const error = document.createElement('p');
+        error.className = 'small';
+        error.style.color = 'var(--red)';
+        error.textContent = delivery.error;
+        container.appendChild(error);
+      }
+
+      const pre = document.createElement('pre');
+      pre.textContent = JSON.stringify(delivery.body, null, 2);
+      container.appendChild(pre);
+    }
+
+    function renderEvents(events) {
+      const container = $('events');
+      if (!events || events.length === 0) {
+        container.innerHTML = '<p class="muted small">Sin eventos.</p>';
+        return;
+      }
+      container.innerHTML = '';
+      const timeline = document.createElement('div');
+      timeline.className = 'timeline';
+      for (const event of [...events].reverse()) {
+        const delivery = event.delivery || {};
+        const ok = delivery.ok === true;
+        const item = document.createElement('div');
+        item.className = 'event ' + (ok ? 'ok' : 'bad');
+
+        const head = document.createElement('div');
+        head.className = 'event-head';
+        const label = document.createElement('b');
+        label.textContent = event.label || event.action || event.id;
+        const statePill = document.createElement('span');
+        statePill.className = 'pill ' + stateClass(event.state);
+        statePill.textContent = event.state;
+        const http = document.createElement('span');
+        http.className = 'pill ' + (ok ? 'ok' : 'bad');
+        http.textContent = delivery.http_status ? 'HTTP ' + delivery.http_status : 'error';
+        const when = document.createElement('span');
+        when.className = 'event-meta';
+        when.textContent = formatDate(event.timestamp);
+        head.append(label, statePill, http, when);
+        item.appendChild(head);
+
+        const details = document.createElement('details');
+        const summary = document.createElement('summary');
+        summary.textContent = 'Ver respuesta del backend';
+        const pre = document.createElement('pre');
+        pre.textContent = JSON.stringify(delivery.body, null, 2);
+        details.append(summary, pre);
+        item.appendChild(details);
+
+        timeline.appendChild(item);
+      }
+      container.appendChild(timeline);
+    }
+
+    function renderSessions(sessions) {
+      const container = $('sessions-table');
+      if (!sessions.length) {
+        container.innerHTML = '<div class="empty">Todavía no hay sesiones. Inicia una desde SEDERG_PAY o crea una de demostración.</div>';
+        return;
+      }
+      const table = document.createElement('table');
+      const head = document.createElement('thead');
+      head.innerHTML = '<tr><th>Sesión</th><th>Expediente</th><th>Solicitante</th><th>Estado</th><th>Creada</th><th></th></tr>';
+      const body = document.createElement('tbody');
+      for (const session of sessions) {
+        const row = document.createElement('tr');
+        const runtime = document.createElement('td');
+        const code = document.createElement('code');
+        code.textContent = shortId(session.runtime_id);
+        code.title = session.runtime_id;
+        runtime.appendChild(code);
+        const caseId = document.createElement('td');
+        caseId.textContent = session.case_public_id ? shortId(session.case_public_id) : '—';
+        caseId.title = session.case_public_id || '';
+        const applicant = document.createElement('td');
+        applicant.textContent = session.applicant_name || '—';
+        const status = document.createElement('td');
+        const pill = document.createElement('span');
+        pill.className = 'pill ' + stateClass(session.status);
+        pill.textContent = session.status;
+        status.appendChild(pill);
+        const created = document.createElement('td');
+        created.textContent = formatDate(session.created_at);
+        const open = document.createElement('td');
+        const link = document.createElement('a');
+        link.href = '/?workflowRuntimeId=' + encodeURIComponent(session.runtime_id);
+        link.textContent = 'Abrir';
+        open.appendChild(link);
+        row.append(runtime, caseId, applicant, status, created, open);
+        body.appendChild(row);
+      }
+      table.append(head, body);
+      container.innerHTML = '';
+      container.appendChild(table);
+    }
+
+    function renderGlobalBanner(message, kind) {
+      const container = $('global-banner');
+      if (!message) {
+        container.innerHTML = '';
+        return;
+      }
+      const banner = document.createElement('div');
+      banner.className = 'banner ' + (kind || 'info');
+      const strong = document.createElement('strong');
+      strong.textContent = kind === 'error' ? 'Atención' : 'Nota';
+      const text = document.createElement('span');
+      text.textContent = message;
+      banner.append(strong, text);
+      container.innerHTML = '';
+      container.appendChild(banner);
+    }
+
+    function flashResult(message, body, transientOnly) {
+      const container = $('result');
+      container.innerHTML = '';
+      const paragraph = document.createElement('p');
+      paragraph.className = 'small';
+      paragraph.style.margin = '0';
+      paragraph.textContent = message;
+      container.appendChild(paragraph);
+      if (body !== null && body !== undefined) {
+        const pre = document.createElement('pre');
+        pre.textContent = JSON.stringify(body, null, 2);
+        container.appendChild(pre);
+      }
+      if (!transientOnly) {
+        // Kept until the next delivery replaces it.
+      }
+    }
+
+    function setBusy(busy) {
+      state.busy = busy;
+      document.querySelectorAll('#primary-actions .action, #edge-actions .action').forEach((button) => {
+        button.disabled = busy;
+      });
+      $('resend').disabled = busy || !state.session || state.session.events.length === 0;
+      $('create-demo').disabled = busy;
+    }
+
+    async function guard(action) {
+      try {
+        await action();
+      } catch (error) {
+        renderGlobalBanner(error.message, 'error');
+      }
+    }
+
+    async function api(path, options = {}) {
+      const response = await fetch(path, {
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        ...options,
+      });
+      const text = await response.text();
+      let payload = null;
+      if (text) {
+        try {
+          payload = JSON.parse(text);
+        } catch {
+          payload = { raw: text };
+        }
+      }
+      if (!response.ok) {
+        const error = new Error((payload && (payload.message || payload.error)) || 'HTTP ' + response.status);
+        error.status = response.status;
+        error.payload = payload;
+        throw error;
+      }
+      return payload;
+    }
+
+    function show(name) {
+      for (const id of ['loading', 'home', 'session']) {
+        $(id).classList.toggle('hidden', id !== name);
+      }
+    }
+
+    function navigate(runtimeId) {
+      window.location.assign('/?workflowRuntimeId=' + encodeURIComponent(runtimeId));
+    }
+
+    function stateClass(status) {
+      switch (status) {
+        case 'approved':
+        case 'pending_verification':
+        case 'pending_review':
+          return 'ok';
+        case 'rejected':
+        case 'failed':
+        case 'error':
+        case 'expired':
+          return 'bad';
+        case 'revision':
+        case 'resubmission_required':
+        case 'pending_documents':
+          return 'warn';
+        default:
+          return 'info';
+      }
+    }
+
+    function shortId(value) {
+      return value && value.length > 18 ? value.slice(0, 8) + '…' + value.slice(-6) : value;
+    }
+
+    function formatDate(value) {
+      if (!value) return '—';
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
+    }
+  </script>
+</body>
+</html>

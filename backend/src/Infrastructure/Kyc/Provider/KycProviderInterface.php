@@ -16,7 +16,7 @@ interface KycProviderInterface
      * Create a short-lived collection session for an already authenticated user.
      *
      * @param array{case_public_id:string,user_public_id:string,country_code:string,locale:string,return_url:string} $context
-     * @return array{provider_session_id:string,collection_url:string,expires_at:string}
+     * @return array{provider_session_id:string,provider_entity_id?:?string,collection_url:string,expires_at:string}
      */
     public function createSession(array $context): array;
 

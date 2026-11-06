@@ -2,6 +2,14 @@
 
 Esta PoC ejecuta el ejemplo oficial de KYC manual-review fuera de los contenedores y del ciclo de vida de SEDERG_PAY. No se agrega una imagen Docker de Ballerine al compose principal porque el upstream documenta un monorepo Node/pnpm que levanta su propio workflow service, UI SDK y backoffice.
 
+> **Alternativa recomendada para integración continua:** el repositorio incluye
+> un simulador propio en Docker (`kyc-mock`) que implementa el contrato que
+> consume el adaptador y emite webhooks firmados reales. Se levanta con
+> `scripts/Enable-BallerineMock.ps1` y se documenta en
+> [`docs/ballerine-kyc-mock.md`](../../../docs/ballerine-kyc-mock.md). Úsalo para
+> probar sesión, webhook, idempotencia y revisión manual. Esta PoC con el
+> monorepo upstream queda para validar el contrato contra Ballerine real.
+
 ## Requisitos
 
 - Windows 10/11 con PowerShell.
@@ -50,9 +58,50 @@ No detengas MySQL ni el backend de SEDERG_PAY: la PoC todavía no está conectad
 - La aprobación del backoffice de Ballerine es una señal del proveedor, no una aprobación regulatoria ni una autorización para ejecutar remesas.
 - La licencia del monorepo es mixta: cada componente se rige por la licencia local más cercana y, si no hay otra, por Elastic License 2.0. La revisión legal debe preceder a cualquier uso comercial o distribución.
 
+## Conectar la PoC local con SEDERG_PAY
+
+La integración ya está implementada pero permanece desactivada hasta configurar
+las variables `SEDERG_BALLERINE_*` y establecer `SEDERG_BALLERINE_ENABLED=1`. Para
+una prueba local con el workflow service en el host y el backend en Docker:
+
+```dotenv
+SEDERG_BALLERINE_ENABLED=1
+SEDERG_BALLERINE_BASE_URL=http://host.docker.internal:3000
+SEDERG_BALLERINE_API_KEY=<api key del servicio Ballerine>
+SEDERG_BALLERINE_WORKFLOW_ID=<id del workflow KYC>
+SEDERG_BALLERINE_COLLECTION_URL=http://localhost:5173
+SEDERG_BALLERINE_WEBHOOK_SECRET=<mismo valor que WEBHOOK_SECRET en Ballerine>
+SEDERG_BALLERINE_RETURN_URL=http://localhost:5173
+```
+
+El contenedor del backend debe poder resolver `host.docker.internal`. El puerto
+5173 del ejemplo Ballerine choca con el frontend de SEDERG_PAY; detén uno de los
+dos o publica el flujo de colección en otro puerto y ajusta
+`SEDERG_BALLERINE_COLLECTION_URL` o `SEDERG_BALLERINE_COLLECTION_URL_TEMPLATE`.
+
+Configura en el workflow de Ballerine la suscripción webhook hacia:
+
+```text
+http://host.docker.internal:8080/api/v1/kyc/webhooks/ballerine
+```
+
+Aplica la migración antes de iniciar sesiones:
+
+```powershell
+docker compose run --rm --no-deps backend php yii migrate --migrationPath=@app/migrations
+```
+
+Los endpoints añadidos son `POST /api/v1/kyc/session` y
+`POST /api/v1/kyc/webhooks/ballerine`. Consulta
+[INTEGRATION_CONTRACT.md](INTEGRATION_CONTRACT.md).
+
 ## Límites de esta fase
 
-Esta PoC verifica únicamente que el flujo de captura y revisión manual de Ballerine puede arrancar localmente. Todavía no hay integración API, webhook firmado, sincronización de estados, almacenamiento compartido ni acceso a documentos de SEDERG_PAY. La conexión real se implementará después de validar compatibilidad, seguridad y tratamiento de datos en Rusia y Cuba.
+La PoC verifica que el flujo de captura y revisión manual de Ballerine puede
+arrancar localmente y que el adaptador puede crear sesiones y recibir eventos.
+Sigue sin estar permitido procesar documentos o identidades reales. La conexión
+productiva requiere validar compatibilidad, seguridad, licencias, residencia de
+datos y tratamiento de datos en Rusia y Cuba.
 
 ## Fuente upstream
 

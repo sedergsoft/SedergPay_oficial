@@ -94,6 +94,16 @@ El portal queda en `http://localhost:5173` y la API en
 `http://localhost:8080`. El flujo usa autenticación de desarrollo únicamente
 para demostración local; no es una configuración válida para producción.
 
+Para probar el flujo KYC con proveedor externo sin desplegar Ballerine:
+
+```powershell
+.\scripts\Enable-BallerineMock.ps1
+```
+
+El simulador queda en `http://localhost:5174` y emite webhooks firmados al
+backend real. Detalles y límites en
+[`docs/ballerine-kyc-mock.md`](./docs/ballerine-kyc-mock.md).
+
 Comprobación rápida del entorno:
 
 ```powershell
@@ -107,6 +117,39 @@ detener los contenedores sin borrar los datos:
 ```powershell
 docker compose down
 ```
+
+### Si los servicios no arrancan en Docker Desktop (Windows)
+
+Síntoma: `docker compose up -d` falla con
+
+```text
+Error response from daemon: error while creating mount source path
+'/run/desktop/mnt/host/d/proyectos/SEDERG_PAY/backend':
+mkdir /run/desktop/mnt/host/d: file exists
+```
+
+el backend queda en `Created` y el portal muere con
+`host not found in upstream "backend"`.
+
+La causa no es el proyecto: el recurso compartido (9p) de la unidad `D:` dentro
+de la VM de Docker Desktop quedó obsoleto. Se comprueba así:
+
+```powershell
+docker run --rm -v "D:\proyectos\SEDERG_PAY\backend:/app" alpine:3.20 ls /app
+```
+
+Si esa orden falla con el mismo error, reinicia el motor y vuelve a levantar el
+stack:
+
+```powershell
+docker desktop restart
+docker compose --profile kyc-mock up -d
+```
+
+Suele ocurrir tras reconectar la unidad, suspender el equipo o actualizar Docker
+Desktop. El portal y el backend declaran `restart: unless-stopped`, y el proxy de
+Nginx resuelve `backend` en cada petición, de modo que un reinicio del backend ya
+no tumba el portal.
 
 ### Autenticación para piloto
 

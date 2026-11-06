@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 declare(strict_types=1);
 
@@ -64,8 +64,8 @@ final class RemittanceRepository
     }
 
     /**
-     * Resuelve la dirección del corredor a partir de los códigos ISO de los países,
-     * en lugar de depender del orden numérico de las claves primarias.
+     * Resuelve la direcciÃ³n del corredor a partir de los cÃ³digos ISO de los paÃ­ses,
+     * en lugar de depender del orden numÃ©rico de las claves primarias.
      */
     public function findDirection(int $sourceCountryId, int $destinationCountryId): string
     {
@@ -88,8 +88,8 @@ final class RemittanceRepository
     }
 
     /**
-     * Bloquea la cotización y la marca como consumida, evitando que la misma
-     * cotización se use para crear varias remesas (incluso en peticiones concurrentes).
+     * Bloquea la cotizaciÃ³n y la marca como consumida, evitando que la misma
+     * cotizaciÃ³n se use para crear varias remesas (incluso en peticiones concurrentes).
      */
     public function consumeQuote(int $quoteId, Transaction $transaction): void
     {
@@ -201,6 +201,7 @@ final class RemittanceRepository
                     d.expected_amount AS deposit_expected_amount, d.currency_code AS deposit_currency,
                     d.status AS deposit_status, d.expires_at AS deposit_expires_at,
                     d.confirmed_at AS deposit_confirmed_at, d.qr_payload AS deposit_qr_payload,
+                    d.qr_kind AS deposit_qr_kind, d.pay_token AS deposit_pay_token, d.paid_at AS deposit_paid_at,
                     d.account_snapshot AS deposit_account_snapshot, d.payment_reference AS deposit_reference_snapshot,
                     po.public_id AS payout_public_id, po.status AS payout_status,
                     po.provider_reference AS payout_provider_reference, po.paid_at AS payout_paid_at
@@ -208,8 +209,8 @@ final class RemittanceRepository
              INNER JOIN {{%beneficiaries}} b ON b.id = r.beneficiary_id
              INNER JOIN {{%users}} su ON su.id = r.sender_user_id
              LEFT JOIN {{%user_profiles}} sp ON sp.user_id = su.id
-             LEFT JOIN {{%deposit_requests}} d ON d.remittance_id = r.id
-             LEFT JOIN {{%payout_orders}} po ON po.remittance_id = r.id
+             LEFT JOIN {{%deposit_requests}} d ON d.id = (SELECT d2.id FROM {{%deposit_requests}} d2 WHERE d2.remittance_id = r.id ORDER BY d2.id DESC LIMIT 1)
+             LEFT JOIN {{%payout_orders}} po ON po.id = (SELECT p2.id FROM {{%payout_orders}} p2 WHERE p2.remittance_id = r.id ORDER BY p2.id DESC LIMIT 1)
              WHERE r.public_id = :public_id AND r.sender_user_id = :user_id
              LIMIT 1',
             [':public_id' => $publicId, ':user_id' => $userId]
@@ -228,6 +229,9 @@ final class RemittanceRepository
         $row['payment_instructions'] = array_merge($row['metadata'], $snapshot);
         $row['payment_method_code'] = $snapshot['method_code'] ?? null;
         $row['payment_qr_type'] = $snapshot['qr_type'] ?? null;
+        $row['payment_qr_kind'] = $row['deposit_qr_kind'] ?? ($snapshot['qr_kind'] ?? null);
+        $row['payment_pay_url'] = $snapshot['pay_url'] ?? null;
+        $row['deposit_paid_at'] = $row['deposit_paid_at'] ?? null;
         if (!empty($row['deposit_reference_snapshot'])) {
             $row['payment_instructions']['reference'] = $row['deposit_reference_snapshot'];
         }

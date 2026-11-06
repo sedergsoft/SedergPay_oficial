@@ -114,16 +114,30 @@ El esquema no fuerza un límite fijo de importe por fila porque los límites dep
 - Los usuarios pueden editar sus beneficiarios mediante `PUT /api/v1/beneficiaries/{public_id}`; la API limita cada consulta y actualización al propietario autenticado.
 - El perfil se consulta y actualiza en `GET/PUT /api/v1/profile`.
 - KYC: `GET /api/v1/kyc`, `POST /api/v1/kyc/documents` (multipart: `file`, `document_type`) y `POST /api/v1/kyc/submit`.
-- Los tipos admitidos son identidad, comprobante de domicilio y selfie opcional. La carga admite PDF/JPG/PNG de hasta 5 MB. La revisión administrativa está disponible en `GET /api/v1/admin/kyc`, descarga protegida de documentos y `POST /api/v1/admin/kyc/{public_id}/review`.
+- Los tipos admitidos son identidad, comprobante de domicilio y selfie opcional. La carga admite PDF/JPG/PNG de hasta 5 MB. Hay dos límites de infraestructura que deben acompañar ese máximo: nginx (`client_max_body_size 10m` en `frontend/nginx.conf`) y PHP (`upload_max_filesize=8M`/`post_max_size=10M` en `backend/docker/php-uploads.ini`). Con los valores por defecto (1 MB en nginx y 2 MB en PHP) los archivos válidos se rechazaban con `HTTP 413` o `A valid document upload is required`. La revisión administrativa está disponible en `GET /api/v1/admin/kyc`, descarga protegida de documentos y `POST /api/v1/admin/kyc/{public_id}/review`.
 - Ejecute `php yii migrate --migrationPath=@app/migrations` para crear las tablas `kyc_cases` y `kyc_documents` y añadir nacionalidad al perfil.
 - Configure `SEDERG_PRIVATE_STORAGE_PATH` como directorio persistente **fuera del document root**, con permisos restringidos para el usuario del proceso PHP. Los documentos se cifran con `SEDERG_PII_KEY` antes de guardarse. En producción, `SEDERG_PII_KEY` es obligatorio y debe ser un secreto fuerte y estable; perderlo impide descifrar los documentos existentes. El volumen Docker `sederg_private_data` conserva los archivos entre despliegues. No exponga este directorio mediante Apache/Nginx ni backups públicos.
 - `SEDERG_KYC_REQUIRED=1` obliga a tener KYC aprobado antes de crear remesas. Fuera del modo de autenticación development, esta condición se aplica por defecto. En sandbox/desarrollo se puede probar el flujo sin bloquear remesas.
 - La política documental y los controles de KYC/AML deben validarse para cada corredor RU-CU y CU-RU con asesoría legal y los operadores autorizados. Esta implementación aporta el flujo técnico; no certifica por sí sola el cumplimiento regulatorio.
 
 
+### Ballerine KYC adapter
+
+- Prueba local sin Ballerine: `scripts/Enable-BallerineMock.ps1` levanta el simulador `kyc-mock` bajo el profile `kyc-mock`, configura `.env` y aplica migraciones. Guía completa: `../docs/ballerine-kyc-mock.md`.
+- La integración está desactivada por defecto mediante `SEDERG_BALLERINE_ENABLED=0`. Aun con el resto de variables configuradas, no se activa hasta establecer el flag en `1` y completar `SEDERG_BALLERINE_BASE_URL`, `SEDERG_BALLERINE_API_KEY`, `SEDERG_BALLERINE_WORKFLOW_ID` y `SEDERG_BALLERINE_COLLECTION_URL`.
+- `POST /api/v1/kyc/session` crea o recupera una sesión de colección vinculada al usuario autenticado. Devuelve `collection_url` y `expires_at`.
+- `POST /api/v1/kyc/webhooks/ballerine` es un receptor aislado sin identidad de cliente. Autentica `X-Authorization` con `SEDERG_BALLERINE_WEBHOOK_SECRET` o una firma HMAC `X-Ballerine-Signature`, valida la ventana temporal y aplica idempotencia por `provider_event_id` en `kyc_provider_events`.
+- Los eventos `approved`/`rejected` de Ballerine se mapean a `pending_verification`; nunca aprueban solos. Estados desconocidos se guardan en cuarentena. El administrador conserva la decisión final.
+- Ejecute las migraciones para añadir las columnas de proveedor y la tabla de eventos: `php yii migrate --migrationPath=@app/migrations`.
+- El workflow de Ballerine debe configurar su suscripción webhook hacia `/api/v1/kyc/webhooks/ballerine` y compartir el mismo `WEBHOOK_SECRET`.
+- Verificación operativa antes de activar: `php yii kyc/provider-status` y `GET /api/v1/admin/kyc/provider`. El panel admin muestra el estado del proveedor, el último evento y las excepciones de las últimas 24 horas.
+- Runbook de activación y rollback: `../docs/ballerine-kyc-activation.md`.
+- Detalles de contrato, variables y límites: `docs/ballerine-kyc-spike/INTEGRATION_CONTRACT.md` y `docs/adr/001-ballerine-kyc-core.md`.
+
 ### KYC hardening and deployment
 
-- KYC uploads are validated against actual MIME, file size (1 byte–5 MB), and file signatures. Documents are scanned through ClamAV using the daemon INSTREAM protocol before encryption and storage.
+- KYC uploads are validated against actual MIME, file size (1 byte–5 MB), and file signatures. The whole path must allow 5 MB: nginx uses `client_max_body_size 10m` and PHP uses `upload_max_filesize=8M`/`post_max_size=10M` from `docker/php-uploads.ini`. Their defaults (1 MB and 2 MB) rejected valid uploads with 413 or a misleading message. Documents are scanned through ClamAV using the daemon INSTREAM protocol before encryption and storage.
+- Upload regression check through the portal (`nginx -> backend -> ClamAV`): `docker compose exec -T backend php tests/integration/kyc_upload_smoke.php`. It verifies a 3 MB file is accepted and a 6 MB file is rejected with the 5 MB message.
 - The Compose stack includes an internal-only ClamAV service with a persistent virus-definition volume. It is not published to the host.
 - Production must set a dedicated random `SEDERG_PII_KEY` (at least 32 characters), `SEDERG_KYC_REQUIRED=1`, and must keep the private storage volume and encryption key in protected backups. Never reuse `SEDERG_COOKIE_KEY` as the document encryption key.
 - Malware scanning fails closed whenever KYC is required or auth mode is not development. If ClamAV is down, uploads are rejected rather than accepted without scanning.

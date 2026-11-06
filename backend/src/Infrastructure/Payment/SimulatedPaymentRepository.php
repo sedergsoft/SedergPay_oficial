@@ -114,7 +114,7 @@ final class SimulatedPaymentRepository
         Transaction $transaction
     ): void {
         $deposit = $this->db->createCommand(
-            'SELECT id, status FROM {{%deposit_requests}}
+            'SELECT id, status, expires_at FROM {{%deposit_requests}}
              WHERE public_id = :public_id AND remittance_id = :remittance_id FOR UPDATE',
             [':public_id' => $depositPublicId, ':remittance_id' => $remittance['id']]
         )->queryOne();
@@ -126,6 +126,9 @@ final class SimulatedPaymentRepository
         }
         if ($deposit['status'] !== 'pending') {
             throw new \DomainException('Deposit request is not pending');
+        }
+        if ($deposit['expires_at'] !== null && strtotime((string) $deposit['expires_at'] . ' UTC') <= time()) {
+            throw new \DomainException('Deposit request has expired. Generate a new payment link.');
         }
         $connectionId = (int) $this->db->createCommand(
             "SELECT id FROM {{%bank_connections}} WHERE bank_code = 'simulator' AND environment = 'sandbox' LIMIT 1"
@@ -144,10 +147,13 @@ final class SimulatedPaymentRepository
             'source' => 'simulator',
         ])->execute();
         $transactionId = (int) $this->db->getLastInsertID();
+        $confirmedAt = (new \DateTimeImmutable())->format('Y-m-d H:i:s');
         $this->db->createCommand()->update('{{%deposit_requests}}', [
             'status' => 'confirmed',
             'matched_transaction_id' => $transactionId,
-            'confirmed_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+            'confirmed_at' => $confirmedAt,
+            'paid_amount' => $remittance['total_debit_amount'],
+            'paid_at' => $confirmedAt,
         ], ['id' => $deposit['id']])->execute();
         (new RemittanceStateMachine())->assertCanTransition($remittance['status'], 'compliance_review');
         $this->db->createCommand()->update('{{%remittances}}', [

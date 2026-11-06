@@ -1,4 +1,4 @@
-services:
+﻿services:
   frontend:
     build:
       context: ./frontend
@@ -8,6 +8,7 @@ services:
       - "5173:80"
     depends_on:
       - backend
+    restart: unless-stopped
   backend:
     build:
       context: ./backend
@@ -36,17 +37,58 @@ services:
       SEDERG_OIDC_AUDIENCE: ${SEDERG_OIDC_AUDIENCE:-sederg-pay-api}
       SEDERG_OIDC_PUBLIC_KEY: ${SEDERG_OIDC_PUBLIC_KEY:-}
       SEDERG_CORS_ORIGINS: ${SEDERG_CORS_ORIGINS:-http://localhost:5173}
+      SEDERG_BALLERINE_ENABLED: ${SEDERG_BALLERINE_ENABLED:-0}
+      SEDERG_BALLERINE_BASE_URL: ${SEDERG_BALLERINE_BASE_URL:-}
+      SEDERG_BALLERINE_API_KEY: ${SEDERG_BALLERINE_API_KEY:-}
+      SEDERG_BALLERINE_WORKFLOW_ID: ${SEDERG_BALLERINE_WORKFLOW_ID:-}
+      SEDERG_BALLERINE_COLLECTION_URL: ${SEDERG_BALLERINE_COLLECTION_URL:-}
+      SEDERG_BALLERINE_COLLECTION_URL_TEMPLATE: ${SEDERG_BALLERINE_COLLECTION_URL_TEMPLATE:-}
+      SEDERG_BALLERINE_AUTH_HEADER: ${SEDERG_BALLERINE_AUTH_HEADER:-Authorization}
+      SEDERG_BALLERINE_AUTH_SCHEME: ${SEDERG_BALLERINE_AUTH_SCHEME:-Api-Key}
+      SEDERG_BALLERINE_WEBHOOK_SECRET: ${SEDERG_BALLERINE_WEBHOOK_SECRET:-}
+      SEDERG_BALLERINE_RETURN_URL: ${SEDERG_BALLERINE_RETURN_URL:-http://localhost:5173}
+      SEDERG_BALLERINE_TIMEOUT_SECONDS: ${SEDERG_BALLERINE_TIMEOUT_SECONDS:-15}
+      SEDERG_BALLERINE_WEBHOOK_TOLERANCE_SECONDS: ${SEDERG_BALLERINE_WEBHOOK_TOLERANCE_SECONDS:-300}
+      SEDERG_BALLERINE_SESSION_TTL_SECONDS: ${SEDERG_BALLERINE_SESSION_TTL_SECONDS:-3600}
+      SEDERG_PUBLIC_BASE_URL: ${SEDERG_PUBLIC_BASE_URL:-http://localhost:5173}
+      SEDERG_PAYMENT_TTL_MINUTES: ${SEDERG_PAYMENT_TTL_MINUTES:-1440}
+      SEDERG_SANDBOX_PAYMENTS: ${SEDERG_SANDBOX_PAYMENTS:-0}
     depends_on:
       mysql:
         condition: service_healthy
       clamav:
         condition: service_healthy
     ports:
-      - "8080:8080"
+      - "${SEDERG_BACKEND_PORT:-8080}:8080"
     volumes:
       - ./backend:/app
+      # Applies the upload limits without rebuilding the image in local dev.
+      - ./backend/docker/php-uploads.ini:/usr/local/etc/php/conf.d/zz-sederg-uploads.ini:ro
       - sederg_private_data:/var/lib/sederg-private
     command: ["php", "yii", "serve", "0.0.0.0:8080", "--docroot=web"]
+    restart: unless-stopped
+
+  # Local-only Ballerine simulator. It is disabled unless the "kyc-mock"
+  # profile is enabled: docker compose --profile kyc-mock up -d
+  # It never handles real documents and is not part of production deployments.
+  kyc-mock:
+    profiles: ["kyc-mock"]
+    build:
+      context: ./kyc-mock
+    environment:
+      PORT: "3000"
+      KYC_MOCK_API_KEY: ${SEDERG_BALLERINE_API_KEY:-local-mock-api-key}
+      KYC_MOCK_AUTH_SCHEME: ${SEDERG_BALLERINE_AUTH_SCHEME:-Api-Key}
+      KYC_MOCK_WORKFLOW_ID: ${SEDERG_BALLERINE_WORKFLOW_ID:-kyc-manual-review}
+      KYC_MOCK_WEBHOOK_URL: http://backend:8080/api/v1/kyc/webhooks/ballerine
+      KYC_MOCK_WEBHOOK_SECRET: ${SEDERG_BALLERINE_WEBHOOK_SECRET:-}
+      KYC_MOCK_PUBLIC_URL: ${SEDERG_BALLERINE_COLLECTION_URL:-http://localhost:5174}
+      KYC_MOCK_APP_URL: ${SEDERG_BALLERINE_RETURN_URL:-http://localhost:5173}
+    ports:
+      # Bound to loopback: the simulator must never be reachable from the LAN.
+      - "127.0.0.1:${SEDERG_BALLERINE_MOCK_PORT:-5174}:3000"
+    restart: unless-stopped
+
   clamav:
     image: clamav/clamav:stable
     restart: unless-stopped
@@ -69,7 +111,7 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-    command: ["sh", "-c", "while true; do php yii rates/update || echo 'Exchange-rate refresh failed; retrying tomorrow.' >&2; sleep 43200; done"]
+    command: ["sh", "-c", "while true; do if php yii rates/update; then sleep 43200; else echo 'Exchange-rate refresh failed; retrying in 5 minutes.' >&2; sleep 300; fi; done"]
     restart: unless-stopped
 
   mysql:
@@ -92,7 +134,9 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      # Solo accesible desde loopback. Se usa 16379 en el host porque Windows
+      # puede reservar el 6379 (rangos excluidos de Hyper-V/WinNAT).
+      - "127.0.0.1:${SEDERG_REDIS_PORT:-16379}:6379"
     volumes:
       - sederg_redis_data:/data
 

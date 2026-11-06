@@ -19,6 +19,11 @@ final class BallerineStatusMapperTest extends TestCase
         self::assertSame('manual_review', BallerineStatusMapper::map('manual_review'));
     }
 
+    public function testRevisionMapsToResubmissionRequired(): void
+    {
+        self::assertSame('resubmission_required', BallerineStatusMapper::map('revision'));
+    }
+
     public function testUnknownProviderStatusFailsClosed(): void
     {
         $this->expectException(\UnexpectedValueException::class);

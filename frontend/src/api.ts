@@ -1,4 +1,4 @@
-const apiBase = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '');
+﻿const apiBase = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '');
 const authMode = import.meta.env.VITE_AUTH_MODE ?? 'development';
 export const isDevelopmentAuth = authMode === 'development';
 
@@ -9,20 +9,22 @@ function authHeaders(userId?: string): Record<string, string> {
     // Never send an authenticated API request without an identity header.
     const publicId = (userId ?? '').trim() || (localStorage.getItem('sederg_user') ?? '').trim();
     if (!publicId) {
-      throw new Error('La sesión de desarrollo no contiene una identidad. Cierra sesión e inicia sesión nuevamente.');
+      throw new Error('La sesiÃ³n de desarrollo no contiene una identidad. Cierra sesiÃ³n e inicia sesiÃ³n nuevamente.');
     }
     return { 'X-User-Public-Id': publicId };
   }
   const token = localStorage.getItem('sederg_access_token');
   if (!token) {
-    throw new Error('Inicia sesión con el proveedor de identidad para continuar');
+    throw new Error('Inicia sesiÃ³n con el proveedor de identidad para continuar');
   }
   return { Authorization: `Bearer ${token}` };
 }
 
 export type UserProfile = { public_id: string; email: string; phone_e164: string | null; preferred_language: string; status: string; first_name: string; last_name: string; middle_name: string | null; date_of_birth: string | null; residence_country_code: string | null; nationality_country_code: string | null; address_line: string | null; city: string | null; postal_code: string | null };
-export type KycCase = { public_id?: string; status: string; submitted_at?: string | null; reviewed_at?: string | null; review_reason?: string | null; documents?: Array<{ public_id: string; document_type: string; original_name: string; mime_type: string; file_size: number; created_at: string }> };
-export type AdminKycCase = { public_id: string; status: string; submitted_at: string | null; reviewed_at: string | null; review_reason: string | null; user_public_id: string; email: string; first_name: string; last_name: string; document_count: number };
+export type KycProviderState = { name: string; enabled: boolean; status: string | null; collection_url: string | null; expires_at: string | null; last_event_at: string | null };
+export type KycCase = { public_id?: string; status: string; submitted_at?: string | null; reviewed_at?: string | null; review_reason?: string | null; documents?: Array<{ public_id: string; document_type: string; original_name: string; mime_type: string; file_size: number; created_at: string }>; provider?: KycProviderState };
+export type AdminKycCase = { public_id: string; status: string; submitted_at: string | null; reviewed_at: string | null; review_reason: string | null; provider_name: string | null; provider_status: string | null; provider_last_event_at: string | null; user_public_id: string; email: string; first_name: string; last_name: string; document_count: number };
+export type KycProviderReadiness = { provider: { configured: boolean; enabled: boolean; session_configured: boolean; webhook_configured: boolean; configuration_error: boolean; events_available: boolean }; last_event_at: string | null; events_last_24h: Array<{ outcome: string; count: number }>; pending_review_cases: number; webhook_path: string };
 
 export type Beneficiary = {
   public_id: string;
@@ -95,6 +97,8 @@ export type Remittance = {
   updated_at?: string;
   payment_qr_payload?: string | null;
   payment_qr_type?: string | null;
+  payment_qr_kind?: string | null;
+  payment_pay_url?: string | null;
   payment_method_code?: string | null;
   deposit_public_id?: string | null;
   deposit_status?: string | null;
@@ -133,6 +137,7 @@ export type RemittanceDetail = Remittance & {
   deposit_status: string | null;
   deposit_expires_at: string | null;
   deposit_confirmed_at: string | null;
+  deposit_paid_at: string | null;
   payout_public_id: string | null;
   payout_status: string | null;
   payout_provider_reference: string | null;
@@ -187,6 +192,16 @@ export type AdminDashboard = {
 
 export type FundingMethod = { code: string; name: string; method_type: string; provider_code: string | null; supports_dynamic_qr: boolean | number; requires_reference: boolean | number; country_code?: string; currency_code?: string; is_active?: boolean | number };
 export type FundingAccount = { public_id: string; country_code: string; currency_code: string; bank_code: string; bank_name: string; account_holder_name: string; legal_entity_name: string | null; account_type: string; account_mask: string; routing_mask: string | null; environment: string; status: string; notes: string | null; methods: string | null };
+export type PaymentIntentState = {
+  public_id: string; status: string; expected_amount: string; currency_code: string; payment_reference: string;
+  expires_at: string | null; confirmed_at?: string | null; paid_amount?: string | null; paid_at?: string | null;
+  qr_payload?: string | null; qr_kind?: string | null; pay_url?: string | null; pay_token?: string | null;
+  bank_name?: string | null; account_holder_name?: string | null; account_mask?: string | null;
+  routing_mask?: string | null; method_name?: string | null;
+};
+export type PublicPayment = PaymentIntentState & {
+  amount?: string; remittance_public_id?: string; remittance_reference?: string; remittance_status?: string; can_confirm?: boolean;
+};
 
 export type PlatformSetting = {
   key: string;
@@ -200,7 +215,7 @@ export type PlatformSetting = {
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!isDevelopmentAuth && apiBase === '') {
-    throw new Error('La API no está configurada. Define VITE_API_BASE_URL en el despliegue.');
+    throw new Error('La API no estÃ¡ configurada. Define VITE_API_BASE_URL en el despliegue.');
   }
   const response = await fetch(`${apiBase}${path}`, {
     ...init,
@@ -241,11 +256,13 @@ export const api = {
   profile: (userId: string) => request<UserProfile>('/api/v1/profile', { headers: authHeaders(userId) }),
   updateProfile: (userId: string, body: Record<string, unknown>) => request<UserProfile>('/api/v1/profile', { method: 'PUT', headers: authHeaders(userId), body: JSON.stringify(body) }),
   kyc: (userId: string) => request<KycCase>('/api/v1/kyc', { headers: authHeaders(userId) }),
+  startKycSession: (userId: string, locale = 'es') => request<{ case_public_id: string; status: string; collection_url: string; expires_at: string }>('/api/v1/kyc/session', { method: 'POST', headers: authHeaders(userId), body: JSON.stringify({ locale }) }),
   submitKyc: (userId: string) => request<KycCase>('/api/v1/kyc/submit', { method: 'POST', headers: authHeaders(userId), body: '{}' }),
-  uploadKycDocument: async (userId: string, file: File, documentType: string) => { const form = new FormData(); form.append('file', file); form.append('document_type', documentType); const headers = authHeaders(userId); const response = await fetch(`${apiBase}/api/v1/kyc/documents`, { method: 'POST', headers, body: form }); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.message ?? `HTTP ${response.status}`); return body; },
+  uploadKycDocument: async (userId: string, file: File, documentType: string) => { const form = new FormData(); form.append('file', file); form.append('document_type', documentType); const headers = authHeaders(userId); const response = await fetch(`${apiBase}/api/v1/kyc/documents`, { method: 'POST', headers, body: form }); const body = await response.json().catch(() => ({})); if (!response.ok) { if (response.status === 413) throw new Error('El archivo supera el tamaÃ±o mÃ¡ximo permitido (5 MB).'); throw new Error(body.message ?? `HTTP ${response.status}`); } return body; },
   adminKycDocuments: (userId: string, publicId: string) => request<{ documents: Array<{ public_id: string; document_type: string; original_name: string; mime_type: string; file_size: number }> }>('/api/v1/admin/kyc/' + publicId + '/documents', { headers: authHeaders(userId) }),
   downloadKycDocument: async (userId: string, publicId: string) => { const response = await fetch(apiBase + '/api/v1/admin/kyc/documents/' + publicId, { headers: authHeaders(userId) }); if (!response.ok) throw new Error('No se pudo descargar el documento KYC'); return await response.blob(); },
   adminKyc: (userId: string) => request<{ cases: AdminKycCase[] }>('/api/v1/admin/kyc', { headers: authHeaders(userId) }),
+  adminKycProvider: (userId: string) => request<KycProviderReadiness>('/api/v1/admin/kyc/provider', { headers: authHeaders(userId) }),
   reviewKyc: (userId: string, publicId: string, decision: 'approved' | 'rejected' | 'more_information', reason: string) => request<KycCase>(`/api/v1/admin/kyc/${publicId}/review`, { method: 'POST', headers: authHeaders(userId), body: JSON.stringify({ decision, reason }) }),
   beneficiaries: (userId: string) => request<Beneficiary[]>('/api/v1/beneficiaries', {
     headers: authHeaders(userId),
@@ -309,11 +326,14 @@ export const api = {
     headers: { ...authHeaders(userId), 'Idempotency-Key': `remittance-${crypto.randomUUID()}` },
     body: JSON.stringify(body),
   }),
-  deposit: (userId: string, remittanceId: string, methodCode: string) => request<{ public_id: string; payment_reference: string; qr_payload: string | null; qr_type: string; provider_payment_id?: string | null; account_mask: string; bank_name: string }>('/api/v1/remittances/' + remittanceId + '/deposit', {
+  deposit: (userId: string, remittanceId: string, methodCode: string) => request<{ public_id: string; payment_reference: string; expected_amount: string; currency_code: string; expires_at: string; qr_payload: string | null; qr_type: string; qr_kind: string; pay_url: string; pay_token: string; provider_payment_id?: string | null; account_mask: string; bank_name: string }>('/api/v1/remittances/' + remittanceId + '/deposit', {
     method: 'POST',
-    headers: { ...authHeaders(userId), 'Idempotency-Key': `deposit-${remittanceId}` },
+    headers: { ...authHeaders(userId), 'Idempotency-Key': `deposit-${remittanceId}-${crypto.randomUUID()}` },
     body: JSON.stringify({ method_code: methodCode }),
   }),
+  depositStatus: (userId: string, depositId: string) => request<PaymentIntentState>('/api/v1/deposits/' + depositId, { headers: authHeaders(userId) }),
+  publicPayment: (token: string) => request<PublicPayment>('/api/v1/public/payments/' + encodeURIComponent(token)),
+  confirmPublicPayment: (token: string) => request<{ public_id: string; status: string; remittance_status: string }>('/api/v1/public/payments/' + encodeURIComponent(token) + '/confirm', { method: 'POST', body: '{}' }),
   confirmDeposit: (userId: string, depositId: string) => request(`/api/v1/deposits/${depositId}/simulate-confirmation`, {
     method: 'POST', headers: authHeaders(userId), body: '{}',
   }),

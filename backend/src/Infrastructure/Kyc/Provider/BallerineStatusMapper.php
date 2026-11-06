@@ -16,12 +16,16 @@ final class BallerineStatusMapper
         'in_progress' => 'in_progress',
         'pending_documents' => 'pending_documents',
         'documents_required' => 'pending_documents',
+        'pending' => 'pending_verification',
         'pending_review' => 'pending_verification',
+        'review' => 'manual_review',
         'manual_review' => 'manual_review',
         'approved' => 'pending_verification',
         'rejected' => 'pending_verification',
+        'revision' => 'resubmission_required',
         'resubmission_required' => 'resubmission_required',
         'expired' => 'expired',
+        'processing' => 'in_progress',
         'failed' => 'error',
     ];
 

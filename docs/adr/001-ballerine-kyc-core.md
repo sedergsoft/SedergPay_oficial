@@ -1,7 +1,7 @@
 # ADR-001: Ballerine como motor de experiencia y orquestación KYC
 
-- Estado: Propuesta técnica aprobada para evaluación; integración funcional pendiente.
-- Fecha: 2026-11-03
+- Estado: Adaptador implementado y desactivado por defecto; activación productiva pendiente de revisión legal, licencias y despliegue.
+- Fecha: 2026-11-03 (actualizado 2026-11-05)
 - Rama: `feat/ballerine-kyc-core`
 
 ## Decisión
@@ -112,6 +112,27 @@ El diseño debe permitir revisión manual cuando un proveedor no admita document
 5. **Webhooks y estados**: firma HMAC/clave rotatoria, timestamp, idempotencia, allowlist cuando proceda y pruebas de replay.
 6. **Panel de revisión**: roles separados, MFA, acceso mínimo, motivo obligatorio y auditoría inmutable.
 7. **Piloto controlado**: primero sandbox; después piloto limitado solo tras validación legal, contractual, de seguridad y privacidad en ambos países.
+
+## Estado de implementación (2026-11-05)
+
+- `BallerineConfig` valida URLs y secretos solo desde variables de entorno.
+- `BallerineKycProvider` crea workflows mediante
+  `POST /api/v1/external/workflows/run` y construye una URL de colección
+  configurable.
+- `POST /api/v1/kyc/session` vincula una sesión corta al expediente del usuario
+  autenticado y la audita.
+- `POST /api/v1/kyc/webhooks/ballerine` valida `X-Authorization` o firma
+  HMAC-SHA256, ventana temporal y tamaño del cuerpo.
+- `kyc_provider_events` impone idempotencia por evento; las repeticiones no
+  duplican transiciones ni auditorías.
+- Los estados desconocidos quedan en cuarentena y los estados finales internos
+  no pueden ser sobrescritos por Ballerine.
+- La integración está desactivada si `SEDERG_BALLERINE_ENABLED` no es `1` o si
+  faltan las variables `SEDERG_BALLERINE_*`.
+- `php yii kyc/provider-status` y `GET /api/v1/admin/kyc/provider` permiten
+  verificar configuración, último evento y excepciones sin exponer secretos.
+- Todavía no se ha validado un despliegue Ballerine concreto, su licencia, sus
+  dependencias ni el tratamiento transfronterizo de datos.
 
 ## Criterios de aceptación
 

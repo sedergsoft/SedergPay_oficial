@@ -85,6 +85,57 @@ final class PaymentController extends Controller
         return $response;
     }
 
+    /**
+     * Authenticated polling endpoint for the current state of a payment intent.
+     * The remittance detail already exposes a snapshot; this endpoint keeps the
+     * panel live while the payer completes the payment on another device.
+     */
+    public function actionView(string $publicId): array
+    {
+        $userId = $this->authenticatedUserId();
+        $row = Yii::$app->db->createCommand(
+            'SELECT d.public_id, d.status, d.expires_at, d.confirmed_at, d.paid_amount, d.paid_at,
+                    d.qr_payload, d.qr_kind, d.pay_token, d.expected_amount, d.currency_code,
+                    d.payment_reference, d.account_snapshot
+             FROM {{%deposit_requests}} d
+             INNER JOIN {{%remittances}} r ON r.id=d.remittance_id
+             WHERE d.public_id=:public_id AND r.sender_user_id=:user_id LIMIT 1',
+            [':public_id' => $publicId, ':user_id' => $userId]
+        )->queryOne();
+        if ($row === false) {
+            throw new NotFoundHttpException('Deposit request not found');
+        }
+        $snapshot = json_decode((string) $row['account_snapshot'], true);
+        $snapshot = is_array($snapshot) ? $snapshot : [];
+        $expired = $row['status'] === 'pending'
+            && $row['expires_at'] !== null
+            && strtotime((string) $row['expires_at'] . ' UTC') <= time();
+        $expiresAt = $row['expires_at'] === null
+            ? null
+            : (new \DateTimeImmutable((string) $row['expires_at'], new \DateTimeZone('UTC')))->format(DATE_ATOM);
+
+        return [
+            'public_id' => $row['public_id'],
+            'status' => $expired ? 'expired' : $row['status'],
+            'expected_amount' => $row['expected_amount'],
+            'currency_code' => $row['currency_code'],
+            'payment_reference' => $row['payment_reference'],
+            'expires_at' => $expiresAt,
+            'confirmed_at' => $row['confirmed_at'],
+            'paid_amount' => $row['paid_amount'],
+            'paid_at' => $row['paid_at'],
+            'qr_payload' => $row['qr_payload'],
+            'qr_kind' => $row['qr_kind'],
+            'pay_url' => $snapshot['pay_url'] ?? null,
+            'pay_token' => $row['pay_token'],
+            'bank_name' => $snapshot['bank_name'] ?? null,
+            'account_holder_name' => $snapshot['account_holder_name'] ?? 'SEDERG_PAY',
+            'account_mask' => $snapshot['account_mask'] ?? null,
+            'routing_mask' => $snapshot['routing_mask'] ?? null,
+            'method_name' => $snapshot['method_name'] ?? null,
+        ];
+    }
+
     public function actionSimulateConfirm(string $publicId): array
     {
         if (getenv('SEDERG_AUTH_MODE') !== 'development') {

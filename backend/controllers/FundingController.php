@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace app\controllers;
 
 use app\Infrastructure\Auth\UserAuthenticator;
-use app\Infrastructure\Payment\FundingPaymentProviderFactory;
+use app\Infrastructure\Payment\IdempotencyConflictException;
+use app\Infrastructure\Payment\PaymentIntentService;
 use Yii;
 use yii\filters\ContentNegotiator;
 use yii\web\BadRequestHttpException;
@@ -237,14 +238,23 @@ final class FundingController extends Controller
             [':public_id' => $publicId, ':user_id' => $userId]
         )->queryOne();
         if (!$remittance) throw new NotFoundHttpException('Remittance not found');
-        if ($remittance['status'] !== 'awaiting_payment') throw new UnprocessableEntityHttpException('Remittance is not awaiting payment');
         $scope = "funding:deposit:user:{$userId}";
         $hash = hash('sha256', $publicId . '|' . $methodCode);
-        $existing = $db->createCommand('SELECT request_hash,response_body FROM {{%idempotency_keys}} WHERE scope=:scope AND idempotency_key=:key AND (expires_at IS NULL OR expires_at>UTC_TIMESTAMP())', [':scope' => $scope, ':key' => $key])->queryOne();
+
+        // Fast path: the client retried the same request. The authoritative
+        // check is repeated inside PaymentIntentService under the row lock.
+        $existing = $db->createCommand(
+            'SELECT request_hash,response_body FROM {{%idempotency_keys}}
+             WHERE scope=:scope AND idempotency_key=:key
+               AND (expires_at IS NULL OR expires_at>UTC_TIMESTAMP())',
+            [':scope' => $scope, ':key' => $key]
+        )->queryOne();
         if ($existing) {
             if (!hash_equals($existing['request_hash'], $hash)) throw new ConflictHttpException('Idempotency-Key was already used with another request');
             return json_decode($existing['response_body'], true, 512, JSON_THROW_ON_ERROR);
         }
+
+        if ($remittance['status'] !== 'awaiting_payment') throw new UnprocessableEntityHttpException('Remittance is not awaiting payment');
         $account = $db->createCommand(
             'SELECT a.id,a.public_id,a.bank_code,a.bank_name,a.account_holder_name,a.account_mask,a.routing_mask,a.currency_code,a.environment,
                     m.code,m.name,m.method_type,m.supports_dynamic_qr,m.provider_code
@@ -259,71 +269,20 @@ final class FundingController extends Controller
             [':method' => $methodCode, ':status' => 'active', ':env' => 'sandbox', ':holder' => 'SEDERG_PAY', ':currency' => $remittance['send_currency']]
         )->queryOne();
         if (!$account) throw new UnprocessableEntityHttpException('No active SEDERG_PAY account is configured for this payment method and currency');
-        $connectionId = $db->createCommand("SELECT id FROM {{%bank_connections}} WHERE bank_code='simulator' AND environment='sandbox' AND status='active' LIMIT 1")->queryScalar();
-        if (!$connectionId) throw new ServiceUnavailableHttpException('Sandbox payment simulator is not configured');
-        $reference = 'PAY-' . strtoupper(bin2hex(random_bytes(5)));
-        $depositId = $this->uuid();
-        $expires = (new \DateTimeImmutable('+24 hours'))->format('Y-m-d H:i:s');
-        $qrPayload = null;
-        $qrType = 'none';
-        $providerPaymentId = null;
-        if ((int) $account['supports_dynamic_qr'] === 1 && $account['method_type'] === 'instant_qr') {
-            if ($account['provider_code'] === 'sbp_c2b_sandbox') {
-                $issued = (new FundingPaymentProviderFactory())->create((string) $account['provider_code'], (string) $account['environment'])->createDynamicQr(
-                    (string) $remittance['total_debit_amount'],
-                    (string) $remittance['send_currency'],
-                    $reference,
-                    $expires,
-                    'SEDERG_PAY'
-                );
-                $qrPayload = $issued['payload'];
-                $providerPaymentId = $issued['provider_payment_id'];
-                $qrType = 'sbp_c2b_sandbox';
-            } else {
-                $qrPayload = 'sedergpay-sandbox://cuba-instant-qr?reference=' . rawurlencode($reference)
-                    . '&amount=' . rawurlencode((string) $remittance['total_debit_amount'])
-                    . '&currency=' . rawurlencode((string) $remittance['send_currency'])
-                    . '&account=' . rawurlencode((string) $account['account_mask']);
-                $qrType = 'sedergpay_sandbox';
-            }
-        }
-        $snapshot = [
-            'platform' => 'SEDERG_PAY', 'bank_code' => $account['bank_code'], 'bank_name' => $account['bank_name'],
-            'account_holder_name' => 'SEDERG_PAY', 'account_mask' => $account['account_mask'], 'routing_mask' => $account['routing_mask'],
-            'currency_code' => $remittance['send_currency'], 'amount' => $remittance['total_debit_amount'],
-            'method_code' => $methodCode, 'method_name' => $account['name'], 'reference' => $reference,
-            'environment' => 'sandbox', 'qr_type' => $qrType, 'provider_payment_id' => $providerPaymentId,
-        ];
-        $response = [
-            'public_id' => $depositId, 'provider' => 'simulator', 'status' => 'pending',
-            'expected_amount' => $remittance['total_debit_amount'], 'currency_code' => $remittance['send_currency'],
-            'payment_reference' => $reference, 'expires_at' => (new \DateTimeImmutable($expires))->format(DATE_ATOM),
-            'method_code' => $methodCode, 'method_name' => $account['name'], 'bank_name' => $account['bank_name'],
-            'account_holder_name' => 'SEDERG_PAY', 'account_mask' => $account['account_mask'], 'routing_mask' => $account['routing_mask'],
-            'qr_payload' => $qrPayload, 'qr_type' => $qrType, 'provider_payment_id' => $providerPaymentId,
-        ];
-        $tx = $db->beginTransaction();
+
         try {
-            $active = (int) $db->createCommand("SELECT COUNT(*) FROM {{%deposit_requests}} WHERE remittance_id=:id AND status IN ('pending','confirmed') AND (expires_at IS NULL OR expires_at>UTC_TIMESTAMP())", [':id' => $remittance['id']])->queryScalar();
-            if ($active > 0) throw new ConflictHttpException('An active payment instruction already exists for this remittance');
-            $db->createCommand()->insert('{{%deposit_requests}}', [
-                'public_id' => $depositId, 'remittance_id' => $remittance['id'], 'bank_connection_id' => (int) $connectionId,
-                'funding_account_id' => $account['id'], 'funding_method_code' => $methodCode,
-                'account_snapshot' => new JsonExpression($snapshot), 'qr_payload' => $qrPayload, 'qr_expires_at' => $expires, 'provider_payment_id' => $providerPaymentId,
-                'expected_amount' => $remittance['total_debit_amount'], 'currency_code' => $remittance['send_currency'],
-                'payment_reference' => $reference, 'status' => 'pending', 'expires_at' => $expires,
-            ])->execute();
-            $db->createCommand()->insert('{{%idempotency_keys}}', [
-                'scope' => $scope, 'idempotency_key' => $key, 'request_hash' => $hash,
-                'response_status' => 201, 'response_body' => new JsonExpression($response),
-                'resource_type' => 'deposit_request', 'resource_id' => $depositId,
-                'expires_at' => $expires,
-            ])->execute();
-            $tx->commit();
-        } catch (\Throwable $e) {
-            if ($tx->isActive) $tx->rollBack();
-            throw $e;
+            $response = (new PaymentIntentService($db))->createIntent(
+                $remittance,
+                $account,
+                $methodCode,
+                ['scope' => $scope, 'key' => $key, 'hash' => $hash]
+            );
+        } catch (IdempotencyConflictException $exception) {
+            throw new ConflictHttpException($exception->getMessage(), 0, $exception);
+        } catch (\DomainException $exception) {
+            throw new UnprocessableEntityHttpException($exception->getMessage(), 0, $exception);
         }
+
         Yii::$app->response->statusCode = 201;
         return $response;
     }
