@@ -46,8 +46,8 @@ final class FundingController extends Controller
                  INNER JOIN {{%platform_funding_accounts}} a ON a.id=fam.funding_account_id
                  WHERE fam.payment_method_code=m.code AND a.status=:active
                    AND a.environment=:environment AND a.account_holder_name=:holder AND a.currency_code=m.currency_code AND a.country_id=m.country_id
-                   AND (a.valid_from IS NULL OR a.valid_from<=UTC_TIMESTAMP())
-                   AND (a.valid_until IS NULL OR a.valid_until>UTC_TIMESTAMP())
+                   AND (a.valid_from IS NULL OR a.valid_from<=CURRENT_TIMESTAMP)
+                   AND (a.valid_until IS NULL OR a.valid_until>CURRENT_TIMESTAMP)
                )
              ORDER BY m.name',
             [':country' => $country, ':active' => 'active', ':environment' => 'sandbox', ':holder' => 'SEDERG_PAY']
@@ -240,7 +240,7 @@ final class FundingController extends Controller
         if ($remittance['status'] !== 'awaiting_payment') throw new UnprocessableEntityHttpException('Remittance is not awaiting payment');
         $scope = "funding:deposit:user:{$userId}";
         $hash = hash('sha256', $publicId . '|' . $methodCode);
-        $existing = $db->createCommand('SELECT request_hash,response_body FROM {{%idempotency_keys}} WHERE scope=:scope AND idempotency_key=:key AND (expires_at IS NULL OR expires_at>UTC_TIMESTAMP())', [':scope' => $scope, ':key' => $key])->queryOne();
+        $existing = $db->createCommand('SELECT request_hash,response_body FROM {{%idempotency_keys}} WHERE scope=:scope AND idempotency_key=:key AND (expires_at IS NULL OR expires_at>CURRENT_TIMESTAMP)', [':scope' => $scope, ':key' => $key])->queryOne();
         if ($existing) {
             if (!hash_equals($existing['request_hash'], $hash)) throw new ConflictHttpException('Idempotency-Key was already used with another request');
             return json_decode($existing['response_body'], true, 512, JSON_THROW_ON_ERROR);
@@ -253,8 +253,8 @@ final class FundingController extends Controller
              INNER JOIN {{%platform_funding_accounts}} a ON a.id=fam.funding_account_id
              WHERE m.code=:method AND m.is_active=1 AND a.status=:status AND a.environment=:env
                AND a.account_holder_name=:holder AND a.currency_code=:currency
-               AND (a.valid_from IS NULL OR a.valid_from<=UTC_TIMESTAMP())
-               AND (a.valid_until IS NULL OR a.valid_until>UTC_TIMESTAMP())
+               AND (a.valid_from IS NULL OR a.valid_from<=CURRENT_TIMESTAMP)
+               AND (a.valid_until IS NULL OR a.valid_until>CURRENT_TIMESTAMP)
              ORDER BY a.updated_at DESC LIMIT 1',
             [':method' => $methodCode, ':status' => 'active', ':env' => 'sandbox', ':holder' => 'SEDERG_PAY', ':currency' => $remittance['send_currency']]
         )->queryOne();
@@ -304,7 +304,7 @@ final class FundingController extends Controller
         ];
         $tx = $db->beginTransaction();
         try {
-            $active = (int) $db->createCommand("SELECT COUNT(*) FROM {{%deposit_requests}} WHERE remittance_id=:id AND status IN ('pending','confirmed') AND (expires_at IS NULL OR expires_at>UTC_TIMESTAMP())", [':id' => $remittance['id']])->queryScalar();
+            $active = (int) $db->createCommand("SELECT COUNT(*) FROM {{%deposit_requests}} WHERE remittance_id=:id AND status IN ('pending','confirmed') AND (expires_at IS NULL OR expires_at>CURRENT_TIMESTAMP)", [':id' => $remittance['id']])->queryScalar();
             if ($active > 0) throw new ConflictHttpException('An active payment instruction already exists for this remittance');
             $db->createCommand()->insert('{{%deposit_requests}}', [
                 'public_id' => $depositId, 'remittance_id' => $remittance['id'], 'bank_connection_id' => (int) $connectionId,
