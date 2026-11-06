@@ -6,7 +6,7 @@ final class m261103_000013_add_quote_fee_mode extends Migration
 {
     public function safeUp()
     {
-        $this->addColumn('{{%remittance_quotes}}', 'fee_mode', $this->string(30)->notNull()->defaultValue('add_to_send')->after('fee_currency'));
+        $this->addColumn('{{%remittance_quotes}}', 'fee_mode', $this->string(30)->notNull()->defaultValue('add_to_send'));
         $this->createIndex('ix_quotes_fee_mode', '{{%remittance_quotes}}', 'fee_mode');
     }
 
