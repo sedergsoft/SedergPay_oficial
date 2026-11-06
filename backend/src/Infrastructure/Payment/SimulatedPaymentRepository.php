@@ -63,7 +63,7 @@ final class SimulatedPaymentRepository
     public function findIdempotency(string $scope, string $key): ?array
     {
         $row = $this->db->createCommand(
-            'SELECT * FROM {{%idempotency_keys}} WHERE scope = :scope AND idempotency_key = :key AND (expires_at IS NULL OR expires_at > UTC_TIMESTAMP()) LIMIT 1',
+            'SELECT * FROM {{%idempotency_keys}} WHERE scope = :scope AND idempotency_key = :key AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1',
             [':scope' => $scope, ':key' => $key]
         )->queryOne();
         return $row === false ? null : $row;
@@ -81,7 +81,7 @@ final class SimulatedPaymentRepository
         $activeDeposit = (int) $this->db->createCommand(
             "SELECT COUNT(*) FROM {{%deposit_requests}}
              WHERE remittance_id = :remittance_id AND status IN ('pending', 'confirmed')
-               AND (expires_at IS NULL OR expires_at > UTC_TIMESTAMP())",
+               AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)",
             [':remittance_id' => $remittance['id']]
         )->queryScalar();
         if ($activeDeposit > 0) {
