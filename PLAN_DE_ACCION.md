@@ -17,7 +17,7 @@ gates jurídicos, contractuales, regulatorios y operativos.
 |---|---|
 | Backend | Yii2 / PHP 8.3 |
 | Frontend | React + TypeScript |
-| Base de datos | MySQL 8.4 LTS / InnoDB / utf8mb4 |
+| Base de datos | PostgreSQL 17 |
 | API | REST/JSON versionada |
 | Identidad | Keycloak/OIDC y MFA; no se implementará autenticación propia |
 | Integraciones | Adaptadores desacoplados, inicialmente simulados |
@@ -29,7 +29,7 @@ gates jurídicos, contractuales, regulatorios y operativos.
 
 - Los documentos maestro, funcional y el PDF DER todavía declaran PostgreSQL; quedan
   como referencias de diseño históricas. El documento de plan, el modelo físico y la
-  implementación activa usan MySQL.
+  implementación activa usan PostgreSQL.
 - El DER conceptual incluye más entidades que la migración Yii2 actual, en especial
   `ledger_transactions`, `ledger_entries`, tesorería, compensación, soporte,
   notificaciones y configuración. No se deben presentar como implementadas.
@@ -49,7 +49,7 @@ gates jurídicos, contractuales, regulatorios y operativos.
 - Materializar el paquete Yii2 inicial en `backend/`.
 - Mantener una única migración autoritativa.
 - Añadir consentimiento, eventos de estado, outbox y doble partida explícita.
-- Añadir entorno local reproducible con MySQL 8.4 y Redis.
+- Añadir entorno local reproducible con PostgreSQL 17 y Redis.
 - Publicar reglas de dominio para transiciones y equilibrio contable.
 
 **Progreso:** migración incremental, `docker-compose.yml`, contrato OpenAPI y reglas de
