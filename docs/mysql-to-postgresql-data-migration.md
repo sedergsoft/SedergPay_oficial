@@ -18,8 +18,9 @@ Procedimiento de importación no destructivo. El volumen MySQL original nunca se
    `docker run --rm -v "${mysqlVolume}:/source:ro" -v "${PWD}:/backup" alpine:3.22 sh -c "tar czf /backup/sederg_mysql_backup.tar.gz -C /source ."`
 4. Detener el contenedor MySQL antiguo sin borrar el volumen. Obtener nombre con `docker ps -a --filter "name=mysql" --format "{{.Names}}"` y detenerlo con `docker stop <nombre-real>`.
 5. Levantar PostgreSQL: `docker compose up -d postgres` y verificar `docker compose ps postgres`.
-6. Ejecutar migración: `docker compose -f docker-compose.yml -f docker-compose.migration.yml --profile migration up --build --abort-on-container-exit --exit-code-from db-migrator db-migrator`.
-7. Solo si aparece `DATA TRANSFER COMPLETED`, iniciar: `docker compose up -d backend rate-updater frontend`; verificar `docker compose ps`.
+6. Construir el backend PostgreSQL y crear el esquema vacío: `docker compose run --rm --build --no-deps backend php yii migrate --interactive=0`.
+7. Ejecutar migración: `docker compose -f docker-compose.yml -f docker-compose.migration.yml --profile migration up --build --abort-on-container-exit --exit-code-from db-migrator db-migrator`.
+8. Solo si aparece `DATA TRANSFER COMPLETED`, iniciar: `docker compose up -d backend rate-updater frontend`; verificar `docker compose ps`.
 
 No ejecutar `docker compose down -v`, no eliminar `sederg_mysql_data` y no borrar el contenedor antiguo hasta finalizar auditoría.
 
