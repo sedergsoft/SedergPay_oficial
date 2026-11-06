@@ -8,9 +8,9 @@
 | Tabla | Propósito y campos principales | PK | FKs e índices relevantes |
 |---|---|---|---|
 | `countries` | `id SMALLINT`, `iso2 CHAR(2)`, `iso3 CHAR(3)`, `name VARCHAR(100)`, `phone_code VARCHAR(8)`, `is_active BOOLEAN`, `created_at DATETIME` | `id` | `UNIQUE(iso2)`, `UNIQUE(iso3)` |
-| `currencies` | `code CHAR(3)`, `name VARCHAR(60)`, `minor_units TINYINT `, `is_active BOOLEAN`, `created_at DATETIME` | `code` | PK por código ISO |
+| `currencies` | `code CHAR(3)`, `name VARCHAR(60)`, `minor_units SMALLINT`, `is_active BOOLEAN`, `created_at DATETIME` | `code` | PK por código ISO |
 | `users` | `id BIGINT`, `public_id CHAR(36)`, `email VARCHAR(190) NULL`, `phone_e164 VARCHAR(20) NULL`, `password_hash VARCHAR(255)`, `status VARCHAR(20)`, `preferred_language VARCHAR(10)`, `country_id SMALLINT NULL`, verificaciones, último acceso, fechas y borrado lógico | `id` | `UNIQUE(public_id/email/phone_e164)`, FK país; índices por estado/fecha |
-| `user_profiles` | `user_id BIGINT UNSIGNED`, nombre, apellidos, segundo nombre, fecha nacimiento, país residencia, dirección, ciudad, código postal y fechas | `user_id` | FK a usuario `CASCADE`; FK país `SET NULL` |
+| `user_profiles` | `user_id BIGINT`, nombre, apellidos, segundo nombre, fecha nacimiento, país residencia, dirección, ciudad, código postal y fechas | `user_id` | FK a usuario `CASCADE`; FK país `SET NULL` |
 | `beneficiaries` | `id`, `public_id`, `sender_user_id`, `country_id`, nombre/apellidos, teléfono/email, `payout_method_code`, proveedor, token de cuenta, últimos 4 dígitos, estado y fechas | `id` | `UNIQUE(public_id)`, índice remitente/estado; FKs a usuario y país |
 | `payment_methods` | `code VARCHAR(30)`, nombre, país opcional, dirección (`inbound/outbound/both`), si requiere cuenta, estado, configuración JSON y fecha | `code` | FK país; catálogo |
 | `exchange_rates` | `id`, monedas base/cotizada, `rate DECIMAL(20,10)`, fuente, vigencia desde/hasta, usuario creador y fecha | `id` | FKs a monedas y creador; índice par/vigencia; `CHECK(rate > 0)` |
