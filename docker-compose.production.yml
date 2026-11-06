@@ -11,35 +11,27 @@ services:
     volumes: !reset
       - sederg_private_data:/var/lib/sederg-private
     restart: unless-stopped
-
   clamav:
     ports: !reset []
     restart: unless-stopped
-
-  mysql:
+  postgres:
     ports: !reset []
     restart: unless-stopped
-
   redis:
     ports: !reset []
     restart: unless-stopped
-
   caddy:
     image: caddy:2-alpine
     environment:
       API_DOMAIN: ${API_DOMAIN:?API_DOMAIN is required}
       TLS_EMAIL: ${TLS_EMAIL:?TLS_EMAIL is required}
-    ports:
-      - "80:80"
-      - "443:443"
+    ports: ["80:80","443:443"]
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
-    depends_on:
-      - backend
+    depends_on: [backend]
     restart: unless-stopped
-
 volumes:
   caddy_data:
   caddy_config:
