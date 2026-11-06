@@ -79,7 +79,7 @@ jobs:
           DB_PASSWORD: root
           DB_NAME: sederg_pay
         run: |
-          php -r '$pdo=new PDO("pgsql:host=".getenv("DB_HOST").";dbname=".getenv("DB_NAME"),getenv("DB_USER"),getenv("DB_PASSWORD")); $tables=["users","user_profiles","beneficiaries","kyc_cases","kyc_documents","audit_logs","remittances","platform_funding_accounts"]; foreach($tables as $table){$q=$pdo->prepare("SELECT to_regclass(?)");$q->execute(["public.".$table]);if(!$q->fetchColumn()){fwrite(STDERR,"Missing table: $table\\n");exit(1);}} $q=$pdo->query("SELECT 1 FROM pg_trigger WHERE tgname = \'trg_users_updated_at\' AND NOT tgisinternal"); if(!$q->fetchColumn()){fwrite(STDERR,"Missing updated_at trigger\\n");exit(1);} echo "Critical PostgreSQL tables and triggers verified.\\n";'
+          php -r '$pdo=new PDO("pgsql:host=".getenv("DB_HOST").";dbname=".getenv("DB_NAME"),getenv("DB_USER"),getenv("DB_PASSWORD")); $tables=["users","user_profiles","beneficiaries","kyc_cases","kyc_documents","audit_logs","remittances","platform_funding_accounts"]; foreach($tables as $table){$q=$pdo->prepare("SELECT to_regclass(?)");$q->execute(["public.".$table]);if(!$q->fetchColumn()){fwrite(STDERR,"Missing table: $table\\n");exit(1);}} $q=$pdo->prepare("SELECT 1 FROM pg_trigger WHERE tgname = ? AND NOT tgisinternal"); $q->execute(["trg_users_updated_at"]); if(!$q->fetchColumn()){fwrite(STDERR,"Missing updated_at trigger\\n");exit(1);} echo "Critical PostgreSQL tables and triggers verified.\\n";'
 
       - name: Run quote and remittance HTTP integration tests
         working-directory: backend
