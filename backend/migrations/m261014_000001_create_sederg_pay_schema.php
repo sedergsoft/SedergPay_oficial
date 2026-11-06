@@ -7,8 +7,8 @@ use yii\db\Migration;
  *
  * Requisitos:
  * - Yii 2.0
- * - MySQL 8.0+
- * - InnoDB, utf8mb4
+ * - PostgreSQL 17
+ * - UTF-8
  *
  * Ejecutar:
  *   php yii migrate --migrationPath=@app/migrations
@@ -37,7 +37,7 @@ class m261014_000001_create_sederg_pay_schema extends Migration
         $this->createTable('{{%currencies}}', [
             'code' => $this->char(3)->notNull(),
             'name' => $this->string(60)->notNull(),
-            'minor_units' => $this->tinyInteger()->notNull()->defaultValue(2),
+            'minor_units' => $this->smallInteger()->notNull()->defaultValue(2),
             'is_active' => $this->boolean()->notNull()->defaultValue(true),
             'created_at' => $this->dateTime()->notNull()->defaultExpression('CURRENT_TIMESTAMP'),
             'PRIMARY KEY (code)',
@@ -457,7 +457,7 @@ class m261014_000001_create_sederg_pay_schema extends Migration
         $this->createIndex('ix_audit_correlation', '{{%audit_logs}}', 'correlation_id');
         $this->addForeignKey('fk_audit_actor', '{{%audit_logs}}', 'actor_user_id', '{{%users}}', 'id', 'SET NULL', 'CASCADE');
 
-        // Restricciones CHECK: aplicadas por MySQL 8.0.16+.
+        // Restricciones CHECK nativas de PostgreSQL.
         $this->execute("ALTER TABLE {{%exchange_rates}} ADD CONSTRAINT chk_exchange_rate_positive CHECK (rate > 0)");
         $this->execute("ALTER TABLE {{%remittance_quotes}} ADD CONSTRAINT chk_quote_amounts CHECK (send_amount > 0 AND receive_amount > 0 AND fee_amount >= 0 AND total_debit_amount > 0)");
         $this->execute("ALTER TABLE {{%remittances}} ADD CONSTRAINT chk_remittance_amounts CHECK (send_amount > 0 AND receive_amount > 0 AND fee_amount >= 0 AND total_debit_amount > 0)");
