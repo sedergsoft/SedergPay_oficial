@@ -2,9 +2,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [main, feature/admin-exchange-rate-source]
+    branches: [main, feature/postgresql-migration]
   push:
-    branches: [feature/user-profile-beneficiaries-kyc, feature/ui-brand-redesign]
+    branches: [feature/postgresql-migration]
   workflow_dispatch:
 
 permissions:
@@ -19,7 +19,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          extensions: bcmath, openssl, pdo_mysql, fileinfo
+          extensions: bcmath, openssl, pdo_pgsql, fileinfo
           coverage: none
       - uses: actions/cache@v4
         with:
@@ -35,19 +35,20 @@ jobs:
         working-directory: backend
         run: vendor/bin/phpunit -c phpunit.xml
 
-  mysql-integration:
-    name: MySQL migrations and schema smoke test
+  postgres-integration:
+    name: PostgreSQL migrations and remittance integration
     runs-on: ubuntu-latest
     services:
-      mysql:
-        image: mysql:8.4
+      postgres:
+        image: postgres:17
         env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: sederg_pay
+          POSTGRES_USER: sederg_app
+          POSTGRES_PASSWORD: root
+          POSTGRES_DB: sederg_pay
         ports:
-          - 3306:3306
+          - 5432:5432
         options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-cmd="pg_isready -U sederg_app -d sederg_pay"
           --health-interval=5s
           --health-timeout=5s
           --health-retries=30
@@ -56,35 +57,35 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          extensions: bcmath, openssl, pdo_mysql, fileinfo
+          extensions: bcmath, openssl, pdo_pgsql, fileinfo
           coverage: none
       - name: Install PHP dependencies
         working-directory: backend
         run: composer install --no-interaction --prefer-dist
-      - name: Apply all Yii migrations against MySQL 8.4
+      - name: Apply all Yii migrations against PostgreSQL 17
         working-directory: backend
         env:
-          SEDERG_DB_DSN: mysql:host=127.0.0.1;port=3306;dbname=sederg_pay
-          SEDERG_DB_USER: root
+          SEDERG_DB_DSN: pgsql:host=127.0.0.1;port=5432;dbname=sederg_pay
+          SEDERG_DB_USER: sederg_app
           SEDERG_DB_PASSWORD: root
         run: |
           php yii migrate --interactive=0
           php yii migrate/down 1 --interactive=0
           php yii migrate --interactive=0
-      - name: Verify critical schema objects
+      - name: Verify critical schema objects and PostgreSQL trigger
         env:
           DB_HOST: 127.0.0.1
-          DB_USER: root
+          DB_USER: sederg_app
           DB_PASSWORD: root
           DB_NAME: sederg_pay
         run: |
-          php -r '$pdo=new PDO("mysql:host=".getenv("DB_HOST").";dbname=".getenv("DB_NAME"),getenv("DB_USER"),getenv("DB_PASSWORD")); $tables=["users","user_profiles","beneficiaries","kyc_cases","kyc_documents","audit_logs","remittances"]; foreach($tables as $table){$q=$pdo->prepare("SHOW TABLES LIKE ?");$q->execute([$table]);if(!$q->fetchColumn()){fwrite(STDERR,"Missing table: $table\\n");exit(1);}} echo "Critical MySQL tables verified.\\n";'
+          php -r '$pdo=new PDO("pgsql:host=".getenv("DB_HOST").";dbname=".getenv("DB_NAME"),getenv("DB_USER"),getenv("DB_PASSWORD")); $tables=["users","user_profiles","beneficiaries","kyc_cases","kyc_documents","audit_logs","remittances","platform_funding_accounts"]; foreach($tables as $table){$q=$pdo->prepare("SELECT to_regclass(?)");$q->execute(["public.".$table]);if(!$q->fetchColumn()){fwrite(STDERR,"Missing table: $table\\n");exit(1);}} $q=$pdo->query("SELECT 1 FROM pg_trigger WHERE tgname = \'trg_users_updated_at\' AND NOT tgisinternal"); if(!$q->fetchColumn()){fwrite(STDERR,"Missing updated_at trigger\\n");exit(1);} echo "Critical PostgreSQL tables and triggers verified.\\n";'
 
       - name: Run quote and remittance HTTP integration tests
         working-directory: backend
         env:
-          SEDERG_DB_DSN: mysql:host=127.0.0.1;port=3306;dbname=sederg_pay
-          SEDERG_DB_USER: root
+          SEDERG_DB_DSN: pgsql:host=127.0.0.1;port=5432;dbname=sederg_pay
+          SEDERG_DB_USER: sederg_app
           SEDERG_DB_PASSWORD: root
           SEDERG_AUTH_MODE: development
           SEDERG_COOKIE_KEY: ci-integration-cookie-key-long-enough-for-tests
@@ -109,7 +110,6 @@ jobs:
       - name: Validate development and production Compose merge
         env:
           SEDERG_DB_PASSWORD: ci-test-db-password
-          SEDERG_MYSQL_ROOT_PASSWORD: ci-test-root-password
           SEDERG_COOKIE_KEY: ci-test-cookie-key-long-enough-for-compose-validation
           SEDERG_PII_KEY: ci-test-pii-key-long-enough-for-compose-validation-0001
           SEDERG_ACCOUNT_ENCRYPTION_KEY: ci-test-account-encryption-key-long-enough-for-compose-validation
