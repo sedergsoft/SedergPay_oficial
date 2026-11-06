@@ -217,7 +217,7 @@ Para activar el backend configura en GitHub:
 
 `DEPLOY_ENV` debe contener el archivo `.env` privado de la VM, incluyendo
 `API_DOMAIN`, `TLS_EMAIL`, `SEDERG_DB_PASSWORD`,
-`SEDERG_MYSQL_ROOT_PASSWORD` y `SEDERG_COOKIE_KEY`. El workflow lo escribe
+`SEDERG_COOKIE_KEY`. El workflow lo escribe
 con permisos privados en `~/sederg-pay/.env`, ejecuta las migraciones y
 publica el backend mediante Caddy en los puertos 80/443. PostgreSQL y Redis no se
 publican en la red externa.
