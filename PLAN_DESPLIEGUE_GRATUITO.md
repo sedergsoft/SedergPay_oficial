@@ -47,7 +47,7 @@ permanente.
 
 Como alternativa de contingencia, Render Free puede alojar el contenedor de la
 API para el sandbox. Su servicio duerme tras inactividad y su disco es
-efímero; por ello requiere una base MySQL-compatible externa y no se considera
+efímero; por ello requiere una base PostgreSQL externa y no se considera
 una plataforma de producción.
 
 ## Fases de ejecución
@@ -67,7 +67,7 @@ una plataforma de producción.
 - Crear un usuario SSH sin usar root.
 - Instalar Docker Engine y Docker Compose.
 - Abrir únicamente SSH restringido y HTTPS.
-- Mantener MySQL y Redis en la red interna de Docker.
+- Mantener PostgreSQL y Redis en la red interna de Docker.
 
 ### F2 — API y persistencia
 
@@ -109,7 +109,7 @@ una plataforma de producción.
 
 ### F6 — Operación mínima
 
-- Backup diario de MySQL.
+- Backup diario de PostgreSQL.
 - Prueba de restauración.
 - Logs sin contraseñas, tokens ni datos bancarios sensibles.
 - Alertas de disponibilidad y cuota.
@@ -141,7 +141,7 @@ DEPLOY_ENV
 
 ```text
 SEDERG_DB_PASSWORD
-SEDERG_MYSQL_ROOT_PASSWORD
+SEDERG_DB_PASSWORD
 SEDERG_COOKIE_KEY
 SEDERG_AUTH_MODE
 SEDERG_OIDC_ISSUER
