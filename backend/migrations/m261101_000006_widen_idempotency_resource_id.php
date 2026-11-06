@@ -14,6 +14,6 @@ class m261101_000006_widen_idempotency_resource_id extends Migration
 
     public function safeDown()
     {
-        $this->alterColumn('{{%idempotency_keys}}', 'resource_id', $this->bigInteger()->unsigned()->null());
+        $this->alterColumn('{{%idempotency_keys}}', 'resource_id', $this->bigInteger()->null());
     }
 }
