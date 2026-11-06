@@ -38,7 +38,7 @@ $userId = $stmt->fetchColumn();
 if (!$userId) {
     $stmt = $pdo->prepare(
         'INSERT INTO users (public_id,email,password_hash,status,preferred_language,email_verified_at)
-         VALUES (?,?,?,?,?,?)'
+         VALUES (?,?,?,?,?,?) RETURNING id'
     );
     $stmt->execute([$userPublicId, 'ci-quote-flow@sederg.invalid', password_hash('CI-only-password', PASSWORD_DEFAULT), 'active', 'es', $now]);
     $userId = (int) $stmt->fetchColumn();
