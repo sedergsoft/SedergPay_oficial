@@ -71,7 +71,7 @@ final class PayoutRepository
             'currency_code' => $remittance['receive_currency'],
             'status' => 'pending',
         ])->execute();
-        return (int) $this->db->getLastInsertID();
+        return (int) $this->db->createCommand("SELECT currval(pg_get_serial_sequence('payout_orders', 'id'))")->queryScalar();
     }
 
     public function complete(array $remittance, string $payoutPublicId, Transaction $transaction): void
@@ -165,7 +165,7 @@ final class PayoutRepository
             'description' => 'Simulated payout',
             'posted_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
         ])->execute();
-        $transactionId = (int) $this->db->getLastInsertID();
+        $transactionId = (int) $this->db->createCommand("SELECT currval(pg_get_serial_sequence('ledger_transactions', 'id'))")->queryScalar();
         foreach ([
             ['ledger-sandbox-funds-' . $suffix, 'debit'],
             ['ledger-sandbox-payout-' . $suffix, 'credit'],
