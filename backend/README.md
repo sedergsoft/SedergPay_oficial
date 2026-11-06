@@ -12,7 +12,7 @@ Esquema inicial para una plataforma de remesas con operaciones en ambos sentidos
 
 ## Instalación
 1. Haga una copia de seguridad y cree una base de datos vacía.
-2. Configure `components['db']` en `config/db.php` con el DSN de MySQL.
+2. Configure `components['db']` en `config/web.php y config/console.php` con el DSN PostgreSQL.
 3. Copie la carpeta `migrations/` a la raíz de la aplicación Yii2 (o configure el `migrationPath`).
 4. Ejecute:
 
