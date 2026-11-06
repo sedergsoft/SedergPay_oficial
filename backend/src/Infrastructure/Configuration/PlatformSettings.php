@@ -124,8 +124,8 @@ final class PlatformSettings
             $manualRateExists = (int) $db->createCommand(
                 'SELECT COUNT(*) FROM {{%exchange_rates}}
                  WHERE base_currency = :base AND quote_currency = :quote
-                   AND source = :source AND valid_from <= UTC_TIMESTAMP()
-                   AND (valid_until IS NULL OR valid_until > UTC_TIMESTAMP())',
+                   AND source = :source AND valid_from <= CURRENT_TIMESTAMP
+                   AND (valid_until IS NULL OR valid_until > CURRENT_TIMESTAMP)',
                 [':base' => 'RUB', ':quote' => 'CUP', ':source' => 'admin_override']
             )->queryScalar();
             if ($manualRateExists === 0) {
