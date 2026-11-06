@@ -30,7 +30,9 @@ jobs:
         working-directory: backend
         run: composer install --no-interaction --prefer-dist
       - name: PHP syntax check
-        run: find backend -path backend/vendor -prune -o -name '*.php' -type f -print0 | xargs -0 -n1 php -l
+        run: |
+          find backend -path backend/vendor -prune -o -name '*.php' -type f -print0 | xargs -0 -n1 php -l
+          php -l scripts/db-migration/migrate-mysql-to-postgres.php
       - name: Run PHPUnit
         working-directory: backend
         run: vendor/bin/phpunit -c phpunit.xml
@@ -107,15 +109,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate development and production Compose merge
+      - name: Validate development, production and migration Compose merges
         env:
           SEDERG_DB_PASSWORD: ci-test-db-password
+          SEDERG_MYSQL_ROOT_PASSWORD: ci-test-mysql-root-password
+          SEDERG_MYSQL_VOLUME: sederg_pay_sederg_mysql_data
           SEDERG_COOKIE_KEY: ci-test-cookie-key-long-enough-for-compose-validation
           SEDERG_PII_KEY: ci-test-pii-key-long-enough-for-compose-validation-0001
           SEDERG_ACCOUNT_ENCRYPTION_KEY: ci-test-account-encryption-key-long-enough-for-compose-validation
           API_DOMAIN: sederg.example.invalid
           TLS_EMAIL: ci@example.invalid
-        run: docker compose -f docker-compose.yml -f docker-compose.production.yml config --quiet
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.production.yml config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.migration.yml --profile migration config --quiet
 
   frontend:
     name: TypeScript and Vite production build
