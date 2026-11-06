@@ -6,7 +6,7 @@ Plataforma de gestión, control y conciliación de remesas Rusia ↔ Cuba.
 
 - Backend: Yii2 sobre PHP 8.3.
 - Frontend: React + TypeScript.
-- Persistencia: MySQL 8.4 LTS, InnoDB y `utf8mb4`.
+- Persistencia: PostgreSQL 17.
 - Integraciones: adaptadores independientes y únicamente en sandbox hasta disponer de autorización contractual.
 - Seguridad: Keycloak/OIDC, MFA, idempotencia, auditoría y ledger inmutable.
 
@@ -54,7 +54,7 @@ secretos o variables de entorno del despliegue.
 
 ## Primer arranque del backend
 
-Requisitos: PHP 8.3+, Composer, MySQL 8.4 y Yii2.
+Requisitos: PHP 8.3+, Composer, PostgreSQL 17 y Yii2.
 
 1. Copiar `.env.example` a `.env` y sustituir todos los valores de ejemplo.
 2. En Windows/PowerShell, inicializar la clave local de cifrado de cuentas antes de arrancar Docker:
@@ -62,7 +62,7 @@ Requisitos: PHP 8.3+, Composer, MySQL 8.4 y Yii2.
    `powershell -ExecutionPolicy Bypass -File .\scripts\Initialize-LocalAccountEncryption.ps1`
 
    El script genera una clave aleatoria independiente de 32 bytes si falta o conserva la existente para no invalidar cuentas ya cifradas. La clave se guarda únicamente en `.env`; nunca la compartas ni la subas a Git. El servicio backend de Docker exige esta variable y no arranca si falta.
-3. Configurar la conexión MySQL mediante variables de entorno; no guardar secretos en el repositorio.
+3. Configurar la conexión PostgreSQL mediante variables de entorno; no guardar secretos en el repositorio.
 4. Ejecutar la migración incluida:
 
    `php yii migrate --migrationPath=@app/migrations`
@@ -83,7 +83,7 @@ docker compose run --rm backend php yii migrate --migrationPath=@app/migrations
 
 ## Arranque completo del MVP sandbox
 
-Define `SEDERG_DB_PASSWORD` y `SEDERG_MYSQL_ROOT_PASSWORD` en `.env` y ejecuta:
+Define `SEDERG_DB_PASSWORD` en `.env` y ejecuta:
 
 ```powershell
 docker compose up --build
@@ -131,10 +131,9 @@ siguiente comando sustituyendo el correo por el de la cuenta registrada; la
 contraseña root se lee desde `.env` y no se guarda en el repositorio:
 
 ```powershell
-$root = ((Get-Content .env | Where-Object { $_ -match '^SEDERG_MYSQL_ROOT_PASSWORD=' }) -split '=',2)[1]
+$dbUser = 'sederg_app'
 $email = 'admin@example.test'
-"UPDATE users SET role='admin' WHERE email='$email';" |
-  docker compose exec -T mysql mysql -uroot "-p$root" sederg_pay
+docker compose exec -T postgres psql -U $dbUser -d sederg_pay -c "UPDATE users SET role='admin' WHERE email='$email';"
 ```
 
 Después de cerrar sesión y volver a entrar, el usuario verá la opción
@@ -220,7 +219,7 @@ Para activar el backend configura en GitHub:
 `API_DOMAIN`, `TLS_EMAIL`, `SEDERG_DB_PASSWORD`,
 `SEDERG_MYSQL_ROOT_PASSWORD` y `SEDERG_COOKIE_KEY`. El workflow lo escribe
 con permisos privados en `~/sederg-pay/.env`, ejecuta las migraciones y
-publica el backend mediante Caddy en los puertos 80/443. MySQL y Redis no se
+publica el backend mediante Caddy en los puertos 80/443. PostgreSQL y Redis no se
 publican en la red externa.
 
 No subas ese archivo al repositorio. Configura `SEDERG_CORS_ORIGINS` con el
@@ -237,6 +236,6 @@ El archivo [`render.yaml`](./render.yaml) permite crear el backend como un
 servicio Docker gratuito en Render. Render Free duerme tras inactividad y su
 disco es efímero, por lo que esta opción es únicamente para el sandbox. No
 uses una base MySQL dentro del contenedor: configura `SEDERG_DB_DSN` hacia una
-base MySQL-compatible persistente y privada, y completa las variables secretas
+base PostgreSQL persistente y privada, y completa las variables secretas
 que Render marca como `sync: false`. El servicio debe quedar en modo
 `development` hasta configurar OIDC/MFA.
