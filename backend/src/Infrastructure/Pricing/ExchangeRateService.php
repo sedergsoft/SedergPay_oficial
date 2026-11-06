@@ -175,8 +175,8 @@ final class ExchangeRateService
              WHERE base_currency = :base
                AND quote_currency = :quote
                AND source = :source
-               AND valid_from <= UTC_TIMESTAMP()
-               AND (valid_until IS NULL OR valid_until > UTC_TIMESTAMP())
+               AND valid_from <= CURRENT_TIMESTAMP
+               AND (valid_until IS NULL OR valid_until > CURRENT_TIMESTAMP)
              ORDER BY valid_from DESC, id DESC
              LIMIT 1',
             [':base' => $base, ':quote' => $quote, ':source' => $source]
@@ -207,8 +207,8 @@ final class ExchangeRateService
              WHERE base_currency = :base
                AND quote_currency = :quote
                AND source IN (:bcc, :cbr)
-               AND valid_from <= UTC_TIMESTAMP()
-               AND (valid_until IS NULL OR valid_until > UTC_TIMESTAMP())
+               AND valid_from <= CURRENT_TIMESTAMP
+               AND (valid_until IS NULL OR valid_until > CURRENT_TIMESTAMP)
              ORDER BY CASE source WHEN :bcc_order THEN 0 ELSE 1 END,
                       valid_from DESC, id DESC
              LIMIT 1',
