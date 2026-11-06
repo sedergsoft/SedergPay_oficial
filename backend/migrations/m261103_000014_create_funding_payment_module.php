@@ -13,14 +13,12 @@ use yii\db\Migration;
  */
 final class m261103_000014_create_funding_payment_module extends Migration
 {
-    private const OPTIONS = 'ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
-
     public function safeUp(): void
     {
         $this->createTable('{{%funding_payment_methods}}', [
             'code' => $this->string(40)->notNull(),
             'name' => $this->string(120)->notNull(),
-            'country_id' => $this->smallInteger()->unsigned()->notNull(),
+            'country_id' => $this->smallInteger()->notNull(),
             'currency_code' => $this->char(3)->notNull(),
             'method_type' => $this->string(30)->notNull(),
             'provider_code' => $this->string(50)->null(),
@@ -29,17 +27,17 @@ final class m261103_000014_create_funding_payment_module extends Migration
             'is_active' => $this->boolean()->notNull()->defaultValue(false),
             'configuration' => $this->json()->null(),
             'created_at' => $this->dateTime()->notNull()->defaultExpression('CURRENT_TIMESTAMP'),
-            'updated_at' => $this->dateTime()->notNull()->defaultExpression('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
+            'updated_at' => $this->dateTime()->notNull()->defaultExpression('CURRENT_TIMESTAMP'),
             'PRIMARY KEY (code)',
-        ], self::OPTIONS);
+        ]);
         $this->createIndex('ix_funding_method_country_active', '{{%funding_payment_methods}}', ['country_id', 'is_active']);
         $this->addForeignKey('fk_funding_method_country', '{{%funding_payment_methods}}', 'country_id', '{{%countries}}', 'id', 'RESTRICT', 'CASCADE');
         $this->addForeignKey('fk_funding_method_currency', '{{%funding_payment_methods}}', 'currency_code', '{{%currencies}}', 'code', 'RESTRICT', 'CASCADE');
 
         $this->createTable('{{%platform_funding_accounts}}', [
-            'id' => $this->bigPrimaryKey()->unsigned(),
+            'id' => $this->bigPrimaryKey(),
             'public_id' => $this->char(36)->notNull(),
-            'country_id' => $this->smallInteger()->unsigned()->notNull(),
+            'country_id' => $this->smallInteger()->notNull(),
             'currency_code' => $this->char(3)->notNull(),
             'bank_code' => $this->string(50)->notNull(),
             'bank_name' => $this->string(120)->notNull(),
@@ -55,11 +53,11 @@ final class m261103_000014_create_funding_payment_module extends Migration
             'valid_from' => $this->dateTime()->null(),
             'valid_until' => $this->dateTime()->null(),
             'notes' => $this->text()->null(),
-            'created_by_user_id' => $this->bigInteger()->unsigned()->null(),
-            'updated_by_user_id' => $this->bigInteger()->unsigned()->null(),
+            'created_by_user_id' => $this->bigInteger()->null(),
+            'updated_by_user_id' => $this->bigInteger()->null(),
             'created_at' => $this->dateTime()->notNull()->defaultExpression('CURRENT_TIMESTAMP'),
-            'updated_at' => $this->dateTime()->notNull()->defaultExpression('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
-        ], self::OPTIONS);
+            'updated_at' => $this->dateTime()->notNull()->defaultExpression('CURRENT_TIMESTAMP'),
+        ]);
         $this->createIndex('ux_platform_funding_account_public', '{{%platform_funding_accounts}}', 'public_id', true);
         $this->createIndex('ix_platform_funding_account_route', '{{%platform_funding_accounts}}', ['country_id', 'currency_code', 'environment', 'status']);
         $this->addForeignKey('fk_platform_funding_account_country', '{{%platform_funding_accounts}}', 'country_id', '{{%countries}}', 'id', 'RESTRICT', 'CASCADE');
@@ -68,20 +66,20 @@ final class m261103_000014_create_funding_payment_module extends Migration
         $this->addForeignKey('fk_platform_funding_account_updater', '{{%platform_funding_accounts}}', 'updated_by_user_id', '{{%users}}', 'id', 'SET NULL', 'CASCADE');
 
         $this->createTable('{{%funding_account_methods}}', [
-            'funding_account_id' => $this->bigInteger()->unsigned()->notNull(),
+            'funding_account_id' => $this->bigInteger()->notNull(),
             'payment_method_code' => $this->string(40)->notNull(),
             'created_at' => $this->dateTime()->notNull()->defaultExpression('CURRENT_TIMESTAMP'),
             'PRIMARY KEY (funding_account_id, payment_method_code)',
-        ], self::OPTIONS);
+        ]);
         $this->addForeignKey('fk_funding_account_methods_account', '{{%funding_account_methods}}', 'funding_account_id', '{{%platform_funding_accounts}}', 'id', 'CASCADE', 'CASCADE');
         $this->addForeignKey('fk_funding_account_methods_method', '{{%funding_account_methods}}', 'payment_method_code', '{{%funding_payment_methods}}', 'code', 'RESTRICT', 'CASCADE');
 
-        $this->addColumn('{{%deposit_requests}}', 'funding_account_id', $this->bigInteger()->unsigned()->null()->after('bank_connection_id'));
-        $this->addColumn('{{%deposit_requests}}', 'funding_method_code', $this->string(40)->null()->after('funding_account_id'));
-        $this->addColumn('{{%deposit_requests}}', 'account_snapshot', $this->json()->null()->after('funding_method_code'));
-        $this->addColumn('{{%deposit_requests}}', 'qr_payload', $this->text()->null()->after('account_snapshot'));
-        $this->addColumn('{{%deposit_requests}}', 'qr_expires_at', $this->dateTime()->null()->after('qr_payload'));
-        $this->addColumn('{{%deposit_requests}}', 'provider_payment_id', $this->string(160)->null()->after('qr_expires_at'));
+        $this->addColumn('{{%deposit_requests}}', 'funding_account_id', $this->bigInteger()->null());
+        $this->addColumn('{{%deposit_requests}}', 'funding_method_code', $this->string(40)->null());
+        $this->addColumn('{{%deposit_requests}}', 'account_snapshot', $this->json()->null());
+        $this->addColumn('{{%deposit_requests}}', 'qr_payload', $this->text()->null());
+        $this->addColumn('{{%deposit_requests}}', 'qr_expires_at', $this->dateTime()->null());
+        $this->addColumn('{{%deposit_requests}}', 'provider_payment_id', $this->string(160)->null());
         $this->createIndex('ux_deposit_provider_payment_id', '{{%deposit_requests}}', 'provider_payment_id', true);
         $this->createIndex('ix_deposit_funding_account', '{{%deposit_requests}}', 'funding_account_id');
         $this->addForeignKey('fk_deposit_funding_account', '{{%deposit_requests}}', 'funding_account_id', '{{%platform_funding_accounts}}', 'id', 'RESTRICT', 'CASCADE');
