@@ -7,7 +7,7 @@ $mysql=null; $pg=null;
 try {
  $mysql=new PDO(getenv('MYSQL_DSN')?:'mysql:host=mysql-source;port=3306;dbname=sederg_pay;charset=utf8mb4',getenv('MYSQL_USER')?:'root',getenv('MYSQL_PASSWORD')?:'', [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC,PDO::MYSQL_ATTR_USE_BUFFERED_QUERY=>false]);
  $pg=new PDO(getenv('PG_DSN')?:'pgsql:host=postgres;port=5432;dbname=sederg_pay',getenv('PG_USER')?:'sederg_app',getenv('PG_PASSWORD')?:'', [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]);
- $found=$mysql->query('SHOW FULL TABLES WHERE Table_type = "BASE TABLE"')->fetchAll(PDO::FETCH_NUM);
+ $found=$mysql->query('SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'')->fetchAll(PDO::FETCH_NUM);
  $tables=array_values(array_filter(array_map(fn($r)=>(string)$r[0],$found),fn($t)=>$t!=='yii_migration')); sort($tables);
  if(!$tables) abortMigration('No MySQL source tables found.');
  $target=$pg->query("SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'")->fetchAll(PDO::FETCH_COLUMN);
@@ -43,6 +43,8 @@ try {
    }
    $insert->execute($values); $count++;
   }
+  $targetCount=(int)$pg->query("SELECT COUNT(*) FROM {$pt}")->fetchColumn();
+  if($targetCount!==$count) abortMigration("Row count mismatch for {$table}: source={$count}, target={$targetCount}.");
   $report[$table]=$count; $total+=$count;
  }
  $ids=$pg->query("SELECT table_name,column_name FROM information_schema.columns WHERE table_schema='public' AND (is_identity='YES' OR column_default LIKE 'nextval(%')")->fetchAll();
