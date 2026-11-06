@@ -9,10 +9,10 @@ return [
     'components' => [
         'db' => [
             'class' => yii\db\Connection::class,
-            'dsn' => getenv('SEDERG_DB_DSN') ?: 'mysql:host=127.0.0.1;dbname=sederg_pay',
-            'username' => getenv('SEDERG_DB_USER') ?: 'root',
+            'dsn' => getenv('SEDERG_DB_DSN') ?: 'pgsql:host=127.0.0.1;port=5432;dbname=sederg_pay',
+            'username' => getenv('SEDERG_DB_USER') ?: 'sederg_app',
             'password' => getenv('SEDERG_DB_PASSWORD') ?: '',
-            'charset' => 'utf8mb4',
+            'charset' => 'utf8',
         ],
         'log' => [
             'class' => yii\log\Dispatcher::class,
