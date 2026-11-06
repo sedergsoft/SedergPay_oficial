@@ -102,7 +102,7 @@ final class ProfileController extends Controller
                 return null;
             }
             $id = $db->createCommand(
-                'SELECT id FROM {{%countries}} WHERE iso2=:code AND is_active=1 LIMIT 1',
+                'SELECT id FROM {{%countries}} WHERE iso2=:code AND is_active = TRUE LIMIT 1',
                 [':code' => strtoupper($code)]
             )->queryScalar();
             return $id === false ? null : (int) $id;
