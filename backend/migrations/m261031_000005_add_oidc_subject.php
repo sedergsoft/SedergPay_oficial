@@ -6,7 +6,7 @@ class m261031_000005_add_oidc_subject extends Migration
 {
     public function safeUp()
     {
-        $this->addColumn('{{%users}}', 'oidc_subject', $this->string(255)->null()->after('public_id'));
+        $this->addColumn('{{%users}}', 'oidc_subject', $this->string(255)->null());
         $this->createIndex('ux_users_oidc_subject', '{{%users}}', 'oidc_subject', true);
     }
 
