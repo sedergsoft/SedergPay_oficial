@@ -99,7 +99,7 @@ final class QuoteRepository
             'expires_at' => (new \DateTimeImmutable($calculated['expires_at']))->format('Y-m-d H:i:s'),
         ])->execute();
 
-        return (int) $this->db->getLastInsertID();
+        return (int) $this->db->createCommand("SELECT currval(pg_get_serial_sequence('remittance_quotes', 'id'))")->queryScalar();
     }
 
     public function saveIdempotency(
