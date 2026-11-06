@@ -69,7 +69,7 @@ final class RegistrationRepository
             'preferred_language' => $payload['preferred_language'] ?? 'es',
             'country_id' => $countryId,
         ])->execute();
-        $userId = (int) $this->db->getLastInsertID();
+        $userId = (int) $this->db->createCommand("SELECT currval(pg_get_serial_sequence('users', 'id'))")->queryScalar();
 
         $this->db->createCommand()->insert('{{%user_profiles}}', [
             'user_id' => $userId,
