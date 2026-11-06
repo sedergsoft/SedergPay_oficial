@@ -1,6 +1,6 @@
 <?php
 
-use yii\\db\\Migration;
+use yii\db\Migration;
 
 /**
  * PostgreSQL equivalent of MySQL's ON UPDATE CURRENT_TIMESTAMP.
