@@ -37,7 +37,7 @@ final class QuoteRepository
     public function findCountryId(string $iso2): ?int
     {
         $id = $this->db->createCommand(
-            'SELECT id FROM {{%countries}} WHERE iso2 = :iso2 AND is_active = 1 LIMIT 1',
+            'SELECT id FROM {{%countries}} WHERE iso2 = :iso2 AND is_active = TRUE LIMIT 1',
             [':iso2' => strtoupper($iso2)]
         )->queryScalar();
 
@@ -47,7 +47,7 @@ final class QuoteRepository
     public function paymentMethodExists(string $code): bool
     {
         return (bool) $this->db->createCommand(
-            'SELECT 1 FROM {{%payment_methods}} WHERE code = :code AND is_active = 1 LIMIT 1',
+            'SELECT 1 FROM {{%payment_methods}} WHERE code = :code AND is_active = TRUE LIMIT 1',
             [':code' => $code]
         )->queryScalar();
     }
