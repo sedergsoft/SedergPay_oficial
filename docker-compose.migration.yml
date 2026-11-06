@@ -1,43 +1,18 @@
 services:
-  mysql-volume-clone:
-    image: alpine:3.22
-    profiles: ["migration"]
-    restart: "no"
-    command:
-      - sh
-      - -ec
-      - |
-        if [ -z "$$(ls -A /legacy-copy 2>/dev/null)" ]; then
-          echo "Cloning stopped MySQL volume into an isolated migration copy..."
-          cp -a /legacy-source/. /legacy-copy/
-          echo "Clone complete."
-        else
-          echo "Migration copy volume already contains data; refusing to overwrite it."
-          exit 1
-        fi
-    volumes:
-      - legacy_mysql_data:/legacy-source:ro
-      - legacy_mysql_migration_copy:/legacy-copy
-
   mysql-source:
     image: mysql:8.4
     profiles: ["migration"]
     restart: "no"
     environment:
       MYSQL_ROOT_PASSWORD: ${SEDERG_MYSQL_ROOT_PASSWORD:?Set the legacy MySQL root password in .env}
-    command: ["--skip-log-bin"]
+    command: ["--read-only=ON", "--skip-log-bin"]
     volumes:
-      - legacy_mysql_migration_copy:/var/lib/mysql
-    depends_on:
-      mysql-volume-clone:
-        condition: service_completed_successfully
+      - legacy_mysql_data:/var/lib/mysql:ro
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$${MYSQL_ROOT_PASSWORD}"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot"]
       interval: 5s
       timeout: 10s
       retries: 30
-      start_period: 30s
-
   db-migrator:
     build:
       context: ./scripts/db-migration
@@ -51,13 +26,9 @@ services:
       PG_USER: ${SEDERG_DB_USER:-sederg_app}
       PG_PASSWORD: ${SEDERG_DB_PASSWORD:?Set SEDERG_DB_PASSWORD in .env}
     depends_on:
-      mysql-source:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-
+      mysql-source: {condition: service_healthy}
+      postgres: {condition: service_healthy}
 volumes:
   legacy_mysql_data:
     external: true
     name: ${SEDERG_MYSQL_VOLUME:-sederg_pay_sederg_mysql_data}
-  legacy_mysql_migration_copy:
