@@ -40,7 +40,7 @@ final class FundingController extends Controller
             'SELECT m.code,m.name,m.method_type,m.provider_code,m.supports_dynamic_qr,m.requires_reference
              FROM {{%funding_payment_methods}} m
              INNER JOIN {{%countries}} c ON c.id=m.country_id
-             WHERE c.iso2=:country AND m.is_active=1
+             WHERE c.iso2=:country AND m.is_active = TRUE
                AND EXISTS (
                  SELECT 1 FROM {{%funding_account_methods}} fam
                  INNER JOIN {{%platform_funding_accounts}} a ON a.id=fam.funding_account_id
@@ -91,7 +91,7 @@ final class FundingController extends Controller
                 throw new UnprocessableEntityHttpException('Configure at least one active SEDERG_PAY sandbox account for this method first');
             }
         }
-        $db->createCommand()->update('{{%funding_payment_methods}}', ['is_active' => (int) $payload['is_active']], ['code' => $code])->execute();
+        $db->createCommand()->update('{{%funding_payment_methods}}', ['is_active' => $payload['is_active']], ['code' => $code])->execute();
         $this->audit($userId, 'funding_method.updated', 'funding_method', $code, ['is_active' => $payload['is_active']]);
         return ['code' => $code, 'is_active' => $payload['is_active']];
     }
@@ -143,7 +143,7 @@ final class FundingController extends Controller
             throw new ServiceUnavailableHttpException('Configure SEDERG_ACCOUNT_ENCRYPTION_KEY (at least 32 characters) before saving bank account details');
         }
         $db = Yii::$app->db;
-        $countryId = $db->createCommand('SELECT id FROM {{%countries}} WHERE iso2=:code AND is_active=1', [':code' => $countryCode])->queryScalar();
+        $countryId = $db->createCommand('SELECT id FROM {{%countries}} WHERE iso2=:code AND is_active = TRUE', [':code' => $countryCode])->queryScalar();
         if (!$countryId) throw new UnprocessableEntityHttpException('Country is not configured');
         $methodParams = [':country' => $countryCode, ':currency' => $currency];
         $methodPlaceholders = [];
@@ -251,7 +251,7 @@ final class FundingController extends Controller
              FROM {{%funding_payment_methods}} m
              INNER JOIN {{%funding_account_methods}} fam ON fam.payment_method_code=m.code
              INNER JOIN {{%platform_funding_accounts}} a ON a.id=fam.funding_account_id
-             WHERE m.code=:method AND m.is_active=1 AND a.status=:status AND a.environment=:env
+             WHERE m.code=:method AND m.is_active = TRUE AND a.status=:status AND a.environment=:env
                AND a.account_holder_name=:holder AND a.currency_code=:currency
                AND (a.valid_from IS NULL OR a.valid_from<=CURRENT_TIMESTAMP)
                AND (a.valid_until IS NULL OR a.valid_until>CURRENT_TIMESTAMP)
@@ -267,7 +267,7 @@ final class FundingController extends Controller
         $qrPayload = null;
         $qrType = 'none';
         $providerPaymentId = null;
-        if ((int) $account['supports_dynamic_qr'] === 1 && $account['method_type'] === 'instant_qr') {
+        if (filter_var($account['supports_dynamic_qr'], FILTER_VALIDATE_BOOLEAN) && $account['method_type'] === 'instant_qr') {
             if ($account['provider_code'] === 'sbp_c2b_sandbox') {
                 $issued = (new FundingPaymentProviderFactory())->create((string) $account['provider_code'], (string) $account['environment'])->createDynamicQr(
                     (string) $remittance['total_debit_amount'],
