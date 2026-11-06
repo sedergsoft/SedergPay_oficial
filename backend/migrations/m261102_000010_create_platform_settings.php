@@ -10,11 +10,11 @@ final class m261102_000010_create_platform_settings extends Migration
             'setting_key' => $this->string(100)->notNull(),
             'setting_value' => $this->string(255)->notNull(),
             'value_type' => $this->string(20)->notNull(),
-            'updated_by_user_id' => $this->bigInteger()->unsigned()->null(),
+            'updated_by_user_id' => $this->bigInteger()->null(),
             'created_at' => $this->dateTime()->notNull()->defaultExpression('CURRENT_TIMESTAMP'),
-            'updated_at' => $this->dateTime()->notNull()->defaultExpression('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
+            'updated_at' => $this->dateTime()->notNull()->defaultExpression('CURRENT_TIMESTAMP'),
             'PRIMARY KEY (setting_key)',
-        ], 'ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+        ]);
         $this->createIndex(
             'ix_platform_settings_updated_by',
             '{{%platform_settings}}',
