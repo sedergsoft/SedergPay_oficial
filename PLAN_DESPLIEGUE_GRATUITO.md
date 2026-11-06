@@ -19,7 +19,7 @@ GitHub Pages
 VM gratuita (Oracle Cloud Always Free u otra VM free elegible)
   ├── Nginx/Caddy + HTTPS
   ├── API Yii2/PHP 8.3
-  ├── MySQL 8.4
+  ├── PostgreSQL 17
   └── Redis
 
 GitHub Actions
@@ -38,7 +38,7 @@ final depende de si la VM puede recibir tráfico en los puertos 80 y 443.
 - No crear recursos AWS, Azure u otro proveedor con facturación activa.
 - Usar una VM Always Free elegible y configurar alertas de consumo.
 - No almacenar secretos en Git ni en el bundle del frontend.
-- Mantener MySQL y Redis sin puertos públicos.
+- Mantener PostgreSQL y Redis sin puertos públicos.
 - Conservar el MVP en sandbox y sin dinero real.
 
 AWS queda documentado como alternativa, pero no es el proveedor base: la cuenta
