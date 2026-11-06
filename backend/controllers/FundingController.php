@@ -188,7 +188,7 @@ final class FundingController extends Controller
                 'environment' => 'sandbox', 'status' => 'active', 'notes' => trim((string) ($p['notes'] ?? '')) ?: null,
                 'created_by_user_id' => $userId, 'updated_by_user_id' => $userId,
             ])->execute();
-            $id = (int) $db->getLastInsertID();
+            $id = (int) $db->createCommand("SELECT currval(pg_get_serial_sequence('platform_funding_accounts', 'id'))")->queryScalar();
             foreach (array_unique($methodRows) as $method) {
                 $db->createCommand()->insert('{{%funding_account_methods}}', ['funding_account_id' => $id, 'payment_method_code' => $method])->execute();
             }
