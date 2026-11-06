@@ -3,12 +3,12 @@
 declare(strict_types=1);
 
 /**
- * MySQL + HTTP integration smoke test for quote and remittance creation.
+ * PostgreSQL + HTTP integration smoke test for quote and remittance creation.
  * Run after migrations, with the Yii development server listening on :8080.
  */
 
-$dsn = getenv('SEDERG_DB_DSN') ?: 'mysql:host=127.0.0.1;dbname=sederg_pay';
-$pdo = new PDO($dsn, getenv('SEDERG_DB_USER') ?: 'root', getenv('SEDERG_DB_PASSWORD') ?: '', [
+$dsn = getenv('SEDERG_DB_DSN') ?: 'pgsql:host=127.0.0.1;port=5432;dbname=sederg_pay';
+$pdo = new PDO($dsn, getenv('SEDERG_DB_USER') ?: 'sederg_app', getenv('SEDERG_DB_PASSWORD') ?: '', [
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
 ]);
@@ -41,7 +41,7 @@ if (!$userId) {
          VALUES (?,?,?,?,?,?)'
     );
     $stmt->execute([$userPublicId, 'ci-quote-flow@sederg.invalid', password_hash('CI-only-password', PASSWORD_DEFAULT), 'active', 'es', $now]);
-    $userId = (int) $pdo->lastInsertId();
+    $userId = (int) $stmt->fetchColumn();
 } else {
     $userId = (int) $userId;
     $pdo->prepare("UPDATE users SET status='active', email_verified_at=? WHERE id=?")->execute([$now, $userId]);
