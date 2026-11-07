@@ -167,7 +167,13 @@ final class AdminController extends Controller
              FROM {{%kyc_cases}} k
              INNER JOIN {{%users}} u ON u.id=k.user_id
              LEFT JOIN {{%user_profiles}} p ON p.user_id=u.id
-             ORDER BY FIELD(k.status, "pending_review", "draft", "rejected", "approved"), k.updated_at DESC
+             ORDER BY CASE k.status
+                        WHEN \'pending_review\' THEN 0
+                        WHEN \'draft\' THEN 1
+                        WHEN \'rejected\' THEN 2
+                        WHEN \'approved\' THEN 3
+                        ELSE 4
+                      END, k.updated_at DESC
              LIMIT 300'
         )->queryAll()];
     }

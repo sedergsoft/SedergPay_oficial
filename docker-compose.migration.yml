@@ -5,14 +5,38 @@ services:
     restart: "no"
     environment:
       MYSQL_ROOT_PASSWORD: ${SEDERG_MYSQL_ROOT_PASSWORD:?Set the legacy MySQL root password in .env}
-    command: ["--read-only=ON", "--skip-log-bin"]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        if [ -f /migration-state/clone-complete ]; then
+          echo "Verified migration copy already exists; reusing it."
+        elif [ -z "$(ls -A /var/lib/mysql 2>/dev/null)" ]; then
+          if [ ! -d /legacy-source/mysql ]; then
+            echo "Legacy source volume does not look like a MySQL datadir; refusing to clone."
+            exit 1
+          fi
+          echo "Cloning stopped MySQL volume into an isolated migration copy..."
+          cp -a /legacy-source/. /var/lib/mysql/
+          chown -R mysql:mysql /var/lib/mysql
+          touch /migration-state/clone-complete
+          echo "Clone complete."
+        else
+          echo "Migration copy is non-empty but has no completion marker; refusing to use a partial copy."
+          exit 1
+        fi
+        exec docker-entrypoint.sh mysqld --skip-log-bin
     volumes:
-      - legacy_mysql_data:/var/lib/mysql:ro
+      - legacy_mysql_data:/legacy-source:ro
+      - legacy_mysql_migration_copy:/var/lib/mysql
+      - legacy_mysql_migration_state:/migration-state
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot"]
       interval: 5s
       timeout: 10s
-      retries: 30
+      retries: 60
+      start_period: 60s
+
   db-migrator:
     build:
       context: ./scripts/db-migration
@@ -32,3 +56,5 @@ volumes:
   legacy_mysql_data:
     external: true
     name: ${SEDERG_MYSQL_VOLUME:-sederg_pay_sederg_mysql_data}
+  legacy_mysql_migration_copy:
+  legacy_mysql_migration_state:

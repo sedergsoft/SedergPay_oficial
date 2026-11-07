@@ -241,7 +241,7 @@ final class ExchangeRateService
         $existing = $this->db->createCommand(
             'SELECT id FROM {{%exchange_rates}}
              WHERE base_currency = :base AND quote_currency = :quote
-               AND source = :source AND DATE(valid_from) = :date LIMIT 1',
+               AND source = :source AND CAST(valid_from AS DATE) = :date LIMIT 1',
             [
                 ':base' => 'RUB',
                 ':quote' => 'CUP',

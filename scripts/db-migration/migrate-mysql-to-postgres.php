@@ -71,7 +71,7 @@ try {
 
     // Yii migrations seed these reference tables. Reconcile them from MySQL by
     // primary key instead of rejecting the non-empty PostgreSQL seed rows.
-    $seedTables = ['countries', 'currencies', 'payment_methods', 'funding_payment_methods'];
+    $seedTables = ['countries', 'currencies', 'payment_methods', 'funding_payment_methods', 'bank_connections', 'ledger_accounts'];
 
     $pg->beginTransaction();
     // Keep explicit source IDs and avoid firing FK/updated_at triggers during bulk load.

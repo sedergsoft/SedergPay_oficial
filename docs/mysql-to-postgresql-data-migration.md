@@ -11,22 +11,27 @@ Procedimiento de importación no destructivo. El volumen MySQL original nunca se
 
 ## PowerShell (Windows)
 
-1. Detener aplicación: `docker compose stop backend rate-updater frontend`.
-2. Confirmar volumen: `docker volume ls`.
-3. Crear backup externo (sustituir el nombre si corresponde):
-   `$mysqlVolume = "sederg_pay_sederg_mysql_data"`
-   `docker run --rm -v "${mysqlVolume}:/source:ro" -v "${PWD}:/backup" alpine:3.22 sh -c "tar czf /backup/sederg_mysql_backup.tar.gz -C /source ."`
-4. Detener el contenedor MySQL antiguo sin borrar el volumen. Obtener nombre con `docker ps -a --filter "name=mysql" --format "{{.Names}}"` y detenerlo con `docker stop <nombre-real>`.
-5. Levantar PostgreSQL: `docker compose up -d postgres` y verificar `docker compose ps postgres`.
-6. Construir el backend PostgreSQL y crear el esquema vacío: `docker compose run --rm --build --no-deps backend php yii migrate --interactive=0`.
-7. Ejecutar migración: `docker compose -f docker-compose.yml -f docker-compose.migration.yml --profile migration up --build --abort-on-container-exit --exit-code-from db-migrator db-migrator`.
-8. Solo si aparece `DATA TRANSFER COMPLETED`, iniciar: `docker compose up -d backend rate-updater frontend`; verificar `docker compose ps`.
+1. Actualiza en `.env` `SEDERG_MYSQL_ROOT_PASSWORD`, `SEDERG_DB_PASSWORD` y, si corresponde, `SEDERG_MYSQL_VOLUME`.
+2. Abre PowerShell en la raíz del repositorio y ejecuta:
 
-No ejecutar `docker compose down -v`, no eliminar `sederg_mysql_data` y no borrar el contenedor antiguo hasta finalizar auditoría.
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\Invoke-MySqlToPostgresMigration.ps1
+```
+
+El script:
+- valida la configuración Docker Compose y comprueba que existe el volumen MySQL;
+- solicita confirmación antes de detener contenedores;
+- detiene los contenedores que utilizan el volumen antiguo y genera un backup comprimido de solo lectura;
+- inicia PostgreSQL, aplica las migraciones Yii y ejecuta la transferencia;
+- solo si el importador termina con `DATA TRANSFER COMPLETED`, levanta todos los servicios y muestra su estado.
+
+Si ya existe un backup externo verificado, puede usarse `-SkipBackup`; no se recomienda omitir el backup inicial.
+
+No ejecutar `docker compose down -v`, no eliminar el volumen MySQL original ni el backup hasta finalizar la auditoría financiera.
 
 ## Qué hace el mecanismo
-1. `mysql-volume-clone` copia el volumen detenido a `legacy_mysql_migration_copy`; el origen se monta `read-only`.
-2. MySQL 8.4 arranca sobre la copia escribible para permitir recuperación InnoDB sin tocar el original.
+1. `mysql-source` copia el volumen detenido a `legacy_mysql_migration_copy` cuando la copia está vacía; el origen se monta `read-only`.
+2. MySQL 8.4 arranca sobre la copia escribible para permitir recuperación InnoDB sin tocar el original. La copia solo se reutiliza si existe su marcador de finalización en `legacy_mysql_migration_state`; si la copia quedó parcial, el contenedor aborta en lugar de iniciar MySQL con datos incompletos.
 3. `db-migrator` transfiere tablas y columnas coincidentes a PostgreSQL dentro de una transacción.
 4. Aborta si falta alguna tabla destino, una columna obligatoria no tiene equivalencia o una tabla destino ya tiene registros.
 5. Conserva IDs, convierte booleanos y fechas cero cuando procede, y reajusta secuencias/identity.
@@ -35,7 +40,7 @@ No ejecutar `docker compose down -v`, no eliminar `sederg_mysql_data` y no borra
 El migrador requiere un rol PostgreSQL con privilegio para ejecutar `SET session_replication_role`.
 
 ## Reintentos
-La importación no sobrescribe tablas destino. Si falla, revisa logs. La transacción debe revertirse completa. La copia temporal solo debe recrearse después de verificar que el volumen original y el backup están intactos. Si se elimina, borrar únicamente `<proyecto>_legacy_mysql_migration_copy`, nunca el volumen original.
+La importación no sobrescribe tablas destino. Si falla, revisa logs. La transacción debe revertirse completa. La copia temporal solo debe recrearse después de verificar que el volumen original y el backup están intactos. Si se elimina, borrar únicamente `<proyecto>_legacy_mysql_migration_copy` y `<proyecto>_legacy_mysql_migration_state`, nunca el volumen original.
 
 ## Validación posterior obligatoria
 Comparar recuentos de todas las tablas con el informe; revisar usuarios, beneficiarios, cotizaciones, remesas, depósitos, pagos, ledger, conciliaciones, KYC, documentos y auditoría. Ejecutar flujos RU-CU y CU-RU, idempotencia, comisión, estados y conciliación. Mantener MySQL y su backup intactos hasta completar la auditoría.
