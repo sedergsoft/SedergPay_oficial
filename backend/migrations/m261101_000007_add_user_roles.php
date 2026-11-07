@@ -9,7 +9,7 @@ class m261101_000007_add_user_roles extends Migration
 {
     public function safeUp()
     {
-        $this->addColumn('{{%users}}', 'role', $this->string(20)->notNull()->defaultValue('customer')->after('status'));
+        $this->addColumn('{{%users}}', 'role', $this->string(20)->notNull()->defaultValue('customer'));
         $this->createIndex('ix_users_role_created', '{{%users}}', ['role', 'created_at']);
     }
 

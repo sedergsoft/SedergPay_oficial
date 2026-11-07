@@ -1,18 +1,18 @@
-# SEDERG_PAY — Modelo físico MySQL y migración Yii2
+# SEDERG_PAY — Modelo físico PostgreSQL y migración Yii2
 
 ## Alcance
 Esquema inicial para una plataforma de remesas con operaciones en ambos sentidos, catálogo de beneficiarios y modalidades de pago, cotizaciones, órdenes de remesa, controles de cumplimiento, integración con bancos rusos (Sberbank, VTB y Alfa-Bank), recepción de notificaciones, importación/consulta de movimientos, conciliación y registro contable idempotente.
 
 ## Requisitos
 - Yii 2.0 (basic o advanced).
-- MySQL 8.0.16 o superior (para aplicar las restricciones `CHECK`).
-- InnoDB y `utf8mb4`.
+- PostgreSQL 17 (para aplicar las restricciones `CHECK`).
+- UTF-8.
 - Extensión PHP `bcmath` para validar saldos de doble partida sin pérdida de precisión.
 - PHP compatible con la versión de Yii2 instalada.
 
 ## Instalación
 1. Haga una copia de seguridad y cree una base de datos vacía.
-2. Configure `components['db']` en `config/db.php` con el DSN de MySQL.
+2. Configure `components['db']` en `config/web.php` y `config/console.php` con el DSN PostgreSQL.
 3. Copie la carpeta `migrations/` a la raíz de la aplicación Yii2 (o configure el `migrationPath`).
 4. Ejecute:
 

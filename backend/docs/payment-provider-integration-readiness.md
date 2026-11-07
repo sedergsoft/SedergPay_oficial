@@ -52,7 +52,7 @@ No incluir en Git ni en documentación compartida secretos, tokens, contraseñas
 ## 5. Reglas de seguridad y contabilidad
 
 - HTTPS/TLS; validar certificados y hostname.
-- Secretos en variables de entorno protegidas o secret manager, nunca en MySQL ni repositorio.
+- Secretos en variables de entorno protegidas o secret manager, nunca en PostgreSQL ni repositorio.
 - Verificar criptográficamente la firma del webhook conforme al contrato real. No inventar algoritmos.
 - Validar timestamp/nonce y proteger contra replay.
 - Registrar eventos con acceso restringido y redacción de datos sensibles.

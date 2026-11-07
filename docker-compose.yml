@@ -4,15 +4,12 @@ services:
       context: ./frontend
       args:
         VITE_AUTH_MODE: ${VITE_AUTH_MODE:-development}
-    ports:
-      - "5173:80"
-    depends_on:
-      - backend
+    ports: ["5173:80"]
+    depends_on: [backend]
   backend:
-    build:
-      context: ./backend
+    build: {context: ./backend}
     environment:
-      SEDERG_DB_DSN: mysql:host=mysql;dbname=sederg_pay
+      SEDERG_DB_DSN: ${SEDERG_DB_DSN:-pgsql:host=postgres;port=5432;dbname=sederg_pay}
       SEDERG_DB_USER: ${SEDERG_DB_USER:-sederg_app}
       SEDERG_DB_PASSWORD: ${SEDERG_DB_PASSWORD:?SEDERG_DB_PASSWORD is required}
       SEDERG_AUTH_MODE: ${SEDERG_AUTH_MODE:-development}
@@ -37,67 +34,54 @@ services:
       SEDERG_OIDC_PUBLIC_KEY: ${SEDERG_OIDC_PUBLIC_KEY:-}
       SEDERG_CORS_ORIGINS: ${SEDERG_CORS_ORIGINS:-http://localhost:5173}
     depends_on:
-      mysql:
-        condition: service_healthy
-      clamav:
-        condition: service_healthy
-    ports:
-      - "8080:8080"
+      postgres: {condition: service_healthy}
+      clamav: {condition: service_healthy}
+    ports: ["8080:8080"]
     volumes:
       - ./backend:/app
       - sederg_private_data:/var/lib/sederg-private
-    command: ["php", "yii", "serve", "0.0.0.0:8080", "--docroot=web"]
+    command: ["php","yii","serve","0.0.0.0:8080","--docroot=web"]
   clamav:
     image: clamav/clamav:stable
     restart: unless-stopped
-    volumes:
-      - clamav_database:/var/lib/clamav
+    volumes: [clamav_database:/var/lib/clamav]
     healthcheck:
-      test: ["CMD-SHELL", "clamdscan --ping=3"]
+      test: ["CMD-SHELL","clamdscan --ping=3"]
       interval: 30s
       timeout: 10s
       retries: 10
       start_period: 120s
-
   rate-updater:
-    build:
-      context: ./backend
+    build: {context: ./backend}
     environment:
-      SEDERG_DB_DSN: mysql:host=mysql;dbname=sederg_pay
+      SEDERG_DB_DSN: ${SEDERG_DB_DSN:-pgsql:host=postgres;port=5432;dbname=sederg_pay}
       SEDERG_DB_USER: ${SEDERG_DB_USER:-sederg_app}
       SEDERG_DB_PASSWORD: ${SEDERG_DB_PASSWORD:?SEDERG_DB_PASSWORD is required}
     depends_on:
-      mysql:
-        condition: service_healthy
-    command: ["sh", "-c", "while true; do php yii rates/update || echo 'Exchange-rate refresh failed; retrying tomorrow.' >&2; sleep 43200; done"]
+      postgres: {condition: service_healthy}
+    command: ["sh","-c","while true; do php yii rates/update || echo 'Exchange-rate refresh failed' >&2; sleep 43200; done"]
     restart: unless-stopped
-
-  mysql:
-    image: mysql:8.4
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
     environment:
-      MYSQL_DATABASE: sederg_pay
-      MYSQL_USER: ${SEDERG_DB_USER:-sederg_app}
-      MYSQL_PASSWORD: ${SEDERG_DB_PASSWORD:?SEDERG_DB_PASSWORD is required}
-      MYSQL_ROOT_PASSWORD: ${SEDERG_MYSQL_ROOT_PASSWORD:?SEDERG_MYSQL_ROOT_PASSWORD is required}
-    ports:
-      - "3306:3306"
-    volumes:
-      - sederg_mysql_data:/var/lib/mysql
+      POSTGRES_DB: sederg_pay
+      POSTGRES_USER: ${SEDERG_DB_USER:-sederg_app}
+      POSTGRES_PASSWORD: ${SEDERG_DB_PASSWORD:?SEDERG_DB_PASSWORD is required}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports: ["${SEDERG_DB_PORT:-5432}:5432"]
+    volumes: [sederg_postgres_data:/var/lib/postgresql/data]
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$${MYSQL_ROOT_PASSWORD}"]
+      test: ["CMD-SHELL","pg_isready -U ${SEDERG_DB_USER:-sederg_app} -d sederg_pay"]
       interval: 5s
       timeout: 5s
       retries: 20
-
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - sederg_redis_data:/data
-
+    ports: ["6379:6379"]
+    volumes: [sederg_redis_data:/data]
 volumes:
-  sederg_mysql_data:
+  sederg_postgres_data:
   sederg_redis_data:
   sederg_private_data:
   clamav_database:

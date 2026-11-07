@@ -17,7 +17,7 @@ final class QuoteRepository
     public function findIdempotency(string $scope, string $key): ?array
     {
         $row = $this->db->createCommand(
-            'SELECT * FROM {{%idempotency_keys}} WHERE scope = :scope AND idempotency_key = :key AND (expires_at IS NULL OR expires_at > UTC_TIMESTAMP()) LIMIT 1',
+            'SELECT * FROM {{%idempotency_keys}} WHERE scope = :scope AND idempotency_key = :key AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1',
             [':scope' => $scope, ':key' => $key]
         )->queryOne();
 
@@ -37,7 +37,7 @@ final class QuoteRepository
     public function findCountryId(string $iso2): ?int
     {
         $id = $this->db->createCommand(
-            'SELECT id FROM {{%countries}} WHERE iso2 = :iso2 AND is_active = 1 LIMIT 1',
+            'SELECT id FROM {{%countries}} WHERE iso2 = :iso2 AND is_active = TRUE LIMIT 1',
             [':iso2' => strtoupper($iso2)]
         )->queryScalar();
 
@@ -47,7 +47,7 @@ final class QuoteRepository
     public function paymentMethodExists(string $code): bool
     {
         return (bool) $this->db->createCommand(
-            'SELECT 1 FROM {{%payment_methods}} WHERE code = :code AND is_active = 1 LIMIT 1',
+            'SELECT 1 FROM {{%payment_methods}} WHERE code = :code AND is_active = TRUE LIMIT 1',
             [':code' => $code]
         )->queryScalar();
     }
@@ -99,7 +99,7 @@ final class QuoteRepository
             'expires_at' => (new \DateTimeImmutable($calculated['expires_at']))->format('Y-m-d H:i:s'),
         ])->execute();
 
-        return (int) $this->db->getLastInsertID();
+        return (int) $this->db->createCommand("SELECT currval(pg_get_serial_sequence('remittance_quotes', 'id'))")->queryScalar();
     }
 
     public function saveIdempotency(

@@ -149,7 +149,7 @@ final class KycController extends Controller
                     'user_id' => $userId,
                     'status' => 'draft',
                 ])->execute();
-                $caseId = (int) $db->getLastInsertID();
+                $caseId = (int) $db->createCommand("SELECT currval(pg_get_serial_sequence('kyc_cases', 'id'))")->queryScalar();
             } else {
                 $caseId = (int) $case['id'];
             }

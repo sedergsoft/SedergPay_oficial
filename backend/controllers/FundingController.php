@@ -40,14 +40,14 @@ final class FundingController extends Controller
             'SELECT m.code,m.name,m.method_type,m.provider_code,m.supports_dynamic_qr,m.requires_reference
              FROM {{%funding_payment_methods}} m
              INNER JOIN {{%countries}} c ON c.id=m.country_id
-             WHERE c.iso2=:country AND m.is_active=1
+             WHERE c.iso2=:country AND m.is_active = TRUE
                AND EXISTS (
                  SELECT 1 FROM {{%funding_account_methods}} fam
                  INNER JOIN {{%platform_funding_accounts}} a ON a.id=fam.funding_account_id
                  WHERE fam.payment_method_code=m.code AND a.status=:active
                    AND a.environment=:environment AND a.account_holder_name=:holder AND a.currency_code=m.currency_code AND a.country_id=m.country_id
-                   AND (a.valid_from IS NULL OR a.valid_from<=UTC_TIMESTAMP())
-                   AND (a.valid_until IS NULL OR a.valid_until>UTC_TIMESTAMP())
+                   AND (a.valid_from IS NULL OR a.valid_from<=CURRENT_TIMESTAMP)
+                   AND (a.valid_until IS NULL OR a.valid_until>CURRENT_TIMESTAMP)
                )
              ORDER BY m.name',
             [':country' => $country, ':active' => 'active', ':environment' => 'sandbox', ':holder' => 'SEDERG_PAY']
@@ -91,7 +91,7 @@ final class FundingController extends Controller
                 throw new UnprocessableEntityHttpException('Configure at least one active SEDERG_PAY sandbox account for this method first');
             }
         }
-        $db->createCommand()->update('{{%funding_payment_methods}}', ['is_active' => (int) $payload['is_active']], ['code' => $code])->execute();
+        $db->createCommand()->update('{{%funding_payment_methods}}', ['is_active' => $payload['is_active']], ['code' => $code])->execute();
         $this->audit($userId, 'funding_method.updated', 'funding_method', $code, ['is_active' => $payload['is_active']]);
         return ['code' => $code, 'is_active' => $payload['is_active']];
     }
@@ -103,7 +103,7 @@ final class FundingController extends Controller
             'SELECT a.public_id,a.country_id,c.iso2 AS country_code,a.currency_code,a.bank_code,a.bank_name,
                     a.account_holder_name,a.legal_entity_name,a.account_type,a.account_mask,a.routing_mask,
                     a.environment,a.status,a.valid_from,a.valid_until,a.notes,a.created_at,a.updated_at,
-                    GROUP_CONCAT(fam.payment_method_code ORDER BY fam.payment_method_code) AS methods
+                    STRING_AGG(fam.payment_method_code, ',' ORDER BY fam.payment_method_code) AS methods
              FROM {{%platform_funding_accounts}} a
              INNER JOIN {{%countries}} c ON c.id=a.country_id
              LEFT JOIN {{%funding_account_methods}} fam ON fam.funding_account_id=a.id
@@ -143,7 +143,7 @@ final class FundingController extends Controller
             throw new ServiceUnavailableHttpException('Configure SEDERG_ACCOUNT_ENCRYPTION_KEY (at least 32 characters) before saving bank account details');
         }
         $db = Yii::$app->db;
-        $countryId = $db->createCommand('SELECT id FROM {{%countries}} WHERE iso2=:code AND is_active=1', [':code' => $countryCode])->queryScalar();
+        $countryId = $db->createCommand('SELECT id FROM {{%countries}} WHERE iso2=:code AND is_active = TRUE', [':code' => $countryCode])->queryScalar();
         if (!$countryId) throw new UnprocessableEntityHttpException('Country is not configured');
         $methodParams = [':country' => $countryCode, ':currency' => $currency];
         $methodPlaceholders = [];
@@ -188,7 +188,7 @@ final class FundingController extends Controller
                 'environment' => 'sandbox', 'status' => 'active', 'notes' => trim((string) ($p['notes'] ?? '')) ?: null,
                 'created_by_user_id' => $userId, 'updated_by_user_id' => $userId,
             ])->execute();
-            $id = (int) $db->getLastInsertID();
+            $id = (int) $db->createCommand("SELECT currval(pg_get_serial_sequence('platform_funding_accounts', 'id'))")->queryScalar();
             foreach (array_unique($methodRows) as $method) {
                 $db->createCommand()->insert('{{%funding_account_methods}}', ['funding_account_id' => $id, 'payment_method_code' => $method])->execute();
             }
@@ -240,7 +240,7 @@ final class FundingController extends Controller
         if ($remittance['status'] !== 'awaiting_payment') throw new UnprocessableEntityHttpException('Remittance is not awaiting payment');
         $scope = "funding:deposit:user:{$userId}";
         $hash = hash('sha256', $publicId . '|' . $methodCode);
-        $existing = $db->createCommand('SELECT request_hash,response_body FROM {{%idempotency_keys}} WHERE scope=:scope AND idempotency_key=:key AND (expires_at IS NULL OR expires_at>UTC_TIMESTAMP())', [':scope' => $scope, ':key' => $key])->queryOne();
+        $existing = $db->createCommand('SELECT request_hash,response_body FROM {{%idempotency_keys}} WHERE scope=:scope AND idempotency_key=:key AND (expires_at IS NULL OR expires_at>CURRENT_TIMESTAMP)', [':scope' => $scope, ':key' => $key])->queryOne();
         if ($existing) {
             if (!hash_equals($existing['request_hash'], $hash)) throw new ConflictHttpException('Idempotency-Key was already used with another request');
             return json_decode($existing['response_body'], true, 512, JSON_THROW_ON_ERROR);
@@ -251,10 +251,10 @@ final class FundingController extends Controller
              FROM {{%funding_payment_methods}} m
              INNER JOIN {{%funding_account_methods}} fam ON fam.payment_method_code=m.code
              INNER JOIN {{%platform_funding_accounts}} a ON a.id=fam.funding_account_id
-             WHERE m.code=:method AND m.is_active=1 AND a.status=:status AND a.environment=:env
+             WHERE m.code=:method AND m.is_active = TRUE AND a.status=:status AND a.environment=:env
                AND a.account_holder_name=:holder AND a.currency_code=:currency
-               AND (a.valid_from IS NULL OR a.valid_from<=UTC_TIMESTAMP())
-               AND (a.valid_until IS NULL OR a.valid_until>UTC_TIMESTAMP())
+               AND (a.valid_from IS NULL OR a.valid_from<=CURRENT_TIMESTAMP)
+               AND (a.valid_until IS NULL OR a.valid_until>CURRENT_TIMESTAMP)
              ORDER BY a.updated_at DESC LIMIT 1',
             [':method' => $methodCode, ':status' => 'active', ':env' => 'sandbox', ':holder' => 'SEDERG_PAY', ':currency' => $remittance['send_currency']]
         )->queryOne();
@@ -267,7 +267,7 @@ final class FundingController extends Controller
         $qrPayload = null;
         $qrType = 'none';
         $providerPaymentId = null;
-        if ((int) $account['supports_dynamic_qr'] === 1 && $account['method_type'] === 'instant_qr') {
+        if (filter_var($account['supports_dynamic_qr'], FILTER_VALIDATE_BOOLEAN) && $account['method_type'] === 'instant_qr') {
             if ($account['provider_code'] === 'sbp_c2b_sandbox') {
                 $issued = (new FundingPaymentProviderFactory())->create((string) $account['provider_code'], (string) $account['environment'])->createDynamicQr(
                     (string) $remittance['total_debit_amount'],
@@ -304,7 +304,7 @@ final class FundingController extends Controller
         ];
         $tx = $db->beginTransaction();
         try {
-            $active = (int) $db->createCommand("SELECT COUNT(*) FROM {{%deposit_requests}} WHERE remittance_id=:id AND status IN ('pending','confirmed') AND (expires_at IS NULL OR expires_at>UTC_TIMESTAMP())", [':id' => $remittance['id']])->queryScalar();
+            $active = (int) $db->createCommand("SELECT COUNT(*) FROM {{%deposit_requests}} WHERE remittance_id=:id AND status IN ('pending','confirmed') AND (expires_at IS NULL OR expires_at>CURRENT_TIMESTAMP)", [':id' => $remittance['id']])->queryScalar();
             if ($active > 0) throw new ConflictHttpException('An active payment instruction already exists for this remittance');
             $db->createCommand()->insert('{{%deposit_requests}}', [
                 'public_id' => $depositId, 'remittance_id' => $remittance['id'], 'bank_connection_id' => (int) $connectionId,

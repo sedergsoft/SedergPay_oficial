@@ -17,7 +17,7 @@ final class RemittanceRepository
     public function findIdempotency(string $scope, string $key): ?array
     {
         $row = $this->db->createCommand(
-            'SELECT * FROM {{%idempotency_keys}} WHERE scope = :scope AND idempotency_key = :key AND (expires_at IS NULL OR expires_at > UTC_TIMESTAMP()) LIMIT 1',
+            'SELECT * FROM {{%idempotency_keys}} WHERE scope = :scope AND idempotency_key = :key AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1',
             [':scope' => $scope, ':key' => $key]
         )->queryOne();
 
@@ -150,7 +150,7 @@ final class RemittanceRepository
             'compliance_status' => 'pending',
             'metadata' => new JsonExpression($metadata),
         ])->execute();
-        $remittanceId = (int) $this->db->getLastInsertID();
+        $remittanceId = (int) $this->db->createCommand("SELECT currval(pg_get_serial_sequence('remittances', 'id'))")->queryScalar();
 
         $this->db->createCommand()->insert('{{%remittance_state_events}}', [
             'remittance_id' => $remittanceId,

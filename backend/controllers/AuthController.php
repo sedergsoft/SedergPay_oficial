@@ -86,7 +86,7 @@ final class AuthController extends Controller
         $token = Yii::$app->db->createCommand(
             'SELECT id FROM {{%email_verification_tokens}}
              WHERE user_id = :user_id AND token_hash = :token_hash
-               AND consumed_at IS NULL AND expires_at > UTC_TIMESTAMP()
+               AND consumed_at IS NULL AND expires_at > CURRENT_TIMESTAMP
              ORDER BY created_at DESC LIMIT 1',
             [':user_id' => $user['id'], ':token_hash' => hash('sha256', strtolower($payload['token']))]
         )->queryOne();

@@ -17,7 +17,7 @@ gates jurídicos, contractuales, regulatorios y operativos.
 |---|---|
 | Backend | Yii2 / PHP 8.3 |
 | Frontend | React + TypeScript |
-| Base de datos | MySQL 8.4 LTS / InnoDB / utf8mb4 |
+| Base de datos | PostgreSQL 17 |
 | API | REST/JSON versionada |
 | Identidad | Keycloak/OIDC y MFA; no se implementará autenticación propia |
 | Integraciones | Adaptadores desacoplados, inicialmente simulados |
@@ -29,7 +29,7 @@ gates jurídicos, contractuales, regulatorios y operativos.
 
 - Los documentos maestro, funcional y el PDF DER todavía declaran PostgreSQL; quedan
   como referencias de diseño históricas. El documento de plan, el modelo físico y la
-  implementación activa usan MySQL.
+  implementación activa usan PostgreSQL.
 - El DER conceptual incluye más entidades que la migración Yii2 actual, en especial
   `ledger_transactions`, `ledger_entries`, tesorería, compensación, soporte,
   notificaciones y configuración. No se deben presentar como implementadas.
@@ -45,15 +45,15 @@ gates jurídicos, contractuales, regulatorios y operativos.
 ### F0–F1 — Base controlada (implementación iniciada)
 
 - Inventariar documentación y contradicciones.
-- Marcar PostgreSQL como legado y usar MySQL como línea base activa.
+- Adoptar PostgreSQL 17 como motor de persistencia de la plataforma.
 - Materializar el paquete Yii2 inicial en `backend/`.
 - Mantener una única migración autoritativa.
 - Añadir consentimiento, eventos de estado, outbox y doble partida explícita.
-- Añadir entorno local reproducible con MySQL 8.4 y Redis.
+- Añadir entorno local reproducible con PostgreSQL 17 y Redis.
 - Publicar reglas de dominio para transiciones y equilibrio contable.
 
 **Progreso:** migración incremental, `docker-compose.yml`, contrato OpenAPI y reglas de
-dominio implementados. Falta ejecutar la migración en una instancia MySQL 8.4 y completar
+dominio implementados. Falta ejecutar la migración en una instancia PostgreSQL 17 y completar
 la instalación de dependencias con PHP 8.3.
 
 **Salida:** estructura reproducible, controles financieros iniciales y decisión técnica registrada.
@@ -105,7 +105,7 @@ la instalación de dependencias con PHP 8.3.
 ## Backlog inmediato
 
 1. Crear la aplicación Yii2 ejecutable alrededor de la migración existente.
-2. Auditar la migración sobre MySQL 8.4 limpio y corregir incompatibilidades.
+2. Auditar la migración sobre PostgreSQL 17 limpio y corregir incompatibilidades.
 3. Definir estados y contratos OpenAPI del flujo sandbox.
 4. Implementar la primera operación de negocio: crear y consultar cotizaciones.
 5. Añadir pruebas de idempotencia y autorización.
@@ -122,7 +122,7 @@ la instalación de dependencias con PHP 8.3.
 - Flujo validado: registro → beneficiario → cotización → remesa → depósito
   simulado → cumplimiento → payout simulado → ledger → conciliación.
 - Frontend React/TypeScript compilado para producción.
-- Docker Compose validado con frontend, backend, MySQL y Redis.
+- Docker Compose validado con frontend, backend, PostgreSQL y Redis.
 - Health check disponible en `GET /health`.
 - No se habilita dinero real, banca productiva ni autenticación de desarrollo
   como sustituto de OIDC.
@@ -140,7 +140,7 @@ la instalación de dependencias con PHP 8.3.
 
 El plan operativo de publicación está documentado en
 [`PLAN_DESPLIEGUE_GRATUITO.md`](./PLAN_DESPLIEGUE_GRATUITO.md). La arquitectura
-base usa GitHub Pages para el frontend y una VM free elegible para API, MySQL y
+base usa GitHub Pages para el frontend y una VM free elegible para API, PostgreSQL y
 Redis. AWS queda como alternativa, no como dependencia, porque la cuenta
 actual no tiene EC2 habilitado.
 
@@ -148,7 +148,7 @@ actual no tiene EC2 habilitado.
 
 - Flujo E2E ejecutable con datos reales introducidos por clientes y proveedores simulados.
 - Consentimiento, minimización, cifrado y acceso por rol para datos personales.
-- Migraciones reproducibles en MySQL 8.4.
+- Migraciones reproducibles en PostgreSQL 17.
 - API versionada con validación de entrada y autorización backend.
 - Idempotencia probada ante reintentos y duplicados.
 - Auditoría de acciones críticas.

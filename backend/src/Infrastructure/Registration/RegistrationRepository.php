@@ -19,7 +19,7 @@ final class RegistrationRepository
     public function findIdempotency(string $scope, string $key): ?array
     {
         $row = $this->db->createCommand(
-            'SELECT * FROM {{%idempotency_keys}} WHERE scope = :scope AND idempotency_key = :key AND (expires_at IS NULL OR expires_at > UTC_TIMESTAMP()) LIMIT 1',
+            'SELECT * FROM {{%idempotency_keys}} WHERE scope = :scope AND idempotency_key = :key AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1',
             [':scope' => $scope, ':key' => $key]
         )->queryOne();
 
@@ -43,7 +43,7 @@ final class RegistrationRepository
     public function countryId(string $iso2): ?int
     {
         $id = $this->db->createCommand(
-            'SELECT id FROM {{%countries}} WHERE iso2 = :iso2 AND is_active = 1 LIMIT 1',
+            'SELECT id FROM {{%countries}} WHERE iso2 = :iso2 AND is_active = TRUE LIMIT 1',
             [':iso2' => $iso2]
         )->queryScalar();
 
@@ -69,7 +69,7 @@ final class RegistrationRepository
             'preferred_language' => $payload['preferred_language'] ?? 'es',
             'country_id' => $countryId,
         ])->execute();
-        $userId = (int) $this->db->getLastInsertID();
+        $userId = (int) $this->db->createCommand("SELECT currval(pg_get_serial_sequence('users', 'id'))")->queryScalar();
 
         $this->db->createCommand()->insert('{{%user_profiles}}', [
             'user_id' => $userId,

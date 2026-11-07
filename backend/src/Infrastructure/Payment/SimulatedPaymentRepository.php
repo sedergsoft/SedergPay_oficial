@@ -63,7 +63,7 @@ final class SimulatedPaymentRepository
     public function findIdempotency(string $scope, string $key): ?array
     {
         $row = $this->db->createCommand(
-            'SELECT * FROM {{%idempotency_keys}} WHERE scope = :scope AND idempotency_key = :key AND (expires_at IS NULL OR expires_at > UTC_TIMESTAMP()) LIMIT 1',
+            'SELECT * FROM {{%idempotency_keys}} WHERE scope = :scope AND idempotency_key = :key AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP) LIMIT 1',
             [':scope' => $scope, ':key' => $key]
         )->queryOne();
         return $row === false ? null : $row;
@@ -81,7 +81,7 @@ final class SimulatedPaymentRepository
         $activeDeposit = (int) $this->db->createCommand(
             "SELECT COUNT(*) FROM {{%deposit_requests}}
              WHERE remittance_id = :remittance_id AND status IN ('pending', 'confirmed')
-               AND (expires_at IS NULL OR expires_at > UTC_TIMESTAMP())",
+               AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)",
             [':remittance_id' => $remittance['id']]
         )->queryScalar();
         if ($activeDeposit > 0) {
@@ -104,7 +104,7 @@ final class SimulatedPaymentRepository
             'status' => 'pending',
             'expires_at' => (new \DateTimeImmutable('+24 hours'))->format('Y-m-d H:i:s'),
         ])->execute();
-        return (int) $this->db->getLastInsertID();
+        return (int) $this->db->createCommand("SELECT currval(pg_get_serial_sequence('deposit_requests', 'id'))")->queryScalar();
     }
 
     public function confirmDeposit(
@@ -143,7 +143,7 @@ final class SimulatedPaymentRepository
             'raw_payload' => new JsonExpression(['simulated' => true]),
             'source' => 'simulator',
         ])->execute();
-        $transactionId = (int) $this->db->getLastInsertID();
+        $transactionId = (int) $this->db->createCommand("SELECT currval(pg_get_serial_sequence('bank_transactions', 'id'))")->queryScalar();
         $this->db->createCommand()->update('{{%deposit_requests}}', [
             'status' => 'confirmed',
             'matched_transaction_id' => $transactionId,
@@ -191,7 +191,7 @@ final class SimulatedPaymentRepository
             'description' => 'Simulated deposit',
             'posted_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
         ])->execute();
-        $transactionId = (int) $this->db->getLastInsertID();
+        $transactionId = (int) $this->db->createCommand("SELECT currval(pg_get_serial_sequence('ledger_transactions', 'id'))")->queryScalar();
         foreach ([
             ['ledger-sandbox-funds-' . $suffix, 'debit'],
             ['ledger-sandbox-deposits-' . $suffix, 'credit'],

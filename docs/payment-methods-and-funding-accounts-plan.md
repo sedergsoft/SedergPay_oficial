@@ -107,7 +107,7 @@ Cambiar la cuenta desde administración afectará solo a depósitos nuevos; las 
 
 ## Implementación realizada en esta rama
 
-- Migración MySQL única `m261103_000014_create_funding_payment_module`: catálogo de métodos de fondeo, cuentas receptoras SEDERG_PAY, relación cuenta-método e instantánea de cuenta/QR en depósitos. Se eliminó una migración duplicada con el mismo número.
+- Migración PostgreSQL única `m261103_000014_create_funding_payment_module`: catálogo de métodos de fondeo, cuentas receptoras SEDERG_PAY, relación cuenta-método e instantánea de cuenta/QR en depósitos. Se eliminó una migración duplicada con el mismo número.
 - API Yii2 para listar métodos disponibles, administrar métodos, registrar cuentas sandbox, activar/desactivar cuentas y crear instrucciones de depósito idempotentes.
 - La cuenta se cifra con `SEDERG_ACCOUNT_ENCRYPTION_KEY` y el API solo devuelve máscara. La clave se inyecta desde Docker y se documenta en `.env.example`; debe ser distinta de `SEDERG_PII_KEY`.
 - Panel React para administrar cuentas/métodos y selección del método en el paso de pago.
