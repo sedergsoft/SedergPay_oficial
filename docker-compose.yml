@@ -36,7 +36,7 @@ services:
     depends_on:
       postgres: {condition: service_healthy}
       clamav: {condition: service_healthy}
-    ports: ["8080:8080"]
+    ports: ["${SEDERG_BACKEND_PORT:-8080}:8080"]
     volumes:
       - ./backend:/app
       - sederg_private_data:/var/lib/sederg-private
