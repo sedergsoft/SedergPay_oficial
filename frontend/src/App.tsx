@@ -9,7 +9,7 @@ const useT = () => { const language = useLanguage(); return (key: string) => tra
 const localeFor = (language: Language) => language === 'ru' ? 'ru-RU' : 'es-ES';
 
 type View = 'summary' | 'beneficiaries' | 'quote' | 'remittances' | 'profile' | 'kyc' | 'admin' | 'funding';
-const storedUserId = isDevelopmentAuth ? localStorage.getItem('sederg_user') ?? '' : '';
+const storedUserId = isDevelopmentAuth && localStorage.getItem('sederg_access_token') ? localStorage.getItem('sederg_user') ?? '' : '';
 
 export function App() {
   const [language, setLanguage] = useState<Language>(getInitialLanguage);
@@ -37,7 +37,7 @@ function AppContent({ language, onLanguageChange }: { language: Language; onLang
 
   useEffect(() => {
     if (!storedUserId) return;
-    api.me(storedUserId).then(setUser).catch(() => localStorage.removeItem('sederg_user')).finally(() => setAuthReady(true));
+    api.me(storedUserId).then(setUser).catch(() => { localStorage.removeItem('sederg_user'); localStorage.removeItem('sederg_access_token'); }).finally(() => setAuthReady(true));
   }, []);
 
   const run = async (action: () => Promise<void>) => {
@@ -57,6 +57,7 @@ function AppContent({ language, onLanguageChange }: { language: Language; onLang
   if (!user && publicView === 'landing') return <Landing language={language} onLanguageChange={onLanguageChange} onLogin={() => { setAuthView('login'); setPublicView('auth'); }} onRegister={() => { setAuthView('register'); setPublicView('auth'); }} />;
   if (!user) return <AuthScreen language={language} onLanguageChange={onLanguageChange} mode={authView} setMode={setAuthView} busy={busy} message={message} run={run} onBack={() => setPublicView('landing')} onAuthenticated={(next) => {
     localStorage.setItem('sederg_user', next.public_id);
+    if (next.access_token) localStorage.setItem('sederg_access_token', next.access_token);
     setUser(next);
   }} />;
 

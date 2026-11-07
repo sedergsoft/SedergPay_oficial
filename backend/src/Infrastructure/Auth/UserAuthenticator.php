@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace app\Infrastructure\Auth;
 
+use app\Infrastructure\Auth\JwtToken;
 use Yii;
 use yii\base\InvalidConfigException;
 use yii\db\Connection;
@@ -18,10 +19,11 @@ final class UserAuthenticator
     public function userId(): int
     {
         if (getenv('SEDERG_AUTH_MODE') === 'development') {
-            $publicId = trim((string) Yii::$app->request->headers->get('X-User-Public-Id', ''));
-            if ($publicId === '') {
-                throw new ForbiddenHttpException('Development identity is required');
+            $header = trim((string) Yii::$app->request->headers->get('Authorization', ''));
+            if (!preg_match('/^Bearer\s+([A-Za-z0-9._-]+)$/', $header, $matches)) {
+                throw new ForbiddenHttpException('A valid development session token is required');
             }
+            $publicId = JwtToken::verify($matches[1]);
             $id = $this->findByPublicId($publicId);
             if ($id === null) {
                 throw new ForbiddenHttpException('Authenticated user was not found');

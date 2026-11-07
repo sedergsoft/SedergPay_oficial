@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace app\controllers;
 
-use app\Infrastructure\Identity\VerificationMailer;
-use app\Infrastructure\Configuration\PlatformSettings;
+use app\Infrastructure\Auth\JwtToken;
 use app\Infrastructure\Auth\UserAuthenticator;
+use app\Infrastructure\Configuration\PlatformSettings;
+use app\Infrastructure\Identity\VerificationMailer;
 use Yii;
 use yii\filters\ContentNegotiator;
 use yii\web\Controller;
@@ -61,7 +62,9 @@ final class AuthController extends Controller
             ['id' => $user['id']]
         )->execute();
 
-        return $this->publicUser($user);
+        $accessToken = JwtToken::sign((string) $user['public_id']);
+
+        return array_merge($this->publicUser($user), ['access_token' => $accessToken]);
     }
 
     public function actionVerifyEmail(): array
@@ -145,7 +148,7 @@ final class AuthController extends Controller
     public function actionMe(): array
     {
         // Use the same authentication path as profile, beneficiaries and remittances.
-        // Development resolves X-User-Public-Id; production validates the OIDC bearer token.
+        // Development validates the JWT session token; production validates the OIDC bearer token.
         $userId = (new UserAuthenticator(Yii::$app->db))->userId();
 
         $user = Yii::$app->db->createCommand(

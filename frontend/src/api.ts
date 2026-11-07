@@ -4,14 +4,12 @@ export const isDevelopmentAuth = authMode === 'development';
 
 function authHeaders(userId?: string): Record<string, string> {
   if (authMode === 'development') {
-    // In sandbox, prefer the authenticated component identity and fall back to
-    // the same persisted public ID used to restore the session after reload.
-    // Never send an authenticated API request without an identity header.
-    const publicId = (userId ?? '').trim() || (localStorage.getItem('sederg_user') ?? '').trim();
-    if (!publicId) {
-      throw new Error('La sesión de desarrollo no contiene una identidad. Cierra sesión e inicia sesión nuevamente.');
+    // In development, send the JWT access token issued at login.
+    const token = (userId ?? '').trim() || (localStorage.getItem('sederg_access_token') ?? '').trim();
+    if (!token) {
+      throw new Error('La sesión de desarrollo no contiene un token de acceso. Cierra sesión e inicia sesión nuevamente.');
     }
-    return { 'X-User-Public-Id': publicId };
+    return { Authorization: `Bearer ${token}` };
   }
   const token = localStorage.getItem('sederg_access_token');
   if (!token) {
@@ -147,6 +145,7 @@ export type User = {
   last_name: string;
   role: 'customer' | 'admin';
   status: string;
+  access_token?: string;
 };
 
 export type AdminOperation = Remittance & {
@@ -218,10 +217,16 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
-  login: (email: string, password: string) => request<User>('/api/v1/auth/login', {
-    method: 'POST',
-    body: JSON.stringify({ email, password }),
-  }),
+  login: async (email: string, password: string): Promise<User> => {
+    const body = await request<User & { access_token?: string }>('/api/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+    if (body.access_token) {
+      localStorage.setItem('sederg_access_token', body.access_token);
+    }
+    return body as User;
+  },
   me: (userId: string) => request<User>('/api/v1/auth/me', {
     headers: authHeaders(userId),
   }),
