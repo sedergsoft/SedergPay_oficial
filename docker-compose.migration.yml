@@ -41,13 +41,9 @@ services:
       PG_USER: ${SEDERG_DB_USER:-sederg_app}
       PG_PASSWORD: ${SEDERG_DB_PASSWORD:?Set SEDERG_DB_PASSWORD in .env}
     depends_on:
-      mysql-source:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-
+      mysql-source: {condition: service_healthy}
+      postgres: {condition: service_healthy}
 volumes:
   legacy_mysql_data:
     external: true
     name: ${SEDERG_MYSQL_VOLUME:-sederg_pay_sederg_mysql_data}
-  legacy_mysql_migration_copy:
