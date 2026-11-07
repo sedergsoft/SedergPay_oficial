@@ -1,0 +1,66 @@
+name: Run database migrations (TiDB Cloud)
+
+# Solo ejecucion manual: los secretos nunca se exponen a triggers de push/PR.
+on:
+  workflow_dispatch:
+
+# Minimo privilegio: el job no necesita escribir nada del repositorio.
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    container: php:8.3-cli
+    steps:
+      # Action fijada por SHA de commit (hardening de supply chain)
+      - uses: actions/checkout@11bd71901dde5d65c0150f27bcaeb1e692dcd2a7 # v4.2.2
+
+      - name: Install PostgreSQL driver
+        run: |
+          apt-get update
+          apt-get install -y --no-interaction --no-install-recommends libzip-dev unzip libpq-dev
+          docker-php-ext-install bcmath pdo_pgsql zip
+          rm -rf /var/lib/apt/lists/*
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      # Guardiola: falla con mensaje claro si falta un secreto, sin imprimir valores.
+      - name: Check required secrets are configured
+        env:
+          SEDERG_DB_HOST: ${{ secrets.SEDERG_DB_HOST }}
+          SEDERG_DB_PORT: ${{ secrets.SEDERG_DB_PORT }}
+          SEDERG_DB_NAME: ${{ secrets.SEDERG_DB_NAME }}
+          SEDERG_DB_USER: ${{ secrets.SEDERG_DB_USER }}
+          SEDERG_DB_PASSWORD: ${{ secrets.SEDERG_DB_PASSWORD }}
+        run: |
+          missing="0"
+          for v in SEDERG_DB_HOST SEDERG_DB_PORT SEDERG_DB_NAME SEDERG_DB_USER SEDERG_DB_PASSWORD; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Falta el secreto ${v} en Settings → Secrets and variables → Actions"
+              missing="1"
+            fi
+          done
+          test "$missing" = "0" || exit 1
+
+      - name: Run migrations
+        run: php yii migrate --migrationPath=@app/migrations --interactive=0
+        env:
+          # DSN ensamblado a partir de secretos discretos (pgwire de TiDB Cloud)
+          SEDERG_DB_DSN: pgsql:host=${{ secrets.SEDERG_DB_HOST }};port=${{ secrets.SEDERG_DB_PORT }};dbname=${{ secrets.SEDERG_DB_NAME }};sslmode=require
+          SEDERG_DB_USER: ${{ secrets.SEDERG_DB_USER }}
+          SEDERG_DB_PASSWORD: ${{ secrets.SEDERG_DB_PASSWORD }}
+
+      # Idempotencia: una segunda pasada no debe detectar migraciones nuevas.
+      - name: Verify migrations are idempotent
+        run: |
+          output=$(php yii migrate --migrationPath=@app/migrations --interactive=0 2>&1)
+          echo "$output"
+          echo "$output" | grep -q "No new migrations found" \
+            && echo "OK: esquema al dia (idempotente)" \
+            || { echo "::error::Quedaron migraciones pendientes en la segunda pasada"; exit 1; }
+        env:
+          SEDERG_DB_DSN: pgsql:host=${{ secrets.SEDERG_DB_HOST }};port=${{ secrets.SEDERG_DB_PORT }};dbname=${{ secrets.SEDERG_DB_NAME }};sslmode=require
+          SEDERG_DB_USER: ${{ secrets.SEDERG_DB_USER }}
+          SEDERG_DB_PASSWORD: ${{ secrets.SEDERG_DB_PASSWORD }}
