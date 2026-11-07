@@ -34,12 +34,22 @@ jobs:
         working-directory: frontend
 
       - name: Build SPA
-        run: npm run build
         working-directory: frontend
         env:
           # Configurar en Settings → Secrets and variables → Actions → Variables
           VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
           VITE_AUTH_MODE: ${{ vars.VITE_AUTH_MODE }}
+          VITE_UI_PREVIEW: ${{ vars.VITE_UI_PREVIEW }}
+        run: |
+          if [ -z "$VITE_API_BASE_URL" ] && [ "$VITE_UI_PREVIEW" != "true" ]; then
+            echo "::error::VITE_API_BASE_URL no está configurada. Define la variable del repo (Settings → Secrets and variables → Actions → Variables) o VITE_UI_PREVIEW=true para publicar solo la UI en modo development."
+            exit 1
+          fi
+          : "${VITE_AUTH_MODE:=development}"
+          if [ -z "$VITE_API_BASE_URL" ]; then
+            echo "::warning::Publicando vista previa de la UI sin API real (VITE_AUTH_MODE=development)."
+          fi
+          VITE_AUTH_MODE="$VITE_AUTH_MODE" npm run build
 
       - name: SPA fallback (404.html)
         run: cp dist/index.html dist/404.html
