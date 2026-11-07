@@ -28,6 +28,13 @@ if ($corsAllowed) {
     header('Access-Control-Allow-Headers: Authorization, Content-Type, Idempotency-Key');
     header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 }
+
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: DENY');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+header('Content-Security-Policy: default-src \'self\'; script-src \'self\'; style-src \'self\' \'unsafe-inline\'; img-src \'self\' data:; connect-src \'self\' http://localhost:18080 http://localhost:5173; base-uri \'self\'; form-action \'self\'');
+if ((string) ($_SERVER['HTTPS'] ?? '') === 'on' || (string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https') { header('Strict-Transport-Security: max-age=31536000; includeSubDomains'); }
+
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
     exit;
