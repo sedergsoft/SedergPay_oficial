@@ -11,18 +11,23 @@ Procedimiento de importación no destructivo. El volumen MySQL original nunca se
 
 ## PowerShell (Windows)
 
-1. Detener aplicación: `docker compose stop backend rate-updater frontend`.
-2. Confirmar volumen: `docker volume ls`.
-3. Crear backup externo (sustituir el nombre si corresponde):
-   `$mysqlVolume = "sederg_pay_sederg_mysql_data"`
-   `docker run --rm -v "${mysqlVolume}:/source:ro" -v "${PWD}:/backup" alpine:3.22 sh -c "tar czf /backup/sederg_mysql_backup.tar.gz -C /source ."`
-4. Detener el contenedor MySQL antiguo sin borrar el volumen. Obtener nombre con `docker ps -a --filter "name=mysql" --format "{{.Names}}"` y detenerlo con `docker stop <nombre-real>`.
-5. Levantar PostgreSQL: `docker compose up -d postgres` y verificar `docker compose ps postgres`.
-6. Construir el backend PostgreSQL y crear el esquema vacío: `docker compose run --rm --build --no-deps backend php yii migrate --interactive=0`.
-7. Ejecutar migración: `docker compose -f docker-compose.yml -f docker-compose.migration.yml --profile migration up --build --abort-on-container-exit --exit-code-from db-migrator db-migrator`.
-8. Solo si aparece `DATA TRANSFER COMPLETED`, iniciar: `docker compose up -d backend rate-updater frontend`; verificar `docker compose ps`.
+1. Actualiza en `.env` `SEDERG_MYSQL_ROOT_PASSWORD`, `SEDERG_DB_PASSWORD` y, si corresponde, `SEDERG_MYSQL_VOLUME`.
+2. Abre PowerShell en la raíz del repositorio y ejecuta:
 
-No ejecutar `docker compose down -v`, no eliminar `sederg_mysql_data` y no borrar el contenedor antiguo hasta finalizar auditoría.
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\Invoke-MySqlToPostgresMigration.ps1
+```
+
+El script:
+- valida la configuración Docker Compose y comprueba que existe el volumen MySQL;
+- solicita confirmación antes de detener contenedores;
+- detiene los contenedores que utilizan el volumen antiguo y genera un backup comprimido de solo lectura;
+- inicia PostgreSQL, aplica las migraciones Yii y ejecuta la transferencia;
+- solo si el importador termina con `DATA TRANSFER COMPLETED`, levanta todos los servicios y muestra su estado.
+
+Si ya existe un backup externo verificado, puede usarse `-SkipBackup`; no se recomienda omitir el backup inicial.
+
+No ejecutar `docker compose down -v`, no eliminar el volumen MySQL original ni el backup hasta finalizar la auditoría financiera.
 
 ## Qué hace el mecanismo
 1. `mysql-source` copia el volumen detenido a `legacy_mysql_migration_copy` cuando la copia está vacía; el origen se monta `read-only`.
