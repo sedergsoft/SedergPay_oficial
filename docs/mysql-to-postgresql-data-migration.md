@@ -25,8 +25,8 @@ Procedimiento de importación no destructivo. El volumen MySQL original nunca se
 No ejecutar `docker compose down -v`, no eliminar `sederg_mysql_data` y no borrar el contenedor antiguo hasta finalizar auditoría.
 
 ## Qué hace el mecanismo
-1. `mysql-volume-clone` copia el volumen detenido a `legacy_mysql_migration_copy`; el origen se monta `read-only`.
-2. MySQL 8.4 arranca sobre la copia escribible para permitir recuperación InnoDB sin tocar el original.
+1. `mysql-source` copia el volumen detenido a `legacy_mysql_migration_copy` cuando la copia está vacía; el origen se monta `read-only`.
+2. MySQL 8.4 arranca sobre la copia escribible para permitir recuperación InnoDB sin tocar el original. En un reintento la copia existente se reutiliza sin volver a clonar.
 3. `db-migrator` transfiere tablas y columnas coincidentes a PostgreSQL dentro de una transacción.
 4. Aborta si falta alguna tabla destino, una columna obligatoria no tiene equivalencia o una tabla destino ya tiene registros.
 5. Conserva IDs, convierte booleanos y fechas cero cuando procede, y reajusta secuencias/identity.

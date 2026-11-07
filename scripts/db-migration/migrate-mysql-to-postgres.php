@@ -8,8 +8,13 @@ try {
  $mysql=new PDO(getenv('MYSQL_DSN')?:'mysql:host=mysql-source;port=3306;dbname=sederg_pay;charset=utf8mb4',getenv('MYSQL_USER')?:'root',getenv('MYSQL_PASSWORD')?:'', [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC,PDO::MYSQL_ATTR_USE_BUFFERED_QUERY=>false]);
  $pg=new PDO(getenv('PG_DSN')?:'pgsql:host=postgres;port=5432;dbname=sederg_pay',getenv('PG_USER')?:'sederg_app',getenv('PG_PASSWORD')?:'', [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]);
  $found=$mysql->query("SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'")->fetchAll(PDO::FETCH_NUM);
- $tables=array_values(array_filter(array_map(fn($r)=>(string)$r[0],$found),fn($t)=>$t!=='yii_migration')); sort($tables);
+ $skip=['migration','yii_migration'];
+ $tables=array_values(array_filter(array_map(fn($r)=>(string)$r[0],$found),fn($t)=>!in_array($t,$skip,true))); sort($tables);
  if(!$tables) abortMigration('No MySQL source tables found.');
+ // Catalog/reference tables are seeded by the Yii migrations, so the destination is
+ // expected to be non-empty before the import. Rows are merged by primary key and
+ // never overwritten; the final row-count check still requires parity with MySQL.
+ $referenceTables=['countries','currencies','payment_methods','bank_connections','ledger_accounts','funding_payment_methods','platform_settings'];
  $target=$pg->query("SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'")->fetchAll(PDO::FETCH_COLUMN);
  $targetSet=array_fill_keys($target,true);
  $missing=array_values(array_filter($tables,fn($t)=>!isset($targetSet[$t])));
@@ -17,8 +22,9 @@ try {
  $pg->beginTransaction(); $pg->exec('SET LOCAL session_replication_role = replica'); $total=0; $report=[];
  foreach($tables as $table) {
   $pt=pgIdent($table); $mt=myIdent($table);
+  $isReference=in_array($table,$referenceTables,true);
   $already=(int)$pg->query("SELECT COUNT(*) FROM {$pt}")->fetchColumn();
-  if($already!==0) abortMigration("Target {$table} already contains {$already} rows; refusing to overwrite.");
+  if($already!==0&&!$isReference) abortMigration("Target {$table} already contains {$already} rows; refusing to overwrite.");
   $src=$mysql->query("SHOW COLUMNS FROM {$mt}")->fetchAll();
   $srcNames=array_fill_keys(array_map(fn($c)=>(string)$c['Field'],$src),true);
   $q=$pg->prepare("SELECT column_name,data_type,is_nullable,column_default,is_identity,is_generated FROM information_schema.columns WHERE table_schema='public' AND table_name=:t ORDER BY ordinal_position");
