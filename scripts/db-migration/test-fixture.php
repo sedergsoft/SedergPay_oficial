@@ -58,8 +58,8 @@ if ($mode === 'setup') {
         ('RUB','Russian ruble',2,1),('CUP','Cuban peso',2,1)");
     $mysql->exec("INSERT INTO users (id,email,status,is_active,created_at)
         VALUES (10,'migration@example.test','active',1,'2026-11-01 10:00:00')");
-    $mysql->exec("INSERT INTO remittances VALUES
-        (20,10,15000.25,'{"direction":"ru_to_cu","fee_mode":"add_to_send"}')");
+    $remittanceInsert = $mysql->prepare('INSERT INTO remittances VALUES (20,10,15000.25,:metadata)');
+    $remittanceInsert->execute([':metadata' => json_encode(['direction' => 'ru_to_cu', 'fee_mode' => 'add_to_send'], JSON_THROW_ON_ERROR)]);
 
     foreach (['remittances', 'users', 'currencies', 'countries'] as $table) {
         $pg->exec("DROP TABLE IF EXISTS \"{$table}\" CASCADE");
