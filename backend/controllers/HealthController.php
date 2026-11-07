@@ -17,11 +17,12 @@ final class HealthController extends Controller
     {
         Yii::$app->db->createCommand('SELECT 1')->queryScalar();
         Yii::$app->response->statusCode = 200;
-        return [
-            'status' => 'ok',
-            'service' => 'sederg-pay-api',
-            'environment' => getenv('SEDERG_AUTH_MODE') === 'development' ? 'sandbox' : 'production',
-        ];
+        $body = ['status' => 'ok', 'service' => 'sederg-pay-api'];
+        // Solo exponer el entorno en modo desarrollo (D-04: no filtrar en producción).
+        if (getenv('SEDERG_AUTH_MODE') === 'development') {
+            $body['environment'] = 'sandbox';
+        }
+        return $body;
     }
 
     public function behaviors(): array

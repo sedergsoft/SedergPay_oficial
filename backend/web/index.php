@@ -35,10 +35,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 $config = require dirname(__DIR__) . '/config/web.php';
 $config['components']['response']['on beforeSend'] = static function (yii\base\Event $event) use ($origin, $corsAllowed): void {
+    $headers = $event->sender->headers;
+    // Cabeceras de seguridad aplicadas a toda respuesta (M-01).
+    $headers->set('X-Content-Type-Options', 'nosniff');
+    $headers->set('X-Frame-Options', 'DENY');
+    $headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
+    $headers->set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+    // CSP restrictiva: solo recursos del mismo origen y CDNs de confianza.
+    $headers->set('Content-Security-Policy',
+        "default-src 'self'; " .
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " .
+        "style-src 'self' 'unsafe-inline'; " .
+        "img-src 'self' data: https:; " .
+        "font-src 'self'; " .
+        "connect-src 'self'; " .
+        "frame-ancestors 'none';"
+    );
+    // HSTS solo si la conexión es HTTPS.
+    if (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+        $headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
     if ($corsAllowed) {
-        $event->sender->headers->set('Access-Control-Allow-Origin', $origin);
-        $event->sender->headers->set('Vary', 'Origin');
-        $event->sender->headers->set('Access-Control-Allow-Credentials', 'false');
+        $headers->set('Access-Control-Allow-Origin', $origin);
+        $headers->set('Vary', 'Origin');
+        $headers->set('Access-Control-Allow-Credentials', 'false');
     }
 };
 try {
@@ -52,3 +72,5 @@ try {
     }
     throw $exception;
 }
+
+
