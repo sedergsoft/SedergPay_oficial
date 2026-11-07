@@ -31,7 +31,7 @@ No ejecutar `docker compose down -v`, no eliminar el volumen MySQL original ni e
 
 ## Qué hace el mecanismo
 1. `mysql-source` copia el volumen detenido a `legacy_mysql_migration_copy` cuando la copia está vacía; el origen se monta `read-only`.
-2. MySQL 8.4 arranca sobre la copia escribible para permitir recuperación InnoDB sin tocar el original. En un reintento la copia existente se reutiliza sin volver a clonar.
+2. MySQL 8.4 arranca sobre la copia escribible para permitir recuperación InnoDB sin tocar el original. La copia solo se reutiliza si existe su marcador de finalización en `legacy_mysql_migration_state`; si la copia quedó parcial, el contenedor aborta en lugar de iniciar MySQL con datos incompletos.
 3. `db-migrator` transfiere tablas y columnas coincidentes a PostgreSQL dentro de una transacción.
 4. Aborta si falta alguna tabla destino, una columna obligatoria no tiene equivalencia o una tabla destino ya tiene registros.
 5. Conserva IDs, convierte booleanos y fechas cero cuando procede, y reajusta secuencias/identity.
@@ -40,7 +40,7 @@ No ejecutar `docker compose down -v`, no eliminar el volumen MySQL original ni e
 El migrador requiere un rol PostgreSQL con privilegio para ejecutar `SET session_replication_role`.
 
 ## Reintentos
-La importación no sobrescribe tablas destino. Si falla, revisa logs. La transacción debe revertirse completa. La copia temporal solo debe recrearse después de verificar que el volumen original y el backup están intactos. Si se elimina, borrar únicamente `<proyecto>_legacy_mysql_migration_copy`, nunca el volumen original.
+La importación no sobrescribe tablas destino. Si falla, revisa logs. La transacción debe revertirse completa. La copia temporal solo debe recrearse después de verificar que el volumen original y el backup están intactos. Si se elimina, borrar únicamente `<proyecto>_legacy_mysql_migration_copy` y `<proyecto>_legacy_mysql_migration_state`, nunca el volumen original.
 
 ## Validación posterior obligatoria
 Comparar recuentos de todas las tablas con el informe; revisar usuarios, beneficiarios, cotizaciones, remesas, depósitos, pagos, ledger, conciliaciones, KYC, documentos y auditoría. Ejecutar flujos RU-CU y CU-RU, idempotencia, comisión, estados y conciliación. Mantener MySQL y su backup intactos hasta completar la auditoría.
