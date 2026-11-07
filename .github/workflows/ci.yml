@@ -139,3 +139,67 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: npm run build
+
+  migration-tool-test:
+    name: MySQL to PostgreSQL data migration fixture
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: sederg_migration_test
+        ports:
+          - 3307:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: sederg_app
+          POSTGRES_PASSWORD: root
+          POSTGRES_DB: sederg_migration_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U sederg_app -d sederg_migration_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, pdo_pgsql
+          coverage: none
+      - name: Prepare isolated source and target fixture databases
+        run: php scripts/db-migration/test-fixture.php setup
+        env:
+          MYSQL_DSN: mysql:host=127.0.0.1;port=3307;dbname=sederg_migration_test;charset=utf8mb4
+          MYSQL_USER: root
+          MYSQL_PASSWORD: root
+          PG_DSN: pgsql:host=127.0.0.1;port=5432;dbname=sederg_migration_test
+          PG_USER: sederg_app
+          PG_PASSWORD: root
+      - name: Execute the real migration utility
+        run: php scripts/db-migration/migrate-mysql-to-postgres.php
+        env:
+          MYSQL_DSN: mysql:host=127.0.0.1;port=3307;dbname=sederg_migration_test;charset=utf8mb4
+          MYSQL_USER: root
+          MYSQL_PASSWORD: root
+          PG_DSN: pgsql:host=127.0.0.1;port=5432;dbname=sederg_migration_test
+          PG_USER: sederg_app
+          PG_PASSWORD: root
+      - name: Verify migrated rows, seed reconciliation, types, foreign keys and sequences
+        run: php scripts/db-migration/test-fixture.php check
+        env:
+          MYSQL_DSN: mysql:host=127.0.0.1;port=3307;dbname=sederg_migration_test;charset=utf8mb4
+          MYSQL_USER: root
+          MYSQL_PASSWORD: root
+          PG_DSN: pgsql:host=127.0.0.1;port=5432;dbname=sederg_migration_test
+          PG_USER: sederg_app
+          PG_PASSWORD: root
