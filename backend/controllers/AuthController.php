@@ -8,6 +8,7 @@ use app\Infrastructure\Auth\JwtToken;
 use app\Infrastructure\Auth\UserAuthenticator;
 use app\Infrastructure\Configuration\PlatformSettings;
 use app\Infrastructure\Identity\VerificationMailer;
+use app\Infrastructure\Security\RateLimiter;
 use Yii;
 use yii\filters\ContentNegotiator;
 use yii\web\Controller;
@@ -32,6 +33,8 @@ final class AuthController extends Controller
         if (getenv('SEDERG_AUTH_MODE') !== 'development') {
             throw new ForbiddenHttpException('Use the configured OIDC provider to sign in');
         }
+
+        (new RateLimiter())->check('auth:login', (string) Yii::$app->request->getUserIP());
 
         $payload = Yii::$app->request->bodyParams;
         if (!is_array($payload) || !is_string($payload['email'] ?? null) || !is_string($payload['password'] ?? null)) {
@@ -118,6 +121,8 @@ final class AuthController extends Controller
 
     public function actionResendVerification(): array
     {
+        (new RateLimiter())->check('auth:resend-verification', (string) Yii::$app->request->getUserIP(), 3, 900);
+
         $payload = Yii::$app->request->bodyParams;
         if (!is_array($payload)
             || !is_string($payload['email'] ?? null)

@@ -7,6 +7,7 @@ namespace app\controllers;
 use app\Infrastructure\Registration\RegistrationRepository;
 use app\Infrastructure\Identity\VerificationMailer;
 use app\Infrastructure\Configuration\PlatformSettings;
+use app\Infrastructure\Security\RateLimiter;
 use Yii;
 use yii\filters\ContentNegotiator;
 use yii\web\BadRequestHttpException;
@@ -36,6 +37,7 @@ final class RegistrationController extends Controller
         if (getenv('SEDERG_AUTH_MODE') !== 'development') {
             throw new ForbiddenHttpException('Client registration must be provisioned through OIDC');
         }
+        (new RateLimiter())->check('registration:create', (string) Yii::$app->request->getUserIP(), 3, 900);
         if (!PlatformSettings::getBool(Yii::$app->db, 'operations.registrations_enabled')) {
             throw new ForbiddenHttpException('New registrations are temporarily disabled by the administrator');
         }
