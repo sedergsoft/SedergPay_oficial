@@ -1,3 +1,7 @@
+# Blueprint de Render — SEDERG_PAY backend (free tier)
+# Crear en Render → New → Blueprint → apuntar a sedergsoft/SedergPay_oficial
+# Los valores `sync: false` se piden en el panel al crear (no van en Git).
+
 services:
   - type: web
     name: sederg-pay-api
@@ -6,24 +10,37 @@ services:
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     healthCheckPath: /health
+    autoDeploy: true
     envVars:
       - key: PORT
         value: "10000"
-      - key: SEDERG_AUTH_MODE
-        value: development
-      - key: SEDERG_DB_DSN
+      - key: SEDERG_DB_DSN          # pgsql:host=<pgwire-host>;port=<port>;dbname=<db>;sslmode=require
         sync: false
       - key: SEDERG_DB_USER
         sync: false
       - key: SEDERG_DB_PASSWORD
         sync: false
-      - key: SEDERG_COOKIE_KEY
-        sync: false
-      - key: SEDERG_CORS_ORIGINS
-        value: https://sedergsoft.github.io
-      - key: SEDERG_OIDC_ISSUER
+      - key: SEDERG_AUTH_MODE
+        value: development          # solo sandbox; producción exige OIDC
+      - key: SEDERG_OIDC_ISSUER     # exigidos fuera de development (placeholder ok en sandbox)
         sync: false
       - key: SEDERG_OIDC_AUDIENCE
         sync: false
       - key: SEDERG_OIDC_PUBLIC_KEY
         sync: false
+      - key: SEDERG_COOKIE_KEY
+        generateValue: true
+      - key: SEDERG_DEBUG
+        value: "0"
+      - key: SEDERG_PII_KEY
+        generateValue: true
+      - key: SEDERG_ACCOUNT_ENCRYPTION_KEY
+        generateValue: true
+      - key: SEDERG_PRIVATE_STORAGE_PATH
+        value: /var/lib/sederg-private
+      - key: SEDERG_MAIL_TRANSPORT
+        value: log                  # sandbox: log; cambiar a smtp cuando haga falta
+      - key: SEDERG_APP_URL
+        value: https://sedergsoft.github.io/SedergPay_oficial/
+      - key: SEDERG_CORS_ORIGINS
+        value: https://sedergsoft.github.io

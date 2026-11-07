@@ -1,0 +1,30 @@
+name: Run database migrations (TiDB Cloud)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    container: php:8.3-cli
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PostgreSQL driver
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends libzip-dev unzip libpq-dev
+          docker-php-ext-install bcmath pdo_pgsql zip
+          rm -rf /var/lib/apt/lists/*
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Run migrations
+        run: php yii migrate --migrationPath=@app/migrations --interactive=0
+        env:
+          # Configurar en Settings → Secrets and variables → Actions → Secrets
+          # Formato DSN (pgwire de TiDB): pgsql:host=<host>;port=<port>;dbname=<db>;sslmode=require
+          SEDERG_DB_DSN: ${{ secrets.SEDERG_DB_DSN }}
+          SEDERG_DB_USER: ${{ secrets.SEDERG_DB_USER }}
+          SEDERG_DB_PASSWORD: ${{ secrets.SEDERG_DB_PASSWORD }}
