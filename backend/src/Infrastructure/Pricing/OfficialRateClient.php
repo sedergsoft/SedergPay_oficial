@@ -12,9 +12,18 @@ final class OfficialRateClient
     public const CBR_SOURCE_URL = 'https://www.cbr.ru/scripts/XML_daily_eng.asp';
 
     /**
-     * Returns CUP per one RUB from an official Cuban source, with Russian fallback.
+     * Returns both RUB/CUP (buy/compra) and CUP/RUB (sell/venta) rates from an official source.
      *
-     * @return array{rate: string, effective_date: string, source_url: string}
+     * BCC publishes:
+     *   - tasaEspecial: CUP per RUB  (buy rate: how many CUP you get for 1 RUB)
+     *   - tasaOficial:  RUB per CUP  (sell rate: how many RUB you get for 1 CUP)
+     *
+     * @return array{
+     *   rate_rub_cup: string,
+     *   rate_cup_rub: string,
+     *   effective_date: string,
+     *   source: string
+     * }
      */
     public function fetchRubCup(): array
     {
@@ -34,9 +43,9 @@ final class OfficialRateClient
     }
 
     /**
-     * The BCC special segment is the official rate for population and FGNE.
+     * The BCC special segment publishes CUP per RUB (tasaEspecial) and RUB per CUP (tasaOficial).
      *
-     * @return array{rate: string, effective_date: string, source_url: string, source: string}
+     * @return array{rate_rub_cup: string, rate_cup_rub: string, effective_date: string, source: string}
      */
     private function fetchFromBcc(): array
     {
@@ -49,16 +58,18 @@ final class OfficialRateClient
             if (!is_array($currency) || ($currency['codigoMoneda'] ?? '') !== 'RUB') {
                 continue;
             }
-            $rate = $this->decimal((string) ($currency['tasaEspecial'] ?? ''), 'BCC rate');
+
+            $rateRubCup = $this->decimal((string) ($currency['tasaEspecial'] ?? ''), 'BCC tasaEspecial (RUB/CUP buy)');
+            $rateCupRub = $this->decimal((string) ($currency['tasaOficial'] ?? ''), 'BCC tasaOficial (CUP/RUB sell)');
             $date = substr((string) ($currency['fechaDia'] ?? ''), 0, 10);
             if ($date === '' || !\DateTimeImmutable::createFromFormat('Y-m-d', $date)) {
                 throw new RuntimeException('BCC exchange-rate date is invalid');
             }
 
             return [
-                'rate' => $rate,
+                'rate_rub_cup' => $rateRubCup,
+                'rate_cup_rub' => $rateCupRub,
                 'effective_date' => $date,
-                'source_url' => self::BCC_SOURCE_URL,
                 'source' => 'bcc_official',
             ];
         }
@@ -67,24 +78,13 @@ final class OfficialRateClient
     }
 
     /**
-     * CBR publishes RUB per CUP, so the value is inverted to CUP per RUB.
+     * CBR publishes RUB per CUP. We invert to get CUP per RUB.
      *
-     * @return array{rate: string, effective_date: string, source_url: string, source: string}
+     * @return array{rate_rub_cup: string, rate_cup_rub: string, effective_date: string, source: string}
      */
     private function fetchFromCbr(): array
     {
-        $context = stream_context_create([
-            'http' => [
-                'method' => 'GET',
-                'timeout' => 20,
-                'ignore_errors' => true,
-                'header' => "Accept: application/xml\r\nUser-Agent: SEDERG_PAY/1.0\r\n",
-            ],
-        ]);
-        $xml = @file_get_contents(self::CBR_SOURCE_URL, false, $context);
-        if ($xml === false || trim($xml) === '') {
-            throw new RuntimeException('Official exchange-rate source is unavailable');
-        }
+        $xml = $this->fetchXml(self::CBR_SOURCE_URL);
 
         libxml_use_internal_errors(true);
         $document = simplexml_load_string($xml);
@@ -102,58 +102,85 @@ final class OfficialRateClient
                 break;
             }
         }
-        if ($cup === null || $date === '') {
+
+        if ($cup === null) {
             throw new RuntimeException('Official exchange-rate source does not publish CUP');
         }
 
         $nominal = $this->decimal((string) $cup->Nominal, 'nominal');
         $value = $this->decimal((string) $cup->Value, 'value');
-        if (bccomp($value, '0', 10) <= 0) {
+        if ($nominal === '' || $value === '') {
             throw new RuntimeException('Official CUP exchange rate is invalid');
         }
-
-        $effectiveDate = \DateTimeImmutable::createFromFormat('d.m.Y', $date);
-        if ($effectiveDate === false) {
+        if ($date === '' || !\DateTimeImmutable::createFromFormat('d/m/Y', $date)) {
             throw new RuntimeException('Official exchange-rate date is invalid');
         }
 
+        // CBR Value/Nominal = RUB per CUP (sell rate: how many RUB for 1 CUP)
+        $rateCupRub = bcdiv($value, $nominal, 10);
+        // Derive CUP per RUB (buy rate: how many CUP for 1 RUB)
+        $rateRubCup = bcdiv('1', $rateCupRub, 10);
+
+        $isoDate = \DateTimeImmutable::createFromFormat('d/m/Y', $date)->format('Y-m-d');
+
         return [
-            'rate' => bcdiv($nominal, $value, 10),
-            'effective_date' => $effectiveDate->format('Y-m-d'),
-            'source_url' => self::CBR_SOURCE_URL,
+            'rate_rub_cup' => $rateRubCup,
+            'rate_cup_rub' => $rateCupRub,
+            'effective_date' => $isoDate,
             'source' => 'cbr_official',
         ];
     }
 
     private function fetchJson(string $url): array
     {
-        $context = stream_context_create([
-            'http' => [
-                'method' => 'GET',
-                'timeout' => 20,
-                'ignore_errors' => true,
-                'header' => "Accept: application/json\r\nUser-Agent: SEDERG_PAY/1.0\r\n",
-            ],
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Accept: application/json',
+            'User-Agent: SEDERG_PAY/1.0',
         ]);
-        $body = @file_get_contents($url, false, $context);
-        if ($body === false || trim($body) === '') {
-            throw new RuntimeException('Official JSON source is unavailable');
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        $json = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($json === false || trim($json) === '' || $httpCode >= 400) {
+            throw new RuntimeException('Official exchange-rate source is unavailable (HTTP ' . $httpCode . ')');
         }
-        $decoded = json_decode($body, true);
-        if (!is_array($decoded)) {
-            throw new RuntimeException('Official JSON source returned invalid data');
+        $data = json_decode($json, true);
+        if ($data === null || !is_array($data)) {
+            throw new RuntimeException('Official exchange-rate source returned invalid JSON');
         }
+        return $data;
+    }
 
-        return $decoded;
+    private function fetchXml(string $url): string
+    {
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Accept: application/xml',
+            'User-Agent: SEDERG_PAY/1.0',
+        ]);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        $xml = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($xml === false || trim($xml) === '' || $httpCode >= 400) {
+            throw new RuntimeException('Official exchange-rate source is unavailable (HTTP ' . $httpCode . ')');
+        }
+        return $xml;
     }
 
     private function decimal(string $value, string $field): string
     {
-        $normalized = str_replace(',', '.', trim($value));
-        if (!preg_match('/^\d+(?:\.\d+)?$/', $normalized)) {
-            throw new RuntimeException("Official exchange-rate {$field} is invalid");
+        $trimmed = trim($value);
+        if ($trimmed === '' || !is_numeric($trimmed)) {
+            throw new RuntimeException("Invalid {$field}");
         }
-
-        return $normalized;
+        return (string) bcadd($trimmed, '0', 10);
     }
 }

@@ -279,9 +279,6 @@ export const api = {
   adminUsers: (userId: string) => request<AdminUser[]>('/api/v1/admin/users', {
     headers: authHeaders(userId),
   }),
-  adminRateHistory: (userId: string) => request<{ rates: AdminRate[] }>('/api/v1/admin/rates/history', {
-    headers: authHeaders(userId),
-  }),
   adminDashboard: (userId: string) => request<AdminDashboard>('/api/v1/admin/dashboard', {
     headers: authHeaders(userId),
   }),
@@ -293,16 +290,23 @@ export const api = {
     headers: authHeaders(userId),
     body: JSON.stringify({ settings }),
   }),
-  currentExchangeRate: () => request<ExchangeRate>('/api/v1/exchange-rates/current'),
-  setExchangeRateSource: (userId: string, source: 'official' | 'admin_override') => request<ExchangeRate>('/api/v1/admin/exchange-rate/source', {
+  currentExchangeRate: (base = 'RUB', quote = 'CUP') => request<ExchangeRate>(`/api/v1/exchange-rates/current?base=${base}&quote=${quote}`),
+  bothExchangeRates: () => Promise.all([
+    request<ExchangeRate>('/api/v1/exchange-rates/current?base=RUB&quote=CUP'),
+    request<ExchangeRate>('/api/v1/exchange-rates/current?base=CUP&quote=RUB'),
+  ]),
+  adminRateHistory: (userId: string, base = 'RUB', quote = 'CUP') => request<{ rates: AdminRate[] }>(`/api/v1/admin/rates/history?base=${base}&quote=${quote}`, {
+    headers: authHeaders(userId),
+  }),
+  setExchangeRateSource: (userId: string, source: 'official' | 'admin_override', base = 'RUB', quote = 'CUP') => request<ExchangeRate>('/api/v1/admin/exchange-rate/source', {
     method: 'PUT',
     headers: authHeaders(userId),
-    body: JSON.stringify({ source }),
+    body: JSON.stringify({ source, base, quote }),
   }),
-  setExchangeRate: (userId: string, rate: string) => request<ExchangeRate>('/api/v1/admin/exchange-rate', {
+  setExchangeRate: (userId: string, rate: string, base = 'RUB', quote = 'CUP') => request<ExchangeRate>('/api/v1/admin/exchange-rate', {
     method: 'POST',
     headers: authHeaders(userId),
-    body: JSON.stringify({ rate }),
+    body: JSON.stringify({ rate, base, quote }),
   }),
   createRemittance: (userId: string, body: Record<string, unknown>) => request<Remittance>('/api/v1/remittances', {
     method: 'POST',

@@ -123,10 +123,10 @@ final class PlatformSettings
         if (($validated['pricing.exchange_rate_source'] ?? null) === 'admin_override') {
             $manualRateExists = (int) $db->createCommand(
                 'SELECT COUNT(*) FROM {{%exchange_rates}}
-                 WHERE base_currency = :base AND quote_currency = :quote
+                 WHERE (base_currency = :base1 AND quote_currency = :quote1 OR base_currency = :base2 AND quote_currency = :quote2)
                    AND source = :source AND valid_from <= CURRENT_TIMESTAMP
                    AND (valid_until IS NULL OR valid_until > CURRENT_TIMESTAMP)',
-                [':base' => 'RUB', ':quote' => 'CUP', ':source' => 'admin_override']
+                [':base1' => 'RUB', ':quote1' => 'CUP', ':base2' => 'CUP', ':quote2' => 'RUB', ':source' => 'admin_override']
             )->queryScalar();
             if ($manualRateExists === 0) {
                 throw new DomainException('No hay una tasa manual guardada para activar.');

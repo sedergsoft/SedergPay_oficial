@@ -59,7 +59,7 @@ services:
       SEDERG_DB_PASSWORD: ${SEDERG_DB_PASSWORD:?SEDERG_DB_PASSWORD is required}
     depends_on:
       postgres: {condition: service_healthy}
-    command: ["sh","-c","while true; do php yii rates/update || echo 'Exchange-rate refresh failed' >&2; sleep 43200; done"]
+    command: ["sh","-c","while true; do php yii rates/update || echo 'Exchange-rate refresh failed' >&2; sleep 21600; done"]
     restart: unless-stopped
   postgres:
     image: postgres:17-alpine

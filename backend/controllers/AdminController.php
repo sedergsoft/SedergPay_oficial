@@ -68,6 +68,12 @@ final class AdminController extends Controller
     public function actionRateHistory(): array
     {
         (new UserAuthenticator(Yii::$app->db))->requireRole('admin');
+        $request = Yii::$app->request;
+        $base = strtoupper(trim($request->get('base', 'RUB')));
+        $quote = strtoupper(trim($request->get('quote', 'CUP')));
+        if (!in_array($base, ['RUB', 'CUP'], true) || !in_array($quote, ['RUB', 'CUP'], true) || $base === $quote) {
+            throw new BadRequestHttpException('Par de monedas no soportado.');
+        }
 
         return ['rates' => Yii::$app->db->createCommand(
             'SELECT e.rate, e.source, e.valid_from, e.valid_until, e.created_at,
@@ -76,7 +82,7 @@ final class AdminController extends Controller
              LEFT JOIN {{%users}} u ON u.id = e.created_by_user_id
              WHERE e.base_currency = :base AND e.quote_currency = :quote
              ORDER BY e.valid_from DESC, e.id DESC LIMIT 500',
-            [':base' => 'RUB', ':quote' => 'CUP']
+            [':base' => $base, ':quote' => $quote]
         )->queryAll()];
     }
 
@@ -120,11 +126,16 @@ final class AdminController extends Controller
         $authenticator->requireRole('admin');
         $payload = Yii::$app->request->bodyParams;
         if (!is_array($payload) || !isset($payload['rate']) || !is_string($payload['rate'])) {
-            throw new BadRequestHttpException('A RUB/CUP rate is required');
+            throw new BadRequestHttpException('La tasa es requerida.');
+        }
+        $base = strtoupper(trim($payload['base'] ?? 'RUB'));
+        $quote = strtoupper(trim($payload['quote'] ?? 'CUP'));
+        if (!in_array($base, ['RUB', 'CUP'], true) || !in_array($quote, ['RUB', 'CUP'], true) || $base === $quote) {
+            throw new BadRequestHttpException('Par de monedas no soportado.');
         }
 
         try {
-            return (new ExchangeRateService(Yii::$app->db))->saveAdminOverride($payload['rate'], $userId);
+            return (new ExchangeRateService(Yii::$app->db))->saveAdminOverride($payload['rate'], $userId, $base, $quote);
         } catch (DomainException $exception) {
             throw new UnprocessableEntityHttpException($exception->getMessage(), 0, $exception);
         }
@@ -139,13 +150,19 @@ final class AdminController extends Controller
         if (!is_array($payload) || !is_string($payload['source'] ?? null)) {
             throw new BadRequestHttpException('La fuente de tasa es obligatoria.');
         }
+        $base = strtoupper(trim($payload['base'] ?? 'RUB'));
+        $quote = strtoupper(trim($payload['quote'] ?? 'CUP'));
+        if (!in_array($base, ['RUB', 'CUP'], true) || !in_array($quote, ['RUB', 'CUP'], true) || $base === $quote) {
+            throw new BadRequestHttpException('Par de monedas no soportado.');
+        }
+        $pairKey = "{$base}/{$quote}";
         try {
-            $rate = (new ExchangeRateService(Yii::$app->db))->setActiveSource($payload['source'], $userId);
+            $rate = (new ExchangeRateService(Yii::$app->db))->setActiveSource($payload['source'], $userId, $base, $quote);
             Yii::$app->db->createCommand()->insert('{{%audit_logs}}', [
                 'actor_user_id' => $userId,
                 'action' => 'exchange_rate.source.changed',
                 'entity_type' => 'exchange_rate',
-                'entity_id' => 'RUB/CUP',
+                'entity_id' => $pairKey,
                 'ip_address' => Yii::$app->request->userIP,
                 'user_agent' => substr((string) Yii::$app->request->userAgent, 0, 500),
                 'after_data' => new JsonExpression(['source' => $payload['source'], 'rate' => $rate['rate']]),

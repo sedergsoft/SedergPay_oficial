@@ -6,8 +6,10 @@ namespace app\Infrastructure\Pricing;
 
 use DateTimeImmutable;
 use DomainException;
+use RuntimeException;
 use app\Infrastructure\Configuration\PlatformSettings;
 use yii\db\Connection;
+use yii\db\Expression;
 use yii\db\Transaction;
 
 final class ExchangeRateService
@@ -28,7 +30,6 @@ final class ExchangeRateService
      *   source: string,
      *   source_label: string,
      *   effective_date: string,
-     *   source_url: ?string,
      *   manual_override: bool
      * }
      */
@@ -39,33 +40,27 @@ final class ExchangeRateService
         if ($baseCurrency === $quoteCurrency
             || !in_array($baseCurrency, ['RUB', 'CUP'], true)
             || !in_array($quoteCurrency, ['RUB', 'CUP'], true)) {
-            throw new DomainException('Only RUB/CUP exchange rates are supported');
+            throw new DomainException('Solo se admiten las tasas RUB/CUP y CUP/RUB');
         }
 
         $activeSource = PlatformSettings::get($this->db, 'pricing.exchange_rate_source');
         $direct = $activeSource === 'admin_override'
-            ? $this->findEffective('RUB', 'CUP', self::ADMIN_SOURCE)
-            : $this->findEffectiveOfficial();
+            ? $this->findEffective($baseCurrency, $quoteCurrency, self::ADMIN_SOURCE)
+            : $this->findEffectiveOfficial($baseCurrency, $quoteCurrency);
         if ($direct === null && $activeSource === 'admin_override') {
-            throw new DomainException('No existe una tasa manual activa. Seleccione la tasa oficial o defina una tasa manual.');
+            throw new DomainException('No existe una tasa manual activa para este par. Seleccione la tasa oficial o defina una tasa manual.');
         }
         if ($direct === null) {
             $official = $this->officialClient->fetchRubCup();
-            $this->saveOfficial($official);
-            $direct = [
-                'rate' => $official['rate'],
-                'source' => $official['source'],
-                'effective_date' => $official['effective_date'],
-                'source_url' => $official['source_url'],
-                'manual_override' => false,
-            ];
+            // Save RUB/CUP (buy/compra: CUP per RUB from tasaEspecial)
+            $this->saveOfficial('RUB', 'CUP', $official['rate_rub_cup'], $official['source'], $official['effective_date']);
+            // Save CUP/RUB (sell/venta: RUB per CUP from tasaOficial)
+            $this->saveOfficial('CUP', 'RUB', $official['rate_cup_rub'], $official['source'], $official['effective_date']);
+            $direct = $baseCurrency === 'RUB'
+                ? ['rate' => $official['rate_rub_cup'], 'source' => $official['source'], 'effective_date' => $official['effective_date'], 'manual_override' => false]
+                : ['rate' => $official['rate_cup_rub'], 'source' => $official['source'], 'effective_date' => $official['effective_date'], 'manual_override' => false];
         }
 
-        if ($baseCurrency === 'RUB') {
-            return $this->format($baseCurrency, $quoteCurrency, $direct);
-        }
-
-        $direct['rate'] = bcdiv('1', $direct['rate'], 10);
         return $this->format($baseCurrency, $quoteCurrency, $direct);
     }
 
@@ -77,109 +72,144 @@ final class ExchangeRateService
      *   source: string,
      *   source_label: string,
      *   effective_date: string,
-     *   source_url: ?string,
      *   manual_override: bool
      * }
      */
     public function refreshOfficial(): array
     {
         $official = $this->officialClient->fetchRubCup();
-        $this->saveOfficial($official);
+        // Save RUB/CUP (buy/compra: CUP per RUB from tasaEspecial)
+        $this->saveOfficial('RUB', 'CUP', $official['rate_rub_cup'], $official['source'], $official['effective_date']);
+        // Save CUP/RUB (sell/venta: RUB per CUP from tasaOficial)
+        $this->saveOfficial('CUP', 'RUB', $official['rate_cup_rub'], $official['source'], $official['effective_date']);
 
         return $this->format('RUB', 'CUP', [
-            'rate' => $official['rate'],
+            'rate' => $official['rate_rub_cup'],
             'source' => $official['source'],
             'effective_date' => $official['effective_date'],
-            'source_url' => $official['source_url'],
             'manual_override' => false,
         ]);
     }
 
-    public function saveAdminOverride(string $rate, int $userId): array
+    public function saveAdminOverride(string $rate, int $userId, string $baseCurrency = 'RUB', string $quoteCurrency = 'CUP'): array
     {
-        $rate = trim($rate);
-        if (!preg_match('/^\d+(?:\.\d{1,10})?$/', $rate) || bccomp($rate, '0', 10) <= 0) {
-            throw new DomainException('Exchange rate must be a positive decimal');
+        $baseCurrency = strtoupper(trim($baseCurrency));
+        $quoteCurrency = strtoupper(trim($quoteCurrency));
+        if ($baseCurrency === $quoteCurrency
+            || !in_array($baseCurrency, ['RUB', 'CUP'], true)
+            || !in_array($quoteCurrency, ['RUB', 'CUP'], true)) {
+            throw new DomainException('Solo se admiten las tasas RUB/CUP y CUP/RUB');
+        }
+        $rate = $this->decimal($rate, 'rate');
+        if ($rate <= '0') {
+            throw new DomainException('La tasa debe ser mayor a cero.');
         }
 
-        $now = new DateTimeImmutable('now', new \DateTimeZone('UTC'));
+        $now = new DateTimeImmutable();
         $transaction = $this->db->beginTransaction();
         try {
-            $this->db->createCommand()->update(
-                '{{%exchange_rates}}',
-                ['valid_until' => $now->format('Y-m-d H:i:s')],
+            $this->db->createCommand(
+                "UPDATE {{%exchange_rates}} SET valid_until = :valid_until
+                 WHERE base_currency = :base AND quote_currency = :quote AND source = :source AND valid_until IS NULL",
                 [
-                    'base_currency' => 'RUB',
-                    'quote_currency' => 'CUP',
-                    'source' => self::ADMIN_SOURCE,
-                    'valid_until' => null,
+                    ':valid_until' => $now->format('Y-m-d H:i:s'),
+                    ':base' => $baseCurrency,
+                    ':quote' => $quoteCurrency,
+                    ':source' => self::ADMIN_SOURCE,
                 ]
             )->execute();
-            $this->db->createCommand()->insert('{{%exchange_rates}}', [
-                'base_currency' => 'RUB',
-                'quote_currency' => 'CUP',
-                'rate' => $rate,
-                'source' => self::ADMIN_SOURCE,
-                'valid_from' => $now->format('Y-m-d H:i:s'),
-                'created_by_user_id' => $userId,
-            ])->execute();
+
+            $this->db->createCommand(
+                "INSERT INTO {{%exchange_rates}}
+                 (base_currency, quote_currency, rate, source, valid_from, valid_until, created_by_user_id)
+                 VALUES (:base, :quote, :rate, :source, :valid_from, NULL, :user_id)",
+                [
+                    ':base' => $baseCurrency,
+                    ':quote' => $quoteCurrency,
+                    ':rate' => $rate,
+                    ':source' => self::ADMIN_SOURCE,
+                    ':valid_from' => $now->format('Y-m-d H:i:s'),
+                    ':user_id' => $userId,
+                ]
+            )->execute();
             $transaction->commit();
-        } catch (\Throwable $exception) {
-            if ($transaction->getIsActive()) {
-                $transaction->rollBack();
-            }
-            throw $exception;
+        } catch (\Throwable $e) {
+            $transaction->rollBack();
+            throw $e;
         }
 
-        $this->db->createCommand()->upsert('{{%platform_settings}}', [
-            'setting_key' => 'pricing.exchange_rate_source',
-            'setting_value' => 'admin_override',
-            'value_type' => 'enum',
-            'updated_by_user_id' => $userId,
-        ], [
-            'setting_value' => 'admin_override',
-            'value_type' => 'enum',
-            'updated_by_user_id' => $userId,
-        ])->execute();
-
-        return $this->resolve('RUB', 'CUP');
+        return $this->format($baseCurrency, $quoteCurrency, [
+            'rate' => $rate,
+            'source' => self::ADMIN_SOURCE,
+            'effective_date' => $now->format('Y-m-d'),
+            'manual_override' => true,
+        ]);
     }
 
-    public function setActiveSource(string $source, int $userId): array
+    public function setActiveSource(string $source, int $userId, string $baseCurrency = 'RUB', string $quoteCurrency = 'CUP'): array
     {
+        $baseCurrency = strtoupper(trim($baseCurrency));
+        $quoteCurrency = strtoupper(trim($quoteCurrency));
         if (!in_array($source, ['official', 'admin_override'], true)) {
             throw new DomainException('La fuente debe ser official o admin_override.');
         }
-        if ($source === 'admin_override' && $this->findEffective('RUB', 'CUP', self::ADMIN_SOURCE) === null) {
-            throw new DomainException('No hay una tasa manual guardada para activar.');
+        if ($source === 'admin_override' && $this->findEffective($baseCurrency, $quoteCurrency, self::ADMIN_SOURCE) === null) {
+            throw new DomainException('No existe una tasa manual activa para este par.');
         }
         $this->db->createCommand()->upsert('{{%platform_settings}}', [
             'setting_key' => 'pricing.exchange_rate_source',
             'setting_value' => $source,
-            'value_type' => 'enum',
-            'updated_by_user_id' => $userId,
-        ], [
-            'setting_value' => $source,
-            'value_type' => 'enum',
-            'updated_by_user_id' => $userId,
-        ])->execute();
+        ], ['setting_key' => 'pricing.exchange_rate_source'])->execute();
 
-        return $this->resolve('RUB', 'CUP');
+        return $this->resolve($baseCurrency, $quoteCurrency);
+    }
+
+    public function getRateHistory(string $baseCurrency, string $quoteCurrency, int $limit = 30): array
+    {
+        $baseCurrency = strtoupper(trim($baseCurrency));
+        $quoteCurrency = strtoupper(trim($quoteCurrency));
+        if (!in_array($baseCurrency, ['RUB', 'CUP'], true) || !in_array($quoteCurrency, ['RUB', 'CUP'], true)) {
+            throw new DomainException('Par de monedas no válido.');
+        }
+
+        $rows = $this->db->createCommand(
+            "SELECT rate, source, valid_from, valid_until, created_by_user_id
+             FROM {{%exchange_rates}}
+             WHERE base_currency = :base AND quote_currency = :quote
+             ORDER BY valid_from DESC
+             LIMIT :limit",
+            [
+                ':base' => $baseCurrency,
+                ':quote' => $quoteCurrency,
+                ':limit' => $limit,
+            ]
+        )->queryAll();
+
+        $result = [];
+        foreach ($rows as $row) {
+            $result[] = [
+                'rate' => (string) $row['rate'],
+                'source' => $row['source'],
+                'effective_date' => (new DateTimeImmutable((string) $row['valid_from']))->format('Y-m-d'),
+                'valid_until' => $row['valid_until'] ? (new DateTimeImmutable((string) $row['valid_until']))->format('Y-m-d H:i:s') : null,
+            ];
+        }
+        return $result;
     }
 
     private function findEffective(string $base, string $quote, string $source): ?array
     {
         $row = $this->db->createCommand(
-            'SELECT rate, source, valid_from, created_at
+            "SELECT rate, source, valid_from
              FROM {{%exchange_rates}}
-             WHERE base_currency = :base
-               AND quote_currency = :quote
-               AND source = :source
-               AND valid_from <= CURRENT_TIMESTAMP
-               AND (valid_until IS NULL OR valid_until > CURRENT_TIMESTAMP)
-             ORDER BY valid_from DESC, id DESC
-             LIMIT 1',
-            [':base' => $base, ':quote' => $quote, ':source' => $source]
+             WHERE base_currency = :base AND quote_currency = :quote AND source = :source AND valid_until IS NULL
+             ORDER BY valid_from DESC
+             LIMIT 1",
+            [
+                ':base' => $base,
+                ':quote' => $quote,
+                ':source' => $source,
+            ]
         )->queryOne();
 
         if ($row === false) {
@@ -188,95 +218,92 @@ final class ExchangeRateService
 
         return [
             'rate' => (string) $row['rate'],
-            'source' => (string) $row['source'],
+            'source' => $row['source'],
             'effective_date' => (new DateTimeImmutable((string) $row['valid_from']))->format('Y-m-d'),
-            'source_url' => $source === self::ADMIN_SOURCE
-                ? null
-                : ($source === 'bcc_official'
-                    ? OfficialRateClient::BCC_SOURCE_URL
-                    : OfficialRateClient::CBR_SOURCE_URL),
-            'manual_override' => $source === self::ADMIN_SOURCE,
         ];
     }
 
-    private function findEffectiveOfficial(): ?array
+    private function findEffectiveOfficial(string $baseCurrency, string $quoteCurrency): ?array
     {
-        $rows = $this->db->createCommand(
-            'SELECT rate, source, valid_from
+        $row = $this->db->createCommand(
+            "SELECT rate, source, valid_from
              FROM {{%exchange_rates}}
-             WHERE base_currency = :base
-               AND quote_currency = :quote
-               AND source IN (:bcc, :cbr)
-               AND valid_from <= CURRENT_TIMESTAMP
-               AND (valid_until IS NULL OR valid_until > CURRENT_TIMESTAMP)
-             ORDER BY CASE source WHEN :bcc_order THEN 0 ELSE 1 END,
-                      valid_from DESC, id DESC
-             LIMIT 1',
+             WHERE base_currency = :base AND quote_currency = :quote
+               AND source IN ('bcc_official', 'cbr_official')
+               AND valid_until IS NULL
+             ORDER BY valid_from DESC
+             LIMIT 1",
             [
-                ':base' => 'RUB',
-                ':quote' => 'CUP',
-                ':bcc' => 'bcc_official',
-                ':cbr' => 'cbr_official',
-                ':bcc_order' => 'bcc_official',
+                ':base' => $baseCurrency,
+                ':quote' => $quoteCurrency,
             ]
         )->queryOne();
-        if ($rows === false) {
+
+        if ($row === false) {
             return null;
         }
 
-        $source = (string) $rows['source'];
         return [
-            'rate' => (string) $rows['rate'],
-            'source' => $source,
-            'effective_date' => (new DateTimeImmutable((string) $rows['valid_from']))->format('Y-m-d'),
-            'source_url' => $source === 'bcc_official'
-                ? OfficialRateClient::BCC_SOURCE_URL
-                : OfficialRateClient::CBR_SOURCE_URL,
-            'manual_override' => false,
+            'rate' => (string) $row['rate'],
+            'source' => $row['source'],
+            'effective_date' => (new DateTimeImmutable((string) $row['valid_from']))->format('Y-m-d'),
         ];
     }
 
-    private function saveOfficial(array $official): void
+    private function saveOfficial(string $baseCurrency, string $quoteCurrency, string $rate, string $source, string $effectiveDate): void
     {
-        $existing = $this->db->createCommand(
-            'SELECT id FROM {{%exchange_rates}}
-             WHERE base_currency = :base AND quote_currency = :quote
-               AND source = :source AND CAST(valid_from AS DATE) = :date LIMIT 1',
+        $now = new DateTimeImmutable();
+        $this->db->createCommand(
+            "UPDATE {{%exchange_rates}} SET valid_until = :valid_until
+             WHERE base_currency = :base AND quote_currency = :quote AND source = :source AND valid_until IS NULL",
             [
-                ':base' => 'RUB',
-                ':quote' => 'CUP',
-                ':source' => $official['source'],
-                ':date' => $official['effective_date'],
+                ':valid_until' => $now->format('Y-m-d H:i:s'),
+                ':base' => $baseCurrency,
+                ':quote' => $quoteCurrency,
+                ':source' => $source,
             ]
-        )->queryScalar();
-        if ($existing !== false) {
-            $this->db->createCommand()->update('{{%exchange_rates}}', [
-                'rate' => $official['rate'],
-                'valid_until' => null,
-            ], ['id' => $existing])->execute();
-            return;
-        }
+        )->execute();
 
-        $this->db->createCommand()->insert('{{%exchange_rates}}', [
-            'base_currency' => 'RUB',
-            'quote_currency' => 'CUP',
-            'rate' => $official['rate'],
-            'source' => $official['source'],
-            'valid_from' => $official['effective_date'] . ' 00:00:00',
-            'created_by_user_id' => null,
-        ])->execute();
+        $this->db->createCommand(
+            "INSERT INTO {{%exchange_rates}}
+             (base_currency, quote_currency, rate, source, valid_from, valid_until, created_by_user_id)
+             VALUES (:base, :quote, :rate, :source, :valid_from, NULL, NULL)",
+            [
+                ':base' => $baseCurrency,
+                ':quote' => $quoteCurrency,
+                ':rate' => $rate,
+                ':source' => $source,
+                ':valid_from' => $now->format('Y-m-d H:i:s'),
+            ]
+        )->execute();
     }
 
     private function format(string $base, string $quote, array $rate): array
     {
-        $rate['base_currency'] = $base;
-        $rate['quote_currency'] = $quote;
-        $rate['source_label'] = $rate['manual_override']
-            ? 'Definida por administrador'
-            : ($rate['source'] === 'bcc_official'
-                ? 'Banco Central de Cuba · segmento población/FGNE'
-                : 'Banco de Rusia · respaldo oficial');
+        $sourceLabel = match ($rate['source']) {
+            'bcc_official' => 'BCC (Banco Central de Cuba)',
+            'cbr_official' => 'CBR (Banco Central de Rusia)',
+            'admin_override' => 'Administrador',
+            default => $rate['source'],
+        };
 
-        return $rate;
+        return [
+            'base_currency' => $base,
+            'quote_currency' => $quote,
+            'rate' => $rate['rate'],
+            'source' => $rate['source'],
+            'source_label' => $sourceLabel,
+            'effective_date' => $rate['effective_date'],
+            'manual_override' => $rate['manual_override'] ?? false,
+        ];
+    }
+
+    private function decimal(string $value, string $field): string
+    {
+        $trimmed = trim($value);
+        if ($trimmed === '' || !is_numeric($trimmed)) {
+            throw new RuntimeException("Invalid {$field}");
+        }
+        return (string) bcadd($trimmed, '0', 10);
     }
 }
