@@ -47,3 +47,4 @@ volumes:
   legacy_mysql_data:
     external: true
     name: ${SEDERG_MYSQL_VOLUME:-sederg_pay_sederg_mysql_data}
+  legacy_mysql_migration_copy:
