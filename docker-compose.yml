@@ -69,7 +69,8 @@ services:
       POSTGRES_USER: ${SEDERG_DB_USER:-sederg_app}
       POSTGRES_PASSWORD: ${SEDERG_DB_PASSWORD:?SEDERG_DB_PASSWORD is required}
       PGDATA: /var/lib/postgresql/data/pgdata
-    ports: ["${SEDERG_DB_PORT:-5432}:5432"]
+    # Puerto solo expuesto en desarrollo local. En produccion dejar comentado y acceder via red interna de Docker.
+    # ports: ["${SEDERG_DB_PORT:-5432}:5432"]
     volumes: [sederg_postgres_data:/var/lib/postgresql/data]
     healthcheck:
       test: ["CMD-SHELL","pg_isready -U ${SEDERG_DB_USER:-sederg_app} -d sederg_pay"]
@@ -78,6 +79,9 @@ services:
       retries: 20
   redis:
     image: redis:7-alpine
+    environment:
+      SEDERG_REDIS_PASSWORD: ${SEDERG_REDIS_PASSWORD:?SEDERG_REDIS_PASSWORD is required}
+    command: ["redis-server", "--requirepass", "${SEDERG_REDIS_PASSWORD}"]
     ports: ["6379:6379"]
     volumes: [sederg_redis_data:/data]
 volumes:
@@ -85,4 +89,3 @@ volumes:
   sederg_redis_data:
   sederg_private_data:
   clamav_database:
-
