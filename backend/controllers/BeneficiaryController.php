@@ -7,6 +7,7 @@ namespace app\controllers;
 use app\Infrastructure\Beneficiary\BeneficiaryRepository;
 use app\Infrastructure\Auth\UserAuthenticator;
 use app\Infrastructure\Configuration\PlatformSettings;
+use app\Infrastructure\Security\AuditLog;
 use Yii;
 use yii\filters\ContentNegotiator;
 use yii\web\BadRequestHttpException;
@@ -171,20 +172,20 @@ final class BeneficiaryController extends Controller
         $tx = Yii::$app->db->beginTransaction();
         try {
             $repository->updateForUser($publicId, $userId, $payload, $countryId);
-            Yii::$app->db->createCommand()->insert('{{%audit_logs}}', [
-                'actor_user_id' => $userId,
-                'action' => 'beneficiary.updated',
-                'entity_type' => 'beneficiary',
-                'entity_id' => $publicId,
-                'ip_address' => Yii::$app->request->userIP,
-                'user_agent' => substr((string) Yii::$app->request->userAgent, 0, 500),
-                'after_data' => new \yii\db\JsonExpression([
+            (new AuditLog(Yii::$app->db))->insert(
+                action: 'beneficiary.updated',
+                entityType: 'beneficiary',
+                actorUserId: $userId,
+                entityId: $publicId,
+                ipAddress: Yii::$app->request->userIP,
+                userAgent: substr((string) Yii::$app->request->userAgent, 0, 500),
+                afterData: [
                     'changed_fields' => array_values(array_intersect(array_keys($payload), [
                         'country_code', 'first_name', 'last_name', 'phone_e164', 'email',
                         'payout_method_code', 'payout_provider',
                     ])),
-                ]),
-            ])->execute();
+                ],
+            );
             $tx->commit();
         } catch (\Throwable $exception) {
             if ($tx->getIsActive()) {

@@ -45,6 +45,8 @@ services:
     image: clamav/clamav:stable
     restart: unless-stopped
     volumes: [clamav_database:/var/lib/clamav]
+    # I-04: Actualizar definiciones de virus automáticamente con freshclam cada 3 horas.
+    command: ["sh","-c","freshclam --quiet --daemon-notify=/var/run/clamav/clamd.sock && clamd --foreground"]
     healthcheck:
       test: ["CMD-SHELL","clamdscan --ping=3"]
       interval: 30s

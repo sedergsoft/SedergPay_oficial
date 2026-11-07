@@ -6,6 +6,7 @@ namespace app\controllers;
 
 use app\Infrastructure\Auth\UserAuthenticator;
 use app\Infrastructure\Kyc\KycDocumentSecurity;
+use app\Infrastructure\Security\AuditLog;
 use Yii;
 use yii\filters\ContentNegotiator;
 use yii\web\Controller;
@@ -67,6 +68,9 @@ final class KycController extends Controller
 
     public function actionUploadDocument(): array
     {
+        if (!Yii::$app->request->isPost) {
+            throw new ForbiddenHttpException('Only POST method is allowed for document upload');
+        }
         $userId = $this->userId();
         $type = (string) Yii::$app->request->post('document_type', 'identity');
         if (!in_array($type, ['identity', 'address', 'selfie'], true)) {
@@ -181,20 +185,20 @@ final class KycController extends Controller
                 'reviewed_by_user_id' => null,
             ], ['id' => $caseId])->execute();
 
-            $db->createCommand()->insert('{{%audit_logs}}', [
-                'actor_user_id' => $userId,
-                'action' => 'kyc.document.uploaded',
-                'entity_type' => 'kyc_case',
-                'entity_id' => (string) $caseId,
-                'ip_address' => Yii::$app->request->userIP,
-                'user_agent' => substr((string) Yii::$app->request->userAgent, 0, 500),
-                'after_data' => new \yii\db\JsonExpression([
+            (new AuditLog(Yii::$app->db))->insert(
+                action: 'kyc.document.uploaded',
+                entityType: 'kyc_case',
+                actorUserId: $userId,
+                entityId: (string) $caseId,
+                ipAddress: Yii::$app->request->userIP,
+                userAgent: substr((string) Yii::$app->request->userAgent, 0, 500),
+                afterData: [
                     'document_type' => $type,
                     'mime_type' => $mime,
                     'file_size' => strlen($originalContent),
                     'sha256' => hash('sha256', $originalContent),
-                ]),
-            ])->execute();
+                ],
+            );
 
             $tx->commit();
         } catch (\Throwable $exception) {
@@ -249,14 +253,14 @@ final class KycController extends Controller
                 'review_reason' => null,
             ], ['id' => $case['id'], 'status' => $case['status']])->execute();
 
-            $db->createCommand()->insert('{{%audit_logs}}', [
-                'actor_user_id' => $userId,
-                'action' => 'kyc.case.submitted',
-                'entity_type' => 'kyc_case',
-                'entity_id' => (string) $case['id'],
-                'ip_address' => Yii::$app->request->userIP,
-                'user_agent' => substr((string) Yii::$app->request->userAgent, 0, 500),
-            ])->execute();
+            (new AuditLog(Yii::$app->db))->insert(
+                action: 'kyc.case.submitted',
+                entityType: 'kyc_case',
+                actorUserId: $userId,
+                entityId: (string) $case['id'],
+                ipAddress: Yii::$app->request->userIP,
+                userAgent: substr((string) Yii::$app->request->userAgent, 0, 500),
+            );
 
             $tx->commit();
         } catch (\Throwable $exception) {

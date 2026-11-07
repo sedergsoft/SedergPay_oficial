@@ -7,6 +7,7 @@ namespace app\controllers;
 use app\Infrastructure\Auth\UserAuthenticator;
 use app\Infrastructure\Configuration\PlatformSettings;
 use app\Infrastructure\Pricing\ExchangeRateService;
+use app\Infrastructure\Security\AuditLog;
 use DomainException;
 use Yii;
 use yii\filters\ContentNegotiator;
@@ -158,15 +159,15 @@ final class AdminController extends Controller
         $pairKey = "{$base}/{$quote}";
         try {
             $rate = (new ExchangeRateService(Yii::$app->db))->setActiveSource($payload['source'], $userId, $base, $quote);
-            Yii::$app->db->createCommand()->insert('{{%audit_logs}}', [
-                'actor_user_id' => $userId,
-                'action' => 'exchange_rate.source.changed',
-                'entity_type' => 'exchange_rate',
-                'entity_id' => $pairKey,
-                'ip_address' => Yii::$app->request->userIP,
-                'user_agent' => substr((string) Yii::$app->request->userAgent, 0, 500),
-                'after_data' => new JsonExpression(['source' => $payload['source'], 'rate' => $rate['rate']]),
-            ])->execute();
+            (new AuditLog(Yii::$app->db))->insert(
+                action: 'exchange_rate.source.changed',
+                entityType: 'exchange_rate',
+                actorUserId: $userId,
+                entityId: $pairKey,
+                ipAddress: Yii::$app->request->userIP,
+                userAgent: substr((string) Yii::$app->request->userAgent, 0, 500),
+                afterData: ['source' => $payload['source'], 'rate' => $rate['rate']],
+            );
             return $rate;
         } catch (DomainException $exception) {
             throw new UnprocessableEntityHttpException($exception->getMessage(), 0, $exception);
@@ -249,15 +250,15 @@ final class AdminController extends Controller
                 'review_reason' => $reason !== '' ? $reason : null,
             ], ['id' => $case['id'], 'status' => 'pending_review'])->execute();
 
-            $db->createCommand()->insert('{{%audit_logs}}', [
-                'actor_user_id' => $reviewerId,
-                'action' => 'kyc.case.reviewed',
-                'entity_type' => 'kyc_case',
-                'entity_id' => $publicId,
-                'ip_address' => Yii::$app->request->userIP,
-                'user_agent' => substr((string) Yii::$app->request->userAgent, 0, 500),
-                'after_data' => new JsonExpression(['status' => $status, 'reason' => $reason]),
-            ])->execute();
+            (new AuditLog(Yii::$app->db))->insert(
+                action: 'kyc.case.reviewed',
+                entityType: 'kyc_case',
+                actorUserId: $reviewerId,
+                entityId: $publicId,
+                ipAddress: Yii::$app->request->userIP,
+                userAgent: substr((string) Yii::$app->request->userAgent, 0, 500),
+                afterData: ['status' => $status, 'reason' => $reason],
+            );
             $tx->commit();
         } catch (\Throwable $exception) {
             if ($tx->getIsActive()) {
@@ -325,15 +326,15 @@ final class AdminController extends Controller
             throw new \yii\web\ServerErrorHttpException('KYC document integrity or decryption check failed');
         }
 
-        Yii::$app->db->createCommand()->insert('{{%audit_logs}}', [
-            'actor_user_id' => $reviewerId,
-            'action' => 'kyc.document.downloaded',
-            'entity_type' => 'kyc_document',
-            'entity_id' => $publicId,
-            'ip_address' => Yii::$app->request->userIP,
-            'user_agent' => substr((string) Yii::$app->request->userAgent, 0, 500),
-            'after_data' => new JsonExpression(['case_public_id' => $doc['case_public_id']]),
-        ])->execute();
+        (new AuditLog(Yii::$app->db))->insert(
+            action: 'kyc.document.downloaded',
+            entityType: 'kyc_document',
+            actorUserId: $reviewerId,
+            entityId: $publicId,
+            ipAddress: Yii::$app->request->userIP,
+            userAgent: substr((string) Yii::$app->request->userAgent, 0, 500),
+            afterData: ['case_public_id' => $doc['case_public_id']],
+        );
 
         Yii::$app->response->headers->set('X-Content-Type-Options', 'nosniff');
         Yii::$app->response->headers->set('Cache-Control', 'no-store, private');
@@ -364,16 +365,16 @@ final class AdminController extends Controller
         $transaction = Yii::$app->db->beginTransaction();
         try {
             $result = PlatformSettings::save(Yii::$app->db, $userId, $payload['settings']);
-            Yii::$app->db->createCommand()->insert('{{%audit_logs}}', [
-                'actor_user_id' => $userId,
-                'action' => 'platform.settings.updated',
-                'entity_type' => 'platform_settings',
-                'entity_id' => 'platform',
-                'ip_address' => Yii::$app->request->userIP,
-                'user_agent' => substr((string) Yii::$app->request->userAgent, 0, 500),
-                'before_data' => new JsonExpression($result['before']),
-                'after_data' => new JsonExpression($result['after']),
-            ])->execute();
+            (new AuditLog(Yii::$app->db))->insert(
+                action: 'platform.settings.updated',
+                entityType: 'platform_settings',
+                actorUserId: $userId,
+                entityId: 'platform',
+                ipAddress: Yii::$app->request->userIP,
+                userAgent: substr((string) Yii::$app->request->userAgent, 0, 500),
+                beforeData: $result['before'],
+                afterData: $result['after'],
+            );
             $transaction->commit();
         } catch (DomainException $exception) {
             if ($transaction->getIsActive()) {
