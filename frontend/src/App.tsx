@@ -7,22 +7,36 @@ const LanguageContext = createContext<Language>('es');
 const useLanguage = () => useContext(LanguageContext);
 const useT = () => { const language = useLanguage(); return (key: string) => translate(language, key); };
 const localeFor = (language: Language) => language === 'ru' ? 'ru-RU' : 'es-ES';
+type Theme = 'light' | 'dark';
+
+function getInitialTheme(): Theme {
+  const saved = localStorage.getItem('sederg_theme');
+  if (saved === 'light' || saved === 'dark') return saved;
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
 
 type View = 'summary' | 'beneficiaries' | 'quote' | 'remittances' | 'profile' | 'kyc' | 'admin' | 'funding';
 const storedUserId = isDevelopmentAuth ? localStorage.getItem('sederg_user') ?? '' : '';
 
 export function App() {
   const [language, setLanguage] = useState<Language>(getInitialLanguage);
+  const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const changeLanguage = (next: Language) => {
     setLanguage(next);
     localStorage.setItem('sederg_language', next);
     document.documentElement.lang = next;
   };
+  const changeTheme = (next: Theme) => {
+    setTheme(next);
+    localStorage.setItem('sederg_theme', next);
+    document.documentElement.dataset.theme = next;
+  };
   useEffect(() => { document.documentElement.lang = language; }, [language]);
-  return <LanguageContext.Provider value={language}><AppContent language={language} onLanguageChange={changeLanguage} /></LanguageContext.Provider>;
+  useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem('sederg_theme', theme); }, [theme]);
+  return <LanguageContext.Provider value={language}><AppContent language={language} onLanguageChange={changeLanguage} theme={theme} onThemeChange={changeTheme} /></LanguageContext.Provider>;
 }
 
-function AppContent({ language, onLanguageChange }: { language: Language; onLanguageChange: (language: Language) => void }) {
+function AppContent({ language, onLanguageChange, theme, onThemeChange }: { language: Language; onLanguageChange: (language: Language) => void; theme: Theme; onThemeChange: (theme: Theme) => void }) {
   const t = useT();
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(!storedUserId);
@@ -53,15 +67,15 @@ function AppContent({ language, onLanguageChange }: { language: Language; onLang
     setView('summary');
   };
 
-  if (!authReady) return <main className="shell narrow"><Header language={language} onLanguageChange={onLanguageChange} /><section className="card"><p className="muted">{t('app.restoringSession')}</p></section></main>;
-  if (!user && publicView === 'landing') return <Landing language={language} onLanguageChange={onLanguageChange} onLogin={() => { setAuthView('login'); setPublicView('auth'); }} onRegister={() => { setAuthView('register'); setPublicView('auth'); }} />;
-  if (!user) return <AuthScreen language={language} onLanguageChange={onLanguageChange} mode={authView} setMode={setAuthView} busy={busy} message={message} run={run} onBack={() => setPublicView('landing')} onAuthenticated={(next) => {
+  if (!authReady) return <main className="shell narrow"><Header language={language} onLanguageChange={onLanguageChange} theme={theme} onThemeChange={onThemeChange} /><section className="card"><p className="muted">{t('app.restoringSession')}</p></section></main>;
+  if (!user && publicView === 'landing') return <Landing language={language} onLanguageChange={onLanguageChange} theme={theme} onThemeChange={onThemeChange} onLogin={() => { setAuthView('login'); setPublicView('auth'); }} onRegister={() => { setAuthView('register'); setPublicView('auth'); }} />;
+  if (!user) return <AuthScreen language={language} onLanguageChange={onLanguageChange} theme={theme} onThemeChange={onThemeChange} mode={authView} setMode={setAuthView} busy={busy} message={message} run={run} onBack={() => setPublicView('landing')} onAuthenticated={(next) => {
     localStorage.setItem('sederg_user', next.public_id);
     setUser(next);
   }} />;
 
   return <main className="shell">
-    <Header language={language} onLanguageChange={onLanguageChange} />
+    <Header language={language} onLanguageChange={onLanguageChange} theme={theme} onThemeChange={onThemeChange} />
     <RateBanner />
     <section className="hero">
       <div><div className="eyebrow">{t('app.operationsPanel')}</div><h1>{t('app.hello')}, {user.first_name}.</h1><p>{t('app.welcomeDescription')}</p></div>
@@ -91,19 +105,30 @@ function AppContent({ language, onLanguageChange }: { language: Language; onLang
   </main>;
 }
 
-function Landing({ language, onLanguageChange, onLogin, onRegister }: { language: Language; onLanguageChange: (language: Language) => void; onLogin: () => void; onRegister: () => void }) {
+function Landing({ language, onLanguageChange, onLogin, onRegister, theme, onThemeChange }: { language: Language; onLanguageChange: (language: Language) => void; onLogin: () => void; onRegister: () => void; theme: Theme; onThemeChange: (theme: Theme) => void }) {
   const text = (key: string) => translate(language, key);
   const [rubToCup, setRubToCup] = useState<ExchangeRate | null>(null);
   const [cupToRub, setCupToRub] = useState<ExchangeRate | null>(null);
   useEffect(() => {
     api.bothExchangeRates().then(([r2c, c2r]) => { setRubToCup(r2c); setCupToRub(c2r); }).catch(() => undefined);
   }, []);
+  const [amount, setAmount] = useState('10000');
+  const [from, setFrom] = useState<'RUB' | 'CUP'>('RUB');
+  const [to, setTo] = useState<'RUB' | 'CUP'>('CUP');
   const currentRate = rubToCup ? Number(rubToCup.rate).toFixed(5) : '—';
   const inverseRate = cupToRub ? Number(cupToRub.rate).toFixed(5) : '—';
   const receiveExample = rubToCup ? (10000 * Number(rubToCup.rate)).toLocaleString(localeFor(language), { maximumFractionDigits: 2 }) : '—';
+  const rateValue = from === to ? null : (from === 'RUB' && to === 'CUP' ? rubToCup : from === 'CUP' && to === 'RUB' ? cupToRub : null);
+  const rate = rateValue ? Number(rateValue.rate) : null;
+  const amountNumber = Number(amount);
+  const canConvert = rate !== null && Number.isFinite(amountNumber) && amountNumber > 0;
+  const receivedAmount = canConvert && rate !== null ? amountNumber * rate : null;
+  const receivedText = receivedAmount !== null ? receivedAmount.toLocaleString(localeFor(language), { maximumFractionDigits: 2 }) : '—';
+  const rateText = rate !== null ? `${Number(rate).toFixed(5)} ${to} por ${from}` : '—';
+  const swapCurrencies = () => { setFrom(to); setTo(from); };
   return <main className="landing">
     <header className="landing-header">
-      <Header language={language} onLanguageChange={onLanguageChange} />
+      <Header language={language} onLanguageChange={onLanguageChange} theme={theme} onThemeChange={onThemeChange} />
       <nav className="landing-actions" aria-label="Acceso">
         <button className="landing-login" onClick={onLogin}>{text('common.login')}</button>
         <button onClick={onRegister}>{text('common.register')} <span aria-hidden="true">→</span></button>
@@ -131,6 +156,20 @@ function Landing({ language, onLanguageChange, onLogin, onRegister }: { language
       </div>
     </section>
     <section className="landing-rate"><div><span className="eyebrow">{text('landing.transparency')}</span><strong>{text('landing.rate')}</strong></div><div className="landing-rate-value"><div><strong>{currentRate}</strong> <span>{text('landing.cupPerRub')}</span><small>{text('landing.updated')} {rubToCup ? rubToCup.effective_date : '…'}</small></div><div><strong>{inverseRate}</strong> <span>{text('landing.rubPerCup')}</span><small>{text('landing.updated')} {cupToRub ? cupToRub.effective_date : '…'}</small></div></div></section>
+    <section className="landing-calculator">
+      <div className="section-intro"><span className="eyebrow">{text('landing.calculatorEyebrow')}</span><h2>{text('landing.calculatorTitle')}<br /><em>{text('landing.calculatorAccent')}</em></h2><p>{text('landing.calculatorDescription')}</p></div>
+      <div className="calculator">
+        <div className="calculator-top">
+          <label className="calculator-field"><span>{text('landing.calcAmount')}</span><input className="calculator-amount" inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value.replace(/[^0-9.,]/g, ''))} placeholder="10000" /></label>
+          <label className="calculator-field"><span>{text('landing.calcFrom')}</span><select className="calculator-select" value={from} onChange={(event) => setFrom(event.target.value as 'RUB' | 'CUP')}><option value="RUB">RUB</option><option value="CUP">CUP</option></select></label>
+          <button className="calculator-swap" type="button" onClick={swapCurrencies} aria-label={text('landing.calcSwap')}><svg className="calculator-swap-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M17 8l4 4-4 4" /><path d="M21 12H3" /></svg></button>
+          <label className="calculator-field"><span>{text('landing.calcTo')}</span><select className="calculator-select" value={to} onChange={(event) => setTo(event.target.value as 'RUB' | 'CUP')}><option value="RUB">RUB</option><option value="CUP">CUP</option></select></label>
+        </div>
+        <div className="calculator-result">
+          <div><span>{text('landing.calcYouReceive')}</span><strong className="calculator-result-value">{canConvert ? `${receivedText} ${to}` : '—'}</strong><small>{canConvert && rateValue ? `${rateText} · ${rateValue.source_label}` : text('landing.calcInvalid')}</small></div>
+        </div>
+      </div>
+    </section>
     <section className="landing-section">
       <div className="section-intro"><span className="eyebrow">{text('landing.featuresEyebrow')}</span><h2>{text('landing.featuresTitle')}<br /><em>{text('landing.featuresAccent')}</em></h2><p>{text('landing.featuresDescription')}</p></div>
       <div className="feature-grid"><Feature icon="transfer" title={text('landing.featureClear')} text={text('landing.featureClearText')} /><Feature icon="shield" title={text('landing.featureSecure')} text={text('landing.featureSecureText')} /><Feature icon="history" title={text('landing.featureTrack')} text={text('landing.featureTrackText')} /></div>
@@ -144,8 +183,8 @@ function Icon({ name, className = "" }: { name: string; className?: string }) { 
 function Feature({ icon, title, text }: { icon: string; title: string; text: string }) { return <article className="feature"><span className="feature-icon"><Icon name={icon} /></span><h3>{title}</h3><p>{text}</p></article>; }
 function Step({ number, title, text }: { number: string; title: string; text: string }) { return <article className="step"><span>{number}</span><div><h3>{title}</h3><p>{text}</p></div></article>; }
 
-function AuthScreen({ language, onLanguageChange, mode, setMode, busy, message, run, onBack, onAuthenticated }: {
-  language: Language; onLanguageChange: (language: Language) => void;
+function AuthScreen({ language, onLanguageChange, theme, onThemeChange, mode, setMode, busy, message, run, onBack, onAuthenticated }: {
+  language: Language; onLanguageChange: (language: Language) => void; theme: Theme; onThemeChange: (theme: Theme) => void;
   mode: 'login' | 'register'; setMode: (mode: 'login' | 'register') => void; busy: boolean;
   message: string; run: (action: () => Promise<void>) => Promise<void>; onBack: () => void; onAuthenticated: (user: User) => void;
 }) {
@@ -176,7 +215,7 @@ function AuthScreen({ language, onLanguageChange, mode, setMode, busy, message, 
       }
     });
   }, []);
-  return <main className="shell narrow"><Header language={language} onLanguageChange={onLanguageChange} /><RateBanner /><section className="auth-card card">
+  return <main className="shell narrow"><Header language={language} onLanguageChange={onLanguageChange} theme={theme} onThemeChange={onThemeChange} /><RateBanner /><section className="auth-card card">
     <button className="back-link" type="button" onClick={onBack}>{text('common.backHome')}</button>
     <div className="eyebrow">{text('auth.secure')}</div><h1>{mode === 'login' ? text('auth.welcome') : text('auth.create')}</h1>
     <p className="muted">{isDevelopmentAuth ? text('auth.description') : text('auth.oidcDescription')}</p>
@@ -628,8 +667,15 @@ function LanguageSwitch({ language, onChange }: { language: Language; onChange: 
     {(Object.keys(languageLabels) as Language[]).map((option) => <button key={option} type="button" className={language === option ? 'language-option active' : 'language-option'} onClick={() => onChange(option)} aria-pressed={language === option}>{languageLabels[option]}</button>)}
   </div>;
 }
-function Header({ language, onLanguageChange }: { language: Language; onLanguageChange: (language: Language) => void }) {
-  return <header><Brand language={language} /><div className="header-tools"><LanguageSwitch language={language} onChange={onLanguageChange} /><span className="sandbox"><i /> {translate(language, 'common.sandbox')}</span></div></header>;
+function ThemeToggle({ theme, onChange }: { theme: Theme; onChange: (theme: Theme) => void }) {
+  const t = useT();
+  const isDark = theme === 'dark';
+  const label = isDark ? t('common.themeLight') : t('common.themeDark');
+  return <button type="button" className="theme-toggle" onClick={() => onChange(isDark ? 'light' : 'dark')} aria-label={t('common.themeToggle')} title={label} aria-pressed={isDark}><svg className="theme-toggle-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{isDark ? <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /> : <><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></>}</svg></button>;
+}
+
+function Header({ language, onLanguageChange, theme, onThemeChange }: { language: Language; onLanguageChange: (language: Language) => void; theme: Theme; onThemeChange: (theme: Theme) => void }) {
+  return <header><Brand language={language} /><div className="header-tools"><ThemeToggle theme={theme} onChange={onThemeChange} /><LanguageSwitch language={language} onChange={onLanguageChange} /><span className="sandbox"><i /> {translate(language, 'common.sandbox')}</span></div></header>;
 }
 function RateBanner() {
   const t = useT();
