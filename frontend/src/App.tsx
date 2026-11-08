@@ -116,6 +116,7 @@ function Landing({ language, onLanguageChange, onLogin, onRegister, theme, onThe
   const [from, setFrom] = useState<'RUB' | 'CUP'>('RUB');
   const [to, setTo] = useState<'RUB' | 'CUP'>('CUP');
   const currentRate = rubToCup ? Number(rubToCup.rate).toFixed(5) : '—';
+  const inverseRate = cupToRub ? Number(cupToRub.rate).toFixed(5) : '—';
   const receiveExample = rubToCup ? (10000 * Number(rubToCup.rate)).toLocaleString(localeFor(language), { maximumFractionDigits: 2 }) : '—';
   const rateValue = from === to ? null : (from === 'RUB' && to === 'CUP' ? rubToCup : from === 'CUP' && to === 'RUB' ? cupToRub : null);
   const rate = rateValue ? Number(rateValue.rate) : null;
@@ -133,6 +134,7 @@ function Landing({ language, onLanguageChange, onLogin, onRegister, theme, onThe
         <button onClick={onRegister}>{text('common.register')} <span aria-hidden="true">→</span></button>
       </nav>
     </header>
+    <RateTicker />
     <section className="landing-hero">
       <div className="landing-copy">
         <div className="eyebrow">{text('landing.eyebrow')}</div>
@@ -154,7 +156,7 @@ function Landing({ language, onLanguageChange, onLogin, onRegister, theme, onThe
         </div>
       </div>
     </section>
-    <section className="landing-rate"><div><span className="eyebrow">{text('landing.transparency')}</span><strong>{text('landing.rate')}</strong></div><div className="landing-rate-value"><RateTicker /></div></section>
+    <section className="landing-rate"><div><span className="eyebrow">{text('landing.transparency')}</span><strong>{text('landing.rate')}</strong></div><div className="landing-rate-value"><div><strong>{currentRate}</strong> <span>{text('landing.cupPerRub')}</span><small>{text('landing.updated')} {rubToCup ? rubToCup.effective_date : '…'}</small></div><div><strong>{inverseRate}</strong> <span>{text('landing.rubPerCup')}</span><small>{text('landing.updated')} {cupToRub ? cupToRub.effective_date : '…'}</small></div></div></section>
     <section className="landing-calculator">
       <div className="section-intro"><span className="eyebrow">{text('landing.calculatorEyebrow')}</span><h2>{text('landing.calculatorTitle')}<br /><em>{text('landing.calculatorAccent')}</em></h2><p>{text('landing.calculatorDescription')}</p></div>
       <div className="calculator">
