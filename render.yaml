@@ -21,13 +21,9 @@ services:
       - key: SEDERG_DB_PASSWORD
         sync: false
       - key: SEDERG_AUTH_MODE
-        value: development          # solo sandbox; producción exige OIDC
-      - key: SEDERG_OIDC_ISSUER     # exigidos fuera de development (placeholder ok en sandbox)
-        sync: false
-      - key: SEDERG_OIDC_AUDIENCE
-        sync: false
-      - key: SEDERG_OIDC_PUBLIC_KEY
-        sync: false
+        value: development          # sandbox: identidad por X-User-Public-Id; produccion exige OIDC
+      # SEDERG_OIDC_ISSUER / _AUDIENCE / _PUBLIC_KEY solo se usan con
+      # SEDERG_AUTH_MODE=production. Anadirlos en el panel al pasar a produccion.
       - key: SEDERG_COOKIE_KEY
         generateValue: true
       - key: SEDERG_DEBUG
@@ -38,8 +34,22 @@ services:
         generateValue: true
       - key: SEDERG_PRIVATE_STORAGE_PATH
         value: /var/lib/sederg-private
+      - key: SEDERG_KYC_REQUIRED
+        value: "0"                  # sin ClamAV en Render Free (disco efimero, solo sandbox)
       - key: SEDERG_MAIL_TRANSPORT
-        value: log                  # sandbox: log; cambiar a smtp cuando haga falta
+        value: smtp                 # el backend solo admite smtp; 'log' rompe el registro
+      - key: SEDERG_MAIL_PORT
+        value: "587"
+      - key: SEDERG_MAIL_ENCRYPTION
+        value: tls
+      - key: SEDERG_MAIL_HOST
+        sync: false
+      - key: SEDERG_MAIL_USERNAME
+        sync: false
+      - key: SEDERG_MAIL_PASSWORD
+        sync: false
+      - key: SEDERG_MAIL_FROM
+        sync: false
       - key: SEDERG_APP_URL
         value: https://sedergsoft.github.io/SedergPay_oficial/
       - key: SEDERG_CORS_ORIGINS
