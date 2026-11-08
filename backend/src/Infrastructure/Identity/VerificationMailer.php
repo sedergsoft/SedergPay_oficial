@@ -169,11 +169,16 @@ private function smtpConfig(): array
     $password = (string) getenv('SEDERG_MAIL_PASSWORD');
     $from = trim((string) getenv('SEDERG_MAIL_FROM'));
     $encryption = strtolower(trim((string) (getenv('SEDERG_MAIL_ENCRYPTION') ?: 'tls')));
-    $incomplete = $host === '' || $username === '' || $password === ''
+    $auth = $username !== '' || $password !== '';
+    if ($encryption === 'none' || $encryption === '') {
+        $encryption = 'none';
+    }
+    $incomplete = $host === ''
         || $from === '' || !filter_var($from, FILTER_VALIDATE_EMAIL)
         || $port < 1 || $port > 65535
-        || !in_array($encryption, ['tls', 'ssl'], true);
-    return compact('host', 'port', 'username', 'password', 'from', 'encryption', 'incomplete');
+        || !in_array($encryption, ['tls', 'ssl', 'none'], true)
+        || ($auth && ($username === '' || $password === ''));
+    return compact('host', 'port', 'username', 'password', 'from', 'encryption', 'incomplete', 'auth');
 }
 
 private function buildVerificationUrl(string $email, string $token): string
@@ -225,8 +230,8 @@ private function sendMessage(string $email, string $subject, string $body, strin
     }
     $host = $config['host'];
     $port = $config['port'];
-    $username = $config['username'];
-    $password = $config['password'];
+    $username = (string) ($config['username'] ?? '');
+    $password = (string) ($config['password'] ?? '');
     $from = $config['from'];
     $encryption = $config['encryption'];
 
@@ -246,9 +251,11 @@ private function sendMessage(string $email, string $subject, string $body, strin
             }
             $this->command($socket, 'EHLO sederg-pay.local', 250);
         }
-        $this->command($socket, 'AUTH LOGIN', 334);
-        $this->command($socket, base64_encode($username), 334);
-        $this->command($socket, base64_encode($password), 235);
+        if (!empty($config['auth'])) {
+            $this->command($socket, 'AUTH LOGIN', 334);
+            $this->command($socket, base64_encode($username), 334);
+            $this->command($socket, base64_encode($password), 235);
+        }
         $this->command($socket, "MAIL FROM:<{$from}>", 250);
         $this->command($socket, "RCPT TO:<{$email}>", [250, 251]);
         $this->command($socket, 'DATA', 354);
