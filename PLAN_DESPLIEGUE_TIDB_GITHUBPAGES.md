@@ -8,8 +8,15 @@ Desplegar el MVP sandbox sin coste usando:
 |---|---|---|
 | Base de datos | **TiDB Cloud Starter** (PostgreSQL-compatible, Public Preview) | Free tier |
 | Frontend | **GitHub Pages** (SPA React/Vite) | Gratis |
-| Backend API (Yii2/PHP 8.3) | **Render Free** (contenedor Docker) — alternativa: Koyeb Free | Free tier |
+| Backend API (Yii2/PHP 8.3) | **Northflank — Sandbox (Free)** (contenedor Docker) — alternativa: Render Free (descartado: pide tarjeta) | Free tier |
 | Redis | **Upstash Free** | Free tier |
+
+> Nota de hosting: **Render Free pide tarjeta de crédito** en su plan actual,
+> por lo que no sirve para el sandbox sin coste. Se sustituyó por
+> **Northflank Sandbox (Free)**: plan gratuito sin tarjeta, *always on / no
+> sleeping*, build con Dockerfile y hasta 2 servicios incluidos. El origen del
+> deploy es el repo fuente `sedergsoft/SedergPay_backend` (contenido raíz =
+> directorio `backend/` del repo principal, Dockerfile en raíz).
 
 Este plan no habilita dinero real. Todo permanece en sandbox hasta completar
 los gates de [PLAN_DE_ACCION.md](./PLAN_DE_ACCION.md).
@@ -81,11 +88,11 @@ Neon o Supabase, que ya se auditaron como compatibles en la conversación).
    > config si hay cache/queue). Si el MVP sandbox no usa Redis todavía, esta
    > fase puede completarse al final.
 
-## Fase 3 — Backend (contenedor PHP) en Render Free
+## Fase 3 - Backend (contenedor PHP) en Northflank (Sandbox Free)
 
-1. En Render → **New → Blueprint / Docker** apuntando al repo (o Push-to-Docker
-   con la imagen del `backend` construida del `Dockerfile` de `./backend`).
-2. Variables de entorno (sin secretos en Git; usar el panel de Render):
+1. En Northflank → **New Project → Deployments → New deployment**: Source
+   **GitHub**, repo `sedergsoft/SedergPay_backend` (Dockerfile en raíz), branch `main`.
+2. Variables de entorno (sin secretos en Git; usar el panel de Northflank):
    ```text
    SEDERG_DB_DSN=pgsql:host=<pgwire-host>;port=<port>;dbname=<db>;sslmode=require
    SEDERG_DB_USER=<usuario-tidb>
@@ -101,19 +108,19 @@ Neon o Supabase, que ya se auditaron como compatibles en la conversación).
    SEDERG_CORS_ORIGINS=https://sedergsoft.github.io
    SEDERG_BACKEND_PORT=8080
    ```
-3. **ClamAV**: el compose local exige `clamav` healthy. En Render Free no hay
-   contenedor sidecar fácil; desacoplar `depends_on` y `SEDERG_CLAMD_HOST`
-   para el despliegue cloud (mantener ClamAV en el stack de VM/producción).
-4. **rate-updater**: en Render crear un segundo servicio (Cron Job free o
-   Background Worker) que ejecute cada 6 h `php yii rates/update` con las
-   mismas variables de BD.
-5. Ejecutar de nuevo `php yii migrate` contra TiDB **desde el propio Render**
-   (shell del servicio) para confirmar conectividad saliente.
-6. Verificar: `GET https://<api>.onrender.com/health` → JSON OK.
+3. **ClamAV**: el compose local exige `clamav` healthy. En Northflank Sandbox
+   (free, sin sidecar) usar `SEDERG_KYC_REQUIRED=0` (scan off en sandbox).
+4. **rate-updater**: en Northflank crear un segundo servicio (cron/background
+   worker) que ejecute cada 6 h `php yii rates/update` con las mismas
+   variables de BD (o mantenerlo en el stack local; la BD es externa TiDB).
+5. Ejecutar de nuevo `php yii migrate` contra TiDB **desde el propio servicio**
+   (shell) para confirmar conectividad saliente.
+6. Verificar: `GET https://<api>.onrender.com/health` → JSON OK (URL final
+   del servicio Northflank; la API se sirve en el puerto configurado).
 
-**Puerta de calidad:** si Render Free bloquea la salida TLS por 4000/pgwire
-o el cold start rompe la primera petición, documentarlo y valorar **Koyeb**
-(como alternativa free-tier con build dockerfile directo).
+**Puerta de calidad:** si el plan free bloquea la salida TLS al pgwire (4000) o
+el arranque tarda >60 s, documentarlo y valorar **Back4App Containers Free**
+(o Koyeb si el pago por uso no aplica).
 
 ## Fase 4 — Frontend en GitHub Pages
 
