@@ -39,7 +39,7 @@ services:
       - key: SEDERG_MAIL_TRANSPORT
         value: smtp                 # el backend solo admite smtp; 'log' rompe el registro
       - key: SEDERG_MAIL_PORT
-        value: "587"
+        value: "2525"               # Render bloquea salida SMTP en 25/465/587; Brevo acepta 2525
       - key: SEDERG_MAIL_ENCRYPTION
         value: tls
       - key: SEDERG_MAIL_HOST
