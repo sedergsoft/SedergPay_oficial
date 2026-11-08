@@ -108,21 +108,23 @@ function AppContent({ language, onLanguageChange, theme, onThemeChange }: { lang
 function LandingRateCard({ language }: { language: Language }) {
   const text = (key: string) => translate(language, key);
   const locale = localeFor(language);
-  const cacheKey = 'sederg_rate_rub_cup_last_valid';
-  const [rate, setRate] = useState<ExchangeRate | null>(null);
-  const [stale, setStale] = useState<{ data: ExchangeRate; reason: string } | null>(null);
+  const cacheKey = 'sederg_rate_both_last_valid';
+  const [rates, setRates] = useState<{ rubToCup: ExchangeRate; cupToRub: ExchangeRate } | null>(null);
+  const [staleReason, setStaleReason] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const readCache = (): ExchangeRate | null => {
+  const readCache = (): { rubToCup: ExchangeRate; cupToRub: ExchangeRate } | null => {
     try {
       const raw = localStorage.getItem(cacheKey);
-      return raw ? (JSON.parse(raw) as ExchangeRate) : null;
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { rubToCup?: ExchangeRate; cupToRub?: ExchangeRate };
+      return parsed.rubToCup && parsed.cupToRub ? { rubToCup: parsed.rubToCup, cupToRub: parsed.cupToRub } : null;
     } catch {
       return null;
     }
   };
-  const writeCache = (value: ExchangeRate) => {
+  const writeCache = (value: { rubToCup: ExchangeRate; cupToRub: ExchangeRate }) => {
     try { localStorage.setItem(cacheKey, JSON.stringify(value)); } catch { /* ignore */ }
   };
 
@@ -130,17 +132,20 @@ function LandingRateCard({ language }: { language: Language }) {
     if (!silent) setLoading(true);
     setError('');
     try {
-      const next = await api.currentExchangeRate('RUB', 'CUP');
-      setRate(next);
-      setStale(next.stale ? { data: next, reason: next.stale_reason || text('landing.rateStaleHint') } : null);
-      if (!next.stale) writeCache(next);
+      const [rubToCup, cupToRub] = await api.bothExchangeRates();
+      const next = { rubToCup, cupToRub };
+      setRates(next);
+      const anyStale = rubToCup.stale || cupToRub.stale;
+      const reason = rubToCup.stale_reason || cupToRub.stale_reason || (anyStale ? translate(language, 'landing.rateStaleHint') : null);
+      setStaleReason(reason);
+      if (!anyStale) writeCache(next);
     } catch (reason) {
       const cached = readCache();
       if (cached) {
-        setRate(cached);
-        setStale({ data: cached, reason: (reason as Error)?.message || text('landing.rateStaleHint') });
+        setRates(cached);
+        setStaleReason((reason as Error)?.message || translate(language, 'landing.rateStaleHint'));
       } else {
-        setError((reason as Error)?.message || text('landing.rateUnavailable'));
+        setError((reason as Error)?.message || translate(language, 'landing.rateUnavailable'));
       }
     } finally {
       setLoading(false);
@@ -153,39 +158,49 @@ function LandingRateCard({ language }: { language: Language }) {
     return () => window.clearInterval(id);
   }, []);
 
-  const shown = rate;
-  if (loading && !shown) return <section className="landing-rate-card-wrap" aria-live="polite"><div className="exchange-rate-card exchange-rate-card-loading"><span className="exchange-rate-capsule">{text('landing.rate')}</span><p className="muted">{text('landing.rateLoading')}</p></div></section>;
-  if (!shown) return <section className="landing-rate-card-wrap" aria-live="polite"><div className="exchange-rate-card exchange-rate-card-error"><span className="exchange-rate-capsule">{text('landing.rate')}</span><p className="alert">{error || text('landing.rateUnavailable')}</p></div></section>;
+  if (loading && !rates) return <section className="landing-rate-card-wrap" aria-live="polite"><div className="exchange-rate-card exchange-rate-card-loading"><span className="exchange-rate-capsule">{text('landing.rate')}</span><p className="muted">{text('landing.rateLoading')}</p></div></section>;
+  if (!rates) return <section className="landing-rate-card-wrap" aria-live="polite"><div className="exchange-rate-card exchange-rate-card-error"><span className="exchange-rate-capsule">{text('landing.rate')}</span><p className="alert">{error || text('landing.rateUnavailable')}</p></div></section>;
 
-  const variation = shown.variation_direction ?? 'unknown';
-  const hasVariation = variation === 'up' || variation === 'down';
-  const variationAbs = shown.variation_absolute ? Number(shown.variation_absolute) : null;
-  const variationPct = shown.variation_percent ? Number(shown.variation_percent) : null;
-  const variationText = hasVariation && variationAbs !== null
-    ? `${variation === 'up' ? '+' : ''}${variationAbs.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}${variationPct !== null ? ` (${variation === 'up' ? '+' : ''}${variationPct.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%)` : ''}`
-    : text('landing.rateNoVariation');
-  const sourceType = (shown.source_type === 'administrative' || shown.manual_override) ? 'administrative' : 'official';
+  const { rubToCup, cupToRub } = rates;
+  const isStale = !!staleReason || !!rubToCup.stale || !!cupToRub.stale;
+  const primary = rubToCup;
+  const sourceType = (primary.source_type === 'administrative' || primary.manual_override) ? 'administrative' : 'official';
   const sourceTypeLabel = sourceType === 'administrative' ? text('landing.rateAdministrative') : text('landing.rateOfficial');
-  const updatedAt = shown.updated_at || shown.valid_from;
-  const updatedText = updatedAt ? new Date(updatedAt).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' }) : shown.effective_date;
-  const provenance = shown.provenance || shown.source_label || '—';
-  const isStale = !!stale || !!shown.stale;
+  const provenance = primary.provenance || primary.source_label || '—';
+  const updatedAt = primary.updated_at || primary.valid_from;
+  const updatedText = updatedAt ? new Date(updatedAt).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' }) : primary.effective_date;
   const statusText = isStale ? text('landing.rateCached') : text('landing.rateLive');
   const flagBase = `${import.meta.env.BASE_URL}assets/sederg-pay/flags`;
+
+  const renderPair = (pair: ExchangeRate, fromFlag: string, toFlag: string, fromAlt: string, toAlt: string) => {
+    const variation = pair.variation_direction ?? 'unknown';
+    const hasVariation = variation === 'up' || variation === 'down';
+    const variationAbs = pair.variation_absolute ? Number(pair.variation_absolute) : null;
+    const variationPct = pair.variation_percent ? Number(pair.variation_percent) : null;
+    const variationText = hasVariation && variationAbs !== null
+      ? `${variation === 'up' ? '+' : ''}${variationAbs.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}${variationPct !== null ? ` (${variation === 'up' ? '+' : ''}${variationPct.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%)` : ''}`
+      : text('landing.rateNoVariation');
+    return (
+      <div className="exchange-rate-pair" aria-label={`${pair.base_currency} a ${pair.quote_currency}`}>
+        <div className="exchange-rate-main">
+          <div className="exchange-rate-leg"><img className="exchange-rate-flag" src={`${flagBase}/${fromFlag}`} alt={fromAlt} /><div><strong>1 {pair.base_currency}</strong></div></div>
+          <div className="exchange-rate-symbol" aria-hidden="true">⇒</div>
+          <div className="exchange-rate-leg"><div><strong className="exchange-rate-value">{Number(pair.rate).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} {pair.quote_currency}</strong></div><img className="exchange-rate-flag" src={`${flagBase}/${toFlag}`} alt={toAlt} /></div>
+        </div>
+        <div className={`exchange-rate-variation ${variation}`}><span className="exchange-rate-arrow" aria-hidden="true">{variation === 'up' ? '↑' : variation === 'down' ? '↓' : '•'}</span><span>{variationText}</span></div>
+        <div className="exchange-rate-pair-meta"><span>{text('landing.rateUpdatedAt')}: {pair.effective_date}</span><span className="exchange-rate-sep">·</span><span>{pair.provenance || pair.source_label || '—'}</span></div>
+      </div>
+    );
+  };
 
   return <section className="landing-rate-card-wrap" aria-live="polite">
     <article className={`exchange-rate-card${isStale ? ' is-stale' : ''}`}>
       <header className="exchange-rate-header"><span className="exchange-rate-capsule">{text('landing.rate')}</span><span className={`exchange-rate-source-badge ${sourceType}`}>{sourceTypeLabel}</span></header>
-      <p className="exchange-rate-subtitle"><span>{text('landing.rateUpdatedAt')}: {shown.effective_date}</span><span className="exchange-rate-sep">·</span><span>{provenance}</span></p>
-      {isStale && <p className="exchange-rate-stale" role="status"><strong>{text('landing.rateStale')}:</strong> {stale?.reason || shown.stale_reason || text('landing.rateStaleHint')}</p>}
-      <div className="exchange-rate-main" aria-label={`${shown.base_currency} ${text('landing.rate')}`}>
-        <div className="exchange-rate-leg"><img className="exchange-rate-flag" src={`${flagBase}/russia.svg`} alt="Rusia" /><div><strong>1 {shown.base_currency || 'RUB'}</strong></div></div>
-        <div className="exchange-rate-symbol" aria-hidden="true">⇒</div>
-        <div className="exchange-rate-leg"><div><strong className="exchange-rate-value">{Number(shown.rate).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} {shown.quote_currency || 'CUP'}</strong></div><img className="exchange-rate-flag" src={`${flagBase}/cuba.svg`} alt="Cuba" /></div>
-      </div>
-      <div className={`exchange-rate-variation ${variation}`} aria-label={text('landing.rateTitle')}>
-        <span className="exchange-rate-arrow" aria-hidden="true">{variation === 'up' ? '↑' : variation === 'down' ? '↓' : '•'}</span>
-        <span>{variationText}</span>
+      <p className="exchange-rate-subtitle"><span>{text('landing.rateUpdatedAt')}: {primary.effective_date}</span><span className="exchange-rate-sep">·</span><span>{provenance}</span></p>
+      {isStale && <p className="exchange-rate-stale" role="status"><strong>{text('landing.rateStale')}:</strong> {staleReason || text('landing.rateStaleHint')}</p>}
+      <div className="exchange-rate-pairs">
+        {renderPair(rubToCup, 'russia.svg', 'cuba.svg', 'Rusia', 'Cuba')}
+        {renderPair(cupToRub, 'cuba.svg', 'russia.svg', 'Cuba', 'Rusia')}
       </div>
       <footer className="exchange-rate-meta">
         <span><strong>{text('landing.rateUpdatedAt')}:</strong> {updatedText}</span>
