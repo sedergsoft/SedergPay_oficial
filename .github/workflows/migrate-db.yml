@@ -14,7 +14,7 @@ jobs:
     container: php:8.3-cli
     steps:
       # Action fijada por SHA de commit (hardening de supply chain)
-      - uses: actions/checkout@11bd71901dde5d65c0150f27bcaeb1e692dcd2a7 # v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Install PostgreSQL driver
         run: |
