@@ -159,16 +159,16 @@ header { display: flex; align-items: center; justify-content: space-between; mar
   background: rgba(255,255,255,.09); font-size: 2rem; transform: rotate(-12deg);
 }
 
-/* ---------- Banner de tasa (ticker) ---------- */
-.rate-banner {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  margin: 0 0 18px; padding: 12px 16px;
-  border: 1px solid var(--line); border-radius: 14px;
-  color: var(--indigo-700); background: linear-gradient(110deg, var(--indigo-100), var(--coral-100));
-  font-size: .84rem;
-}
-.rate-banner strong { font-variant-numeric: tabular-nums; }
-.rate-banner span { color: var(--ink-600); font-size: .76rem; font-variant-numeric: tabular-nums; }
+/* ---------- Ticker de tipo de cambio (anuncios de bolsa) ---------- */
+.rate-ticker { position: relative; display: flex; overflow: hidden; width: 100%; margin: 0 0 18px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 14px; color: var(--indigo-700); background: linear-gradient(110deg, var(--indigo-100), var(--coral-100)); font-size: .84rem; }
+.rate-ticker-track { display: flex; width: max-content; flex-shrink: 0; animation: rate-ticker-scroll var(--rate-ticker-duration, 45s) linear infinite; }
+.rate-ticker:hover .rate-ticker-track { animation-play-state: paused; }
+.rate-ticker-group { display: flex; align-items: center; gap: 44px; padding-right: 44px; }
+.rate-ticker-item { display: flex; align-items: baseline; gap: 10px; white-space: nowrap; }
+.rate-ticker-item strong { font-variant-numeric: tabular-nums; }
+.rate-ticker-item span { color: var(--ink-600); font-size: .76rem; font-variant-numeric: tabular-nums; }
+@keyframes rate-ticker-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { .rate-ticker-track { animation: none; } }
 
 /* ---------- Layout de trabajo ---------- */
 .toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; color: var(--ink-600); font-size: .82rem; }
@@ -375,8 +375,9 @@ footer { padding-top: 18px; text-align: center; }
 .landing-rate { display: flex; align-items: center; justify-content: space-between; gap: 18px; max-width: 1140px; margin: 0 auto 100px; padding: 24px 30px; border: 1px solid var(--line); border-radius: var(--radius-m); background: var(--surface-0); box-shadow: var(--shadow-1); }
 .landing-rate > div { display: grid; gap: 5px; }
 .landing-rate-value { display: flex !important; align-items: center; gap: 15px; }
-.landing-rate-value strong { color: var(--indigo-700); font-size: 1.45rem; font-variant-numeric: tabular-nums; }
-.landing-rate-value span { color: var(--ink-400); font-size: .75rem; }
+.landing-rate-value .rate-ticker { flex: 1; min-width: 0; margin-bottom: 0; }
+.landing-rate-value .rate-ticker strong { color: var(--indigo-700); font-size: 1.45rem; font-variant-numeric: tabular-nums; }
+.landing-rate-value .rate-ticker .rate-ticker-item span { color: var(--ink-400); font-size: .75rem; }
 
 .landing-section, .landing-steps { max-width: 1140px; margin: 0 auto; padding: 0 25px 110px; }
 .section-intro h2 { margin: 10px 0 13px; font-size: clamp(2rem, 4vw, 3.2rem); line-height: 1.08; letter-spacing: -.04em; }
@@ -411,6 +412,7 @@ footer { padding-top: 18px; text-align: center; }
   .landing-visual { min-height: 380px; margin-top: 15px; transform: scale(.9); }
   .landing-rate { align-items: flex-start; flex-direction: column; margin: 0 15px 75px; padding: 20px; }
   .landing-rate-value { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .landing-rate-value .rate-ticker { width: 100%; }
   .landing-section, .landing-steps { padding-right: 22px; padding-bottom: 75px; padding-left: 22px; }
   .feature-grid { grid-template-columns: 1fr; margin-top: 28px; }
   .settings-grid { grid-template-columns: 1fr; }
@@ -422,7 +424,7 @@ footer { padding-top: 18px; text-align: center; }
   header { margin-bottom: 20px; }
   .hero { align-items: flex-start; padding: 24px 22px; border-radius: 19px; }
   .hero-mark { width: 48px; height: 48px; border-radius: 15px; font-size: 1.45rem; }
-  .rate-banner { align-items: flex-start; flex-direction: column; gap: 3px; }
+  .rate-ticker { align-items: center; }
   .grid { grid-template-columns: 1fr; gap: 0; }
   .workspace { grid-template-columns: 1fr; gap: 12px; }
   .menu { position: static; display: flex; overflow-x: auto; padding: 8px; border-radius: 14px; }
@@ -494,7 +496,7 @@ header { margin-bottom:24px; }
 .hero::after { border-color:rgba(255,255,255,.13); }
 .hero .eyebrow { color:#BFEAFF; }
 .hero-mark { border-radius:18px; background:rgba(255,255,255,.13); }
-.rate-banner { border-color:#C7DFF4; color:#0B3F8C; background:linear-gradient(105deg,#E8F5FF,#F7FBFF); }
+.rate-ticker { border-color:#C7DFF4; color:#0B3F8C; background:linear-gradient(105deg,#E8F5FF,#F7FBFF); }
 .workspace { grid-template-columns:232px minmax(0,1fr); gap:20px; }
 .menu,.card,.transfer-card,.feature,.landing-rate { border-color:#DCE5F0; background:#fff; box-shadow:var(--shadow-1); }
 .menu { border-radius:16px; }
@@ -810,8 +812,8 @@ td,th { border-bottom:1px solid #E5EDF5; }
 :root[data-theme='dark'] .landing-footer { border-top-color: var(--line); color:#6C7688; }
 :root[data-theme='dark'] .landing-calculator .calculator { background: var(--surface-0); border-color: var(--line); }
 
-:root[data-theme='dark'] .rate-banner { border-color:#2A3A55; color:#9FB6E8; background:linear-gradient(105deg,#141E36,#101A2E); }
-:root[data-theme='dark'] .rate-banner span { color:#A7B0C3; }
+:root[data-theme='dark'] .rate-ticker { border-color:#2A3A55; color:#9FB6E8; background:linear-gradient(105deg,#141E36,#101A2E); }
+:root[data-theme='dark'] .rate-ticker span { color:#A7B0C3; }
 :root[data-theme='dark'] .menu, :root[data-theme='dark'] .card, :root[data-theme='dark'] .transfer-card, :root[data-theme='dark'] .feature, :root[data-theme='dark'] .landing-rate { background: var(--surface-0); border-color: var(--line); }
 :root[data-theme='dark'] .menu { background: var(--surface-0); }
 :root[data-theme='dark'] .nav-button { color:#A7B0C3; }

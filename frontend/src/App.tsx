@@ -76,7 +76,7 @@ function AppContent({ language, onLanguageChange, theme, onThemeChange }: { lang
 
   return <main className="shell">
     <Header language={language} onLanguageChange={onLanguageChange} theme={theme} onThemeChange={onThemeChange} />
-    <RateBanner />
+    <RateTicker />
     <section className="hero">
       <div><div className="eyebrow">{t('app.operationsPanel')}</div><h1>{t('app.hello')}, {user.first_name}.</h1><p>{t('app.welcomeDescription')}</p></div>
       <div className="hero-mark" aria-hidden="true">↗</div>
@@ -116,7 +116,6 @@ function Landing({ language, onLanguageChange, onLogin, onRegister, theme, onThe
   const [from, setFrom] = useState<'RUB' | 'CUP'>('RUB');
   const [to, setTo] = useState<'RUB' | 'CUP'>('CUP');
   const currentRate = rubToCup ? Number(rubToCup.rate).toFixed(5) : '—';
-  const inverseRate = cupToRub ? Number(cupToRub.rate).toFixed(5) : '—';
   const receiveExample = rubToCup ? (10000 * Number(rubToCup.rate)).toLocaleString(localeFor(language), { maximumFractionDigits: 2 }) : '—';
   const rateValue = from === to ? null : (from === 'RUB' && to === 'CUP' ? rubToCup : from === 'CUP' && to === 'RUB' ? cupToRub : null);
   const rate = rateValue ? Number(rateValue.rate) : null;
@@ -155,7 +154,7 @@ function Landing({ language, onLanguageChange, onLogin, onRegister, theme, onThe
         </div>
       </div>
     </section>
-    <section className="landing-rate"><div><span className="eyebrow">{text('landing.transparency')}</span><strong>{text('landing.rate')}</strong></div><div className="landing-rate-value"><div><strong>{currentRate}</strong> <span>{text('landing.cupPerRub')}</span><small>{text('landing.updated')} {rubToCup ? rubToCup.effective_date : '…'}</small></div><div><strong>{inverseRate}</strong> <span>{text('landing.rubPerCup')}</span><small>{text('landing.updated')} {cupToRub ? cupToRub.effective_date : '…'}</small></div></div></section>
+    <section className="landing-rate"><div><span className="eyebrow">{text('landing.transparency')}</span><strong>{text('landing.rate')}</strong></div><div className="landing-rate-value"><RateTicker /></div></section>
     <section className="landing-calculator">
       <div className="section-intro"><span className="eyebrow">{text('landing.calculatorEyebrow')}</span><h2>{text('landing.calculatorTitle')}<br /><em>{text('landing.calculatorAccent')}</em></h2><p>{text('landing.calculatorDescription')}</p></div>
       <div className="calculator">
@@ -215,7 +214,7 @@ function AuthScreen({ language, onLanguageChange, theme, onThemeChange, mode, se
       }
     });
   }, []);
-  return <main className="shell narrow"><Header language={language} onLanguageChange={onLanguageChange} theme={theme} onThemeChange={onThemeChange} /><RateBanner /><section className="auth-card card">
+  return <main className="shell narrow"><Header language={language} onLanguageChange={onLanguageChange} theme={theme} onThemeChange={onThemeChange} /><RateTicker /><section className="auth-card card">
     <button className="back-link" type="button" onClick={onBack}>{text('common.backHome')}</button>
     <div className="eyebrow">{text('auth.secure')}</div><h1>{mode === 'login' ? text('auth.welcome') : text('auth.create')}</h1>
     <p className="muted">{isDevelopmentAuth ? text('auth.description') : text('auth.oidcDescription')}</p>
@@ -677,7 +676,7 @@ function ThemeToggle({ theme, onChange }: { theme: Theme; onChange: (theme: Them
 function Header({ language, onLanguageChange, theme, onThemeChange }: { language: Language; onLanguageChange: (language: Language) => void; theme: Theme; onThemeChange: (theme: Theme) => void }) {
   return <header><Brand language={language} /><div className="header-tools"><ThemeToggle theme={theme} onChange={onThemeChange} /><LanguageSwitch language={language} onChange={onLanguageChange} /><span className="sandbox"><i /> {translate(language, 'common.sandbox')}</span></div></header>;
 }
-function RateBanner() {
+function RateTicker() {
   const t = useT();
   const [rubToCup, setRubToCup] = useState<ExchangeRate | null>(null);
   const [cupToRub, setCupToRub] = useState<ExchangeRate | null>(null);
@@ -687,7 +686,13 @@ function RateBanner() {
   }, []);
   if (error) return <p className="alert">{t('rate.unavailable')}</p>;
   if (!rubToCup || !cupToRub) return <p className="muted">{t('rate.loading')}</p>;
-  return <div className="rate-banner" role="status"><strong>{t('rate.rubToCup')}: {rubToCup.rate} CUP por RUB</strong><span>{rubToCup.source_label} · {rubToCup.effective_date}</span><strong>{t('rate.cupToRub')}: {cupToRub.rate} RUB por CUP</strong><span>{cupToRub.source_label} · {cupToRub.effective_date}</span></div>;
+  const groups = [0, 1].map((copy) => (
+    <div className="rate-ticker-group" key={copy} aria-hidden={copy === 1}>
+      <span className="rate-ticker-item"><strong>{t('rate.rubToCup')}: {rubToCup.rate} CUP por RUB</strong><span>{rubToCup.source_label} · {rubToCup.effective_date}</span></span>
+      <span className="rate-ticker-item"><strong>{t('rate.cupToRub')}: {cupToRub.rate} RUB por CUP</strong><span>{cupToRub.source_label} · {cupToRub.effective_date}</span></span>
+    </div>
+  ));
+  return <div className="rate-ticker" role="status"><div className="rate-ticker-track">{groups}</div></div>;
 }
 function Alert({ text }: { text: string }) { return <p className="alert">{text}</p>; }
 function isValidCardNumber(value: string) {
