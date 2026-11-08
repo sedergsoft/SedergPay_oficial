@@ -72,12 +72,28 @@ export type Quote = {
 export type ExchangeRate = {
   base_currency: string;
   quote_currency: string;
+  base_amount?: string;
+  quote_amount?: string;
   rate: string;
+  previous_rate?: string | null;
+  variation_absolute?: string | null;
+  variation_percent?: string | null;
+  variation_direction?: 'up' | 'down' | 'flat' | 'unknown';
   source: string;
   source_label: string;
+  source_type?: 'official' | 'administrative';
+  source_type_label?: string;
+  source_url?: string | null;
+  provenance?: string | null;
+  active_source?: 'official' | 'admin_override';
   effective_date: string;
-  source_url: string | null;
+  updated_at?: string;
+  valid_from?: string;
   manual_override: boolean;
+  stale?: boolean;
+  stale_reason?: string | null;
+  previous_effective_date?: string;
+  previous_updated_at?: string | null;
 };
 
 export type Remittance = {

@@ -51,17 +51,36 @@ final class ExchangeRateService
             throw new DomainException('No existe una tasa manual activa para este par. Seleccione la tasa oficial o defina una tasa manual.');
         }
         if ($direct === null) {
-            $official = $this->officialClient->fetchRubCup();
-            // Save RUB/CUP (buy/compra: CUP per RUB from tasaEspecial)
-            $this->saveOfficial('RUB', 'CUP', $official['rate_rub_cup'], $official['source'], $official['effective_date']);
-            // Save CUP/RUB (sell/venta: RUB per CUP from tasaOficial)
-            $this->saveOfficial('CUP', 'RUB', $official['rate_cup_rub'], $official['source'], $official['effective_date']);
-            $direct = $baseCurrency === 'RUB'
-                ? ['rate' => $official['rate_rub_cup'], 'source' => $official['source'], 'effective_date' => $official['effective_date'], 'manual_override' => false]
-                : ['rate' => $official['rate_cup_rub'], 'source' => $official['source'], 'effective_date' => $official['effective_date'], 'manual_override' => false];
+            try {
+                $official = $this->officialClient->fetchRubCup();
+                // Save RUB/CUP (buy/compra: CUP per RUB from tasaEspecial)
+                $this->saveOfficial('RUB', 'CUP', $official['rate_rub_cup'], $official['source'], $official['effective_date']);
+                // Save CUP/RUB (sell/venta: RUB per CUP from tasaOficial)
+                $this->saveOfficial('CUP', 'RUB', $official['rate_cup_rub'], $official['source'], $official['effective_date']);
+                $direct = $this->findEffectiveOfficial($baseCurrency, $quoteCurrency);
+                if ($direct === null) {
+                    $now = new DateTimeImmutable();
+                    $direct = $this->normalizeRateRow([
+                        'rate' => $baseCurrency === 'RUB' ? $official['rate_rub_cup'] : $official['rate_cup_rub'],
+                        'source' => $official['source'],
+                        'valid_from' => $now->format('Y-m-d H:i:s'),
+                        'created_at' => $now->format('Y-m-d H:i:s'),
+                        'manual_override' => false,
+                    ]);
+                }
+            } catch (\Throwable $exception) {
+                $stale = $this->findLatestStoredOfficial($baseCurrency, $quoteCurrency);
+                if ($stale !== null) {
+                    $stale['stale'] = true;
+                    $stale['stale_reason'] = 'La fuente oficial no está disponible; se muestra el último valor válido almacenado.';
+                    $direct = $stale;
+                } else {
+                    throw $exception;
+                }
+            }
         }
 
-        return $this->format($baseCurrency, $quoteCurrency, $direct);
+        return $this->format($baseCurrency, $quoteCurrency, $direct, $activeSource);
     }
 
     /**
@@ -83,12 +102,19 @@ final class ExchangeRateService
         // Save CUP/RUB (sell/venta: RUB per CUP from tasaOficial)
         $this->saveOfficial('CUP', 'RUB', $official['rate_cup_rub'], $official['source'], $official['effective_date']);
 
-        return $this->format('RUB', 'CUP', [
-            'rate' => $official['rate_rub_cup'],
-            'source' => $official['source'],
-            'effective_date' => $official['effective_date'],
-            'manual_override' => false,
-        ]);
+        $direct = $this->findEffectiveOfficial('RUB', 'CUP');
+        if ($direct === null) {
+            $now = new DateTimeImmutable();
+            $direct = $this->normalizeRateRow([
+                'rate' => $official['rate_rub_cup'],
+                'source' => $official['source'],
+                'valid_from' => $now->format('Y-m-d H:i:s'),
+                'created_at' => $now->format('Y-m-d H:i:s'),
+                'manual_override' => false,
+            ]);
+        }
+
+        return $this->format('RUB', 'CUP', $direct, 'official');
     }
 
     public function saveAdminOverride(string $rate, int $userId, string $baseCurrency = 'RUB', string $quoteCurrency = 'CUP'): array
@@ -138,12 +164,14 @@ final class ExchangeRateService
             throw $e;
         }
 
-        return $this->format($baseCurrency, $quoteCurrency, [
+        return $this->format($baseCurrency, $quoteCurrency, $this->normalizeRateRow([
+            'id' => $this->db->getLastInsertID(),
             'rate' => $rate,
             'source' => self::ADMIN_SOURCE,
-            'effective_date' => $now->format('Y-m-d'),
+            'valid_from' => $now->format('Y-m-d H:i:s'),
+            'created_at' => $now->format('Y-m-d H:i:s'),
             'manual_override' => true,
-        ]);
+        ]), 'admin_override');
     }
 
     public function setActiveSource(string $source, int $userId, string $baseCurrency = 'RUB', string $quoteCurrency = 'CUP'): array
@@ -200,7 +228,7 @@ final class ExchangeRateService
     private function findEffective(string $base, string $quote, string $source): ?array
     {
         $row = $this->db->createCommand(
-            "SELECT rate, source, valid_from
+            "SELECT id, rate, source, valid_from, created_at
              FROM {{%exchange_rates}}
              WHERE base_currency = :base AND quote_currency = :quote AND source = :source AND valid_until IS NULL
              ORDER BY valid_from DESC
@@ -216,17 +244,13 @@ final class ExchangeRateService
             return null;
         }
 
-        return [
-            'rate' => (string) $row['rate'],
-            'source' => $row['source'],
-            'effective_date' => (new DateTimeImmutable((string) $row['valid_from']))->format('Y-m-d'),
-        ];
+        return $this->normalizeRateRow($row);
     }
 
     private function findEffectiveOfficial(string $baseCurrency, string $quoteCurrency): ?array
     {
         $row = $this->db->createCommand(
-            "SELECT rate, source, valid_from
+            "SELECT id, rate, source, valid_from, created_at
              FROM {{%exchange_rates}}
              WHERE base_currency = :base AND quote_currency = :quote
                AND source IN ('bcc_official', 'cbr_official')
@@ -243,10 +267,70 @@ final class ExchangeRateService
             return null;
         }
 
+        return $this->normalizeRateRow($row);
+    }
+
+    private function findPrevious(string $base, string $quote, string $source, string $beforeValidFrom): ?array
+    {
+        $row = $this->db->createCommand(
+            "SELECT id, rate, source, valid_from, created_at
+             FROM {{%exchange_rates}}
+             WHERE base_currency = :base AND quote_currency = :quote AND source = :source
+               AND valid_from < :before
+             ORDER BY valid_from DESC
+             LIMIT 1",
+            [
+                ':base' => $base,
+                ':quote' => $quote,
+                ':source' => $source,
+                ':before' => $beforeValidFrom,
+            ]
+        )->queryOne();
+
+        if ($row === false) {
+            return null;
+        }
+
+        return $this->normalizeRateRow($row);
+    }
+
+    private function findLatestStoredOfficial(string $base, string $quote): ?array
+    {
+        $row = $this->db->createCommand(
+            "SELECT id, rate, source, valid_from, created_at
+             FROM {{%exchange_rates}}
+             WHERE base_currency = :base AND quote_currency = :quote
+               AND source IN ('bcc_official', 'cbr_official')
+             ORDER BY valid_from DESC
+             LIMIT 1",
+            [
+                ':base' => $base,
+                ':quote' => $quote,
+            ]
+        )->queryOne();
+
+        if ($row === false) {
+            return null;
+        }
+
+        return $this->normalizeRateRow($row);
+    }
+
+    private function normalizeRateRow(array $row): array
+    {
+        $validFrom = new DateTimeImmutable((string) $row['valid_from']);
+        $createdAt = isset($row['created_at']) && $row['created_at'] !== null && $row['created_at'] !== ''
+            ? new DateTimeImmutable((string) $row['created_at'])
+            : $validFrom;
+
         return [
+            'id' => isset($row['id']) ? (string) $row['id'] : null,
             'rate' => (string) $row['rate'],
-            'source' => $row['source'],
-            'effective_date' => (new DateTimeImmutable((string) $row['valid_from']))->format('Y-m-d'),
+            'source' => (string) $row['source'],
+            'effective_date' => $validFrom->format('Y-m-d'),
+            'valid_from' => $validFrom->format(DateTimeImmutable::ATOM),
+            'updated_at' => $createdAt->format(DateTimeImmutable::ATOM),
+            'manual_override' => ($row['source'] ?? '') === 'admin_override' || !empty($row['manual_override']),
         ];
     }
 
@@ -278,24 +362,85 @@ final class ExchangeRateService
         )->execute();
     }
 
-    private function format(string $base, string $quote, array $rate): array
+    private function format(string $base, string $quote, array $rate, ?string $activeSource = null): array
     {
-        $sourceLabel = match ($rate['source']) {
+        $activeSource = $activeSource ?? ($rate['manual_override'] ?? false ? 'admin_override' : 'official');
+        $source = (string) ($rate['source'] ?? '');
+        $sourceLabel = match ($source) {
             'bcc_official' => 'BCC (Banco Central de Cuba)',
             'cbr_official' => 'CBR (Banco Central de Rusia)',
-            'admin_override' => 'Administrador',
-            default => $rate['source'],
+            'admin_override' => 'Tasa administrativa',
+            default => $source !== '' ? $source : 'Fuente no disponible',
+        };
+        $sourceType = $source === 'admin_override' ? 'administrative' : 'official';
+        $sourceTypeLabel = $sourceType === 'administrative' ? 'ADMINISTRATIVA' : 'OFICIAL';
+        $sourceUrl = match ($source) {
+            'bcc_official' => OfficialRateClient::BCC_SOURCE_URL,
+            'cbr_official' => OfficialRateClient::CBR_SOURCE_URL,
+            default => null,
+        };
+        $provenance = match ($source) {
+            'bcc_official' => 'Banco Central de Cuba (BCC)',
+            'cbr_official' => 'Banco Central de Rusia (CBR)',
+            'admin_override' => 'Configuración administrativa de SEDERG_PAY',
+            default => $sourceLabel,
         };
 
-        return [
+        $validFrom = isset($rate['valid_from']) ? (string) $rate['valid_from'] : (new DateTimeImmutable((string) ($rate['effective_date'] ?? 'now')))->format(DateTimeImmutable::ATOM);
+        $updatedAt = isset($rate['updated_at']) ? (string) $rate['updated_at'] : $validFrom;
+        $effectiveDate = isset($rate['effective_date']) ? (string) $rate['effective_date'] : (new DateTimeImmutable($validFrom))->format('Y-m-d');
+
+        $previous = null;
+        $variationAbsolute = null;
+        $variationPercent = null;
+        $variationDirection = 'unknown';
+        if ($source !== '' && isset($rate['valid_from'])) {
+            $previous = $this->findPrevious($base, $quote, $source, (string) $rate['valid_from']);
+            if ($previous !== null) {
+                $prevRate = (string) $previous['rate'];
+                $currRate = (string) $rate['rate'];
+                $variationAbsolute = bcsub($currRate, $prevRate, 10);
+                $variationDirection = bccomp($variationAbsolute, '0', 10) === 0 ? 'flat' : (bccomp($variationAbsolute, '0', 10) > 0 ? 'up' : 'down');
+                if (bccomp($prevRate, '0', 10) !== 0) {
+                    $variationPercent = bcmul(bcdiv($variationAbsolute, $prevRate, 12), '100', 10);
+                }
+            }
+        }
+
+        $stale = !empty($rate['stale']);
+        $staleReason = $rate['stale_reason'] ?? null;
+
+        $result = [
             'base_currency' => $base,
             'quote_currency' => $quote,
-            'rate' => $rate['rate'],
-            'source' => $rate['source'],
+            'base_amount' => '1',
+            'quote_amount' => (string) $rate['rate'],
+            'rate' => (string) $rate['rate'],
+            'previous_rate' => $previous['rate'] ?? null,
+            'variation_absolute' => $variationAbsolute,
+            'variation_percent' => $variationPercent,
+            'variation_direction' => $variationDirection,
+            'source' => $source,
             'source_label' => $sourceLabel,
-            'effective_date' => $rate['effective_date'],
-            'manual_override' => $rate['manual_override'] ?? false,
+            'source_type' => $sourceType,
+            'source_type_label' => $sourceTypeLabel,
+            'source_url' => $sourceUrl,
+            'provenance' => $provenance,
+            'active_source' => $activeSource,
+            'effective_date' => $effectiveDate,
+            'updated_at' => $updatedAt,
+            'valid_from' => $validFrom,
+            'manual_override' => (bool) ($rate['manual_override'] ?? ($source === 'admin_override')),
+            'stale' => $stale,
+            'stale_reason' => $staleReason,
         ];
+
+        if ($previous !== null) {
+            $result['previous_effective_date'] = $previous['effective_date'];
+            $result['previous_updated_at'] = $previous['updated_at'] ?? $previous['valid_from'] ?? null;
+        }
+
+        return $result;
     }
 
     private function decimal(string $value, string $field): string
