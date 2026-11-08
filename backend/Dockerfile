@@ -9,4 +9,7 @@ WORKDIR /app
 COPY composer.json composer.lock ./
 RUN composer install --no-interaction --no-progress --prefer-dist
 COPY . .
+# runtime/ y web/assets son excluidos por .dockerignore; Yii los necesita en
+# tiempo de ejecucion (logs, cache, assets publicados) tambien fuera de Compose.
+RUN mkdir -p runtime/logs runtime/debug
 CMD ["sh","-c","php yii serve 0.0.0.0:${PORT:-8080} --docroot=web"]
