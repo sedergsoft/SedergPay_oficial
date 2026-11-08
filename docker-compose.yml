@@ -22,12 +22,12 @@ services:
       SEDERG_CLAMD_HOST: clamav
       SEDERG_CLAMD_PORT: 3310
       SEDERG_MAIL_TRANSPORT: ${SEDERG_MAIL_TRANSPORT:-smtp}
-      SEDERG_MAIL_HOST: ${SEDERG_MAIL_HOST:-mailpit}
-      SEDERG_MAIL_PORT: ${SEDERG_MAIL_PORT:-1025}
-      SEDERG_MAIL_ENCRYPTION: ${SEDERG_MAIL_ENCRYPTION:-none}
+      SEDERG_MAIL_HOST: ${SEDERG_MAIL_HOST:-smtp-relay.brevo.com}
+      SEDERG_MAIL_PORT: ${SEDERG_MAIL_PORT:-587}
+      SEDERG_MAIL_ENCRYPTION: ${SEDERG_MAIL_ENCRYPTION:-tls}
       SEDERG_MAIL_USERNAME: ${SEDERG_MAIL_USERNAME:-}
       SEDERG_MAIL_PASSWORD: ${SEDERG_MAIL_PASSWORD:-}
-      SEDERG_MAIL_FROM: ${SEDERG_MAIL_FROM:-no-reply@sederg-pay.local}
+      SEDERG_MAIL_FROM: ${SEDERG_MAIL_FROM:-}
       SEDERG_APP_URL: ${SEDERG_APP_URL:-http://localhost:5173}
       SEDERG_OIDC_ISSUER: ${SEDERG_OIDC_ISSUER:-https://identity.example.invalid/realms/sederg}
       SEDERG_OIDC_AUDIENCE: ${SEDERG_OIDC_AUDIENCE:-sederg-pay-api}
@@ -36,7 +36,6 @@ services:
     depends_on:
       postgres: {condition: service_healthy}
       clamav: {condition: service_healthy}
-      mailpit: {condition: service_started}
     ports: ["${SEDERG_BACKEND_PORT:-8080}:8080"]
     volumes:
       - ./backend:/app
@@ -81,12 +80,6 @@ services:
     image: redis:7-alpine
     ports: ["6379:6379"]
     volumes: [sederg_redis_data:/data]
-  mailpit:
-    image: axllent/mailpit:latest
-    restart: unless-stopped
-    ports:
-      - "${SEDERG_MAIL_WEB_PORT:-8025}:8025"
-      - "${SEDERG_MAIL_SMTP_PORT:-1025}:1025"
 volumes:
   sederg_postgres_data:
   sederg_redis_data:
