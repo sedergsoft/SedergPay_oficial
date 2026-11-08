@@ -80,6 +80,7 @@ final class RegistrationController extends Controller
 
         $publicId = $this->generateUuid();
         $verificationToken = bin2hex(random_bytes(32));
+        $ttlMinutes = (int) PlatformSettings::get(Yii::$app->db, 'security.verification_token_ttl_minutes');
         $response = [
             'public_id' => $publicId,
             'status' => 'pending',
@@ -101,7 +102,11 @@ final class RegistrationController extends Controller
                 $transaction
             );
             $repository->saveVerificationToken($userId, hash('sha256', $verificationToken));
-            (new VerificationMailer())->send($email, $payload['first_name'], $verificationToken);
+            $mailLogged = (new VerificationMailer())->send($email, $payload['first_name'], $verificationToken, $ttlMinutes);
+            if (getenv('SEDERG_AUTH_MODE') === 'development' && $mailLogged) {
+                $response['dev_verification_token'] = $verificationToken;
+                $response['dev_verification_url'] = rtrim((string) (getenv('SEDERG_APP_URL') ?: 'http://localhost:5173'), '/') . '/?verify_email=' . rawurlencode($email) . '&token=' . rawurlencode($verificationToken);
+            }
             $repository->saveIdempotency($scope, $idempotencyKey, $requestHash, $response, $transaction);
             $transaction->commit();
         } catch (\Throwable $exception) {
@@ -110,6 +115,9 @@ final class RegistrationController extends Controller
             }
             if ($exception instanceof \RuntimeException && str_starts_with($exception->getMessage(), 'SMTP')) {
                 throw new HttpException(503, 'No se pudo enviar el correo de verificación. Configura el SMTP e inténtalo de nuevo.', 0, $exception);
+            }
+            if ($exception instanceof \yii\db\IntegrityException) {
+                throw new ConflictHttpException('Email or phone is already registered');
             }
             throw $exception;
         }

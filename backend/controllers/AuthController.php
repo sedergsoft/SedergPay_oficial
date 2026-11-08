@@ -129,17 +129,33 @@ final class AuthController extends Controller
              WHERE u.email = :email AND u.deleted_at IS NULL LIMIT 1',
             [':email' => strtolower(trim($payload['email']))]
         )->queryOne();
+        $result = ['verification_sent' => true];
         if ($user !== false && $user['status'] !== 'active') {
             $token = bin2hex(random_bytes(32));
+            $ttlMinutes = (int) PlatformSettings::get(Yii::$app->db, 'security.verification_token_ttl_minutes');
             Yii::$app->db->createCommand()->insert('{{%email_verification_tokens}}', [
                 'user_id' => $user['id'],
                 'token_hash' => hash('sha256', $token),
-                'expires_at' => (new \DateTimeImmutable('+' . PlatformSettings::get(Yii::$app->db, 'security.verification_token_ttl_minutes') . ' minutes'))->format('Y-m-d H:i:s'),
+                'expires_at' => (new \DateTimeImmutable('+' . $ttlMinutes . ' minutes'))->format('Y-m-d H:i:s'),
             ])->execute();
-            (new VerificationMailer())->send($user['email'], (string) $user['first_name'], $token);
+            try {
+                $mailLogged = (new VerificationMailer())->send($user['email'], (string) $user['first_name'], $token, $ttlMinutes);
+                if (getenv('SEDERG_AUTH_MODE') === 'development' && $mailLogged) {
+                    $result['dev_verification_token'] = $token;
+                    $result['dev_verification_url'] = rtrim((string) (getenv('SEDERG_APP_URL') ?: 'http://localhost:5173'), '/') . '/?verify_email=' . rawurlencode((string) $user['email']) . '&token=' . rawurlencode($token);
+                }
+            } catch (\Throwable $exception) {
+                Yii::error('Resend verification mail failed: ' . $exception->getMessage(), __METHOD__);
+                if (getenv('SEDERG_AUTH_MODE') === 'development') {
+                    $result['dev_verification_token'] = $token;
+                    $result['dev_verification_url'] = rtrim((string) (getenv('SEDERG_APP_URL') ?: 'http://localhost:5173'), '/') . '/?verify_email=' . rawurlencode((string) $user['email']) . '&token=' . rawurlencode($token);
+                    $result['mail_warning'] = 'No se pudo enviar el correo; se generó un enlace de verificación de desarrollo.';
+                }
+                // Preserve anti-enumeration shape in non-dev contexts.
+            }
         }
 
-        return ['verification_sent' => true];
+        return $result;
     }
 
     public function actionMe(): array

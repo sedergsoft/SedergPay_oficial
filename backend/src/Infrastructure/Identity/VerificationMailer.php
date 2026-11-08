@@ -6,9 +6,14 @@ final class VerificationMailer
 {
 private const LOGO_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAALQAAACKCAIAAACM3/e4AAAAAXNSR0IB2cksfwAAAAlwSFlzAAALEwAACxMBAJqcGAAAjv5JREFUeJyEfQecXUW9/5Rzzu13+256JQmpJAECCAIiHQUFpCqC2EB9+lf5q/hUfMVn4+mzI6KCoIACIoj0gPTQkhASEtKTTXazfW8/ZeY//cy5u7z//Ww2d0+ZMzO/9v2VmeMEEQWUAgCB+lD+l/7Of0F5Cqp/7CAVJ6A+Ss0Jc0ncBEjebD9I3xIfMm3b98mbeS+S/Yy7Zn8oiHsEgd2cPDKha+a0OqcvsLsmf9u3UgiSz4bJ8VHVN2j1Euq+6EvMtIhZ5B9AxGMITZBB9c+0rPtrDxtaUywvpvFIzHPNVKqx6rutbqkj/Lwjm4CQqs7qUSky2XQDMDE4M1+wqWFFSetGEN9rBmc3ZMYB7Um3qWQYj0KrNTlA1nk1UgjlBJjZb6IgjduEMXPCmKGhZBIQz4Zmf6D/1j2n9mP0leIH0vi8ZDeo2BTGc6tnSgydGvZBQFJCThMVTKgfINkXWhIjHhbLZMxB9pgtJlMDZf0R3GONzJJK8UTRtGNaiBlfPQ3qeaExw8T9iEkOEydochKtfpvb6CTj0ISAk97YREc5mxanqoHCxI00MU9UjZomxFXQRo/Pun4Ci8IJDcLEF3O/EYLmp1ttKdk1o6OUEAqRYG0kTlOpSGBS1WmGSeiexGzTpueCWCMmu5NU0PaVMJ5bx3CelkKoGVJKrGRkamkxJSNS0JSKo01PgVT3QTOZ1g6GErSZjRKzrXWPJRdGg1hqFcbq0aanmH1bHGIlasahWpYzQuMBJkwXtNXeZBNqM7m+CBpWS8hR3EP5NGhZMYQhJWL2acxAyraIyZTTpdW8mSilLanmG6v372CVJucMqJjMkhFuVgwZEm3aQvQOht1i/iT7QouqcrJo0kKKudGqN9GoNZkTbUJC9dj8pR5q2Ss1iQl+U7ygWDIhjs0DjC1gQu1BJSmTffSlsQBQxVOSnDBxlW5HEBVxPiiPwHybAB1E9lPNKjAka9apWmFZnZ3wrUk+m2cjntIJzCKZQ0hO09X2E6lBMVRxuiXr2lonbDy1Jl+YN5tXVDtJ1KdPxUekFqcwBnOUJtCGdat5LGzSInTCNbEtmsjwRi4tQBDPgurVJLeZm4FUVwmKJm4yIFHrI0AJQAg0hvr3fuXr835xE/IwoQTGE5GY+bjzsZ4zRyaaE3028XQ9TqPwaWJc4lHxBDt6EiCN5wTGV7zjbCTO2FybEK7JbtdoOeYym1SKu5KEaDKuCeUHLU4W9q7pcZZrBZQafgfxh8knxDf/L58YcCQ0bPw9qTHlf6JDiJ1BSJwerQw+8ODs75RxdwtwXE47gVJlx2ksDhZ8aOKGBO5JiLrW0E2dU4rLGvIkEM0Rs0ulGpOCl4S3xkzG00a1pU7KFJR6JlZEyhjGOgNYnGexoGFbbTOsDki2gNACzNQoCApNu1oEqH2NltCYkaD1xNgu6tM0nmDzdD12qAdknzFGyVKdseMaT6K+mELpsLIfxL5Gle1bQWnIf+CRKSGt3fwz/8gjnCWLvVnzOX8QMREQGeADtCOm5oIm3FeJUZLevi1ittUFiXHC5IXWQcfGsvIOY0qApc5ijtSj11aVmpkG2gIBmzT//481HmONbL6UhhMmrpBdaCK17qNl+JIzlZg5rUWaqWhAbNyXRO+S7SshUUi/SZ02a0RxEfNMCGU6g4T+vttvqvz+Tz2VsBU75R98dyBdWPTY3xEAUUQs62aZBC3yNrpVbB73s0m2qBEPzet26CpxTxP7OFSRWd6jzJkRbjF4PXLQpLGE6MNmnpTtqBuVNbAI8I5BqPiMmfEEh1gnre9ab9pTF0uqzbRNWqr5iPluFDrV4Y4J7AESBIDxqIGaLvEFmv5pqVGMzn4IiSD0sov/7SeVQnb0f35...';
 
-public function send(string $email, string $firstName, string $token): void
+public function send(string $email, string $firstName, string $token, int $ttlMinutes = 30): bool
 {
-    if ((getenv('SEDERG_MAIL_TRANSPORT') ?: 'smtp') !== 'smtp') {
+    $transport = getenv('SEDERG_MAIL_TRANSPORT') ?: 'smtp';
+    if ($transport === 'log' || $transport === 'file') {
+        $this->logVerification($email, $token, $ttlMinutes);
+        return true;
+    }
+    if ($transport !== 'smtp') {
         throw new RuntimeException('Only SMTP email transport is allowed');
     }
     $host = trim((string) getenv('SEDERG_MAIL_HOST'));
@@ -18,10 +23,15 @@ public function send(string $email, string $firstName, string $token): void
     $from = trim((string) getenv('SEDERG_MAIL_FROM'));
     $encryption = strtolower(trim((string) (getenv('SEDERG_MAIL_ENCRYPTION') ?: 'tls')));
 
-    if ($host === '' || $username === '' || $password === ''
+    $configIncomplete = $host === '' || $username === '' || $password === ''
         || $from === '' || !filter_var($from, FILTER_VALIDATE_EMAIL)
         || $port < 1 || $port > 65535
-        || !in_array($encryption, ['tls', 'ssl'], true)) {
+        || !in_array($encryption, ['tls', 'ssl'], true);
+    if ($configIncomplete) {
+        if ($this->isDevelopmentMode()) {
+            $this->logVerification($email, $token, $ttlMinutes);
+            return true;
+        }
         throw new RuntimeException('SMTP email configuration is incomplete');
     }
 
@@ -40,8 +50,10 @@ public function send(string $email, string $firstName, string $token): void
     $safeEmail = htmlspecialchars($email, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     $safeUrl = htmlspecialchars($verificationUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     $logoSrc = $this->logoCid();
+    $ttlMinutes = max(1, $ttlMinutes);
+    $ttlText = "{$ttlMinutes} minutos";
     $subject = 'Activa tu cuenta de SEDERG_PAY';
-    $body = "Hola {$firstName},\n\n" . "Activa tu cuenta haciendo clic en este enlace:\n{$verificationUrl}\n\n" . "El enlace vence en 30 minutos y solo puede utilizarse una vez.\n" . "Si no solicitaste esta cuenta, ignora este mensaje.";
+    $body = "Hola {$firstName},\n\n" . "Activa tu cuenta haciendo clic en este enlace:\n{$verificationUrl}\n\n" . "El enlace vence en {$ttlText} y solo puede utilizarse una vez.\n" . "Si no solicitaste esta cuenta, ignora este mensaje.";
     $html = <<<HTML
 <!doctype html>
 <html lang="es">
@@ -62,7 +74,7 @@ public function send(string $email, string $firstName, string $token): void
           <table role="presentation" cellspacing="0" cellpadding="0"><tr><td style="margin:0 auto;border-radius:16px;background:linear-gradient(135deg:#1d4ed8,#06b6d4);box-shadow:0 12px 32px rgba(11,79,156,.35);width:fit-content;">
             <a href="{$safeUrl}" style="display:block;padding:18px 38px;border-radius:16px;color:#ffffff;text-decoration:none;font-size:16px;font-weight:700;letter-spacing:.05em;">Activar mi cuenta</a>
           </td></tr></table>
-          <p style="margin:0 0 32px;font-size:14px;line-height:1.6;color:#94a3b8;">Este enlace vence en 30 minutos y solo puede utilizarse una vez. No tendrás que volver a introducir tu contraseña para activar la cuenta.</p>
+          <p style="margin:0 0 32px;font-size:14px;line-height:1.6;color:#94a3b8;">Este enlace vence en {$ttlText} y solo puede utilizarse una vez. No tendrás que volver a introducir tu contraseña para activar la cuenta.</p>
           <p style="margin:0;padding-top:28px;border-top:1px solid #e2e8f0;font-size:12px;line-height:1.6;color:#94a3b8;">Si el botón no funciona, copia y pega este enlace en tu navegador:<br><span style="word-break:break-all;color:#06b6dc;">{$safeUrl}</span></p>
         </td></tr>
         <tr><td style="padding:24px 48px;background:#f1f5f9;color:#94a3b8;font-size:12px;line-height:1.5;">
@@ -75,6 +87,7 @@ public function send(string $email, string $firstName, string $token): void
 </html>
 HTML;
     $this->sendMessage($email, $subject, $body, $html);
+    return false;
 }
 
 public function sendRemittanceReceipt(string $email, string $firstName, array $remittance): void
@@ -148,7 +161,7 @@ HTML;
 
 private function getLogoImage(): ?array
 {
-    $path = __DIR__ . '/../../../../backend/web/assets/sederg-pay-logo.png';
+    $path = __DIR__ . '/../../../web/assets/sederg-pay-logo.png';
     if (!is_file($path)) {
         return null;
     }
@@ -230,6 +243,24 @@ private function sendMessage(string $email, string $subject, string $body, strin
         $this->command($socket, 'QUIT', 221);
     } finally {
         fclose($socket);
+    }
+}
+
+private function isDevelopmentMode(): bool
+{
+    return getenv('SEDERG_AUTH_MODE') === 'development' || getenv('YII_ENV') === 'dev';
+}
+
+private function logVerification(string $email, string $token, int $ttlMinutes): void
+{
+    $appUrl = rtrim((string) (getenv('SEDERG_APP_URL') ?: 'http://localhost:5173'), '/');
+    $verificationUrl = $appUrl . '/?verify_email=' . rawurlencode($email) . '&token=' . rawurlencode($token);
+    $ttlMinutes = max(1, $ttlMinutes);
+    $message = "[SEDERG_PAY][DEV][verification] email={$email} ttl_minutes={$ttlMinutes} url={$verificationUrl}";
+    error_log($message);
+    $logDir = dirname(__DIR__, 3) . '/runtime/logs';
+    if (is_dir($logDir) && is_writable($logDir)) {
+        @file_put_contents($logDir . '/verification-dev.log', '[' . gmdate('c') . '] ' . $message . PHP_EOL, FILE_APPEND);
     }
 }
 
