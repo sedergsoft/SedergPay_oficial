@@ -269,7 +269,10 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .payment-qr { width: 220px; height: 220px; background: #fff; padding: 8px; border: 1px solid var(--line); border-radius: 14px; }
 
 /* ---------- Tablas ---------- */
-.table-wrap { overflow-x: auto; }
+.table-wrap + .pager, .pager { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.pager span { color: var(--ink-600); font-size: .82rem; font-variant-numeric: tabular-nums; }
+.pager button { min-height: 34px; padding: 6px 12px; font-size: .78rem; }
+:root[data-theme='dark'] .pager span { color: #A7B0C3; }
 table { width: 100%; border-collapse: collapse; font-size: .82rem; }
 th { padding: 10px 8px; color: var(--ink-400); border-bottom: 1px solid var(--line); font-size: .7rem; letter-spacing: .05em; text-align: left; text-transform: uppercase; }
 td { padding: 13px 8px; border-bottom: 1px solid var(--line); color: var(--ink-600); white-space: nowrap; font-variant-numeric: tabular-nums; }
