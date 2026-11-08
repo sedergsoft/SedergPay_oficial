@@ -121,15 +121,20 @@ final class PlatformSettings
             $validated[$key] = $normalized;
         }
         if (($validated['pricing.exchange_rate_source'] ?? null) === 'admin_override') {
-            $manualRateExists = (int) $db->createCommand(
-                'SELECT COUNT(*) FROM {{%exchange_rates}}
-                 WHERE (base_currency = :base1 AND quote_currency = :quote1 OR base_currency = :base2 AND quote_currency = :quote2)
-                   AND source = :source AND valid_from <= CURRENT_TIMESTAMP
-                   AND (valid_until IS NULL OR valid_until > CURRENT_TIMESTAMP)',
-                [':base1' => 'RUB', ':quote1' => 'CUP', ':base2' => 'CUP', ':quote2' => 'RUB', ':source' => 'admin_override']
-            )->queryScalar();
-            if ($manualRateExists === 0) {
-                throw new DomainException('No hay una tasa manual guardada para activar.');
+            $missing = [];
+            foreach ([['RUB', 'CUP'], ['CUP', 'RUB']] as [$base, $quote]) {
+                $exists = (int) $db->createCommand(
+                    'SELECT COUNT(*) FROM {{%exchange_rates}}
+                     WHERE base_currency = :base AND quote_currency = :quote
+                       AND source = :source AND valid_until IS NULL',
+                    [':base' => $base, ':quote' => $quote, ':source' => 'admin_override']
+                )->queryScalar();
+                if ($exists === 0) {
+                    $missing[] = $base . '/' . $quote;
+                }
+            }
+            if ($missing !== []) {
+                throw new DomainException('No hay una tasa manual activa para: ' . implode(', ', $missing) . '. Defina una tasa manual para cada par o use la selección por par en Control de mercado.');
             }
         }
 
@@ -153,6 +158,19 @@ final class PlatformSettings
                 'value_type' => $definition['type'],
                 'updated_by_user_id' => $userId,
             ])->execute();
+            if ($key === 'pricing.exchange_rate_source' && in_array($value, ['official', 'admin_override'], true)) {
+                foreach (['RUB_CUP', 'CUP_RUB'] as $pair) {
+                    $db->createCommand()->upsert('{{%platform_settings}}', [
+                        'setting_key' => 'pricing.exchange_rate_source_' . $pair,
+                        'setting_value' => $value,
+                        'value_type' => 'enum',
+                        'updated_by_user_id' => $userId,
+                    ], [
+                        'setting_value' => $value,
+                        'updated_by_user_id' => $userId,
+                    ])->execute();
+                }
+            }
         }
 
         return ['before' => $before, 'after' => $validated, 'settings' => self::all($db)];

@@ -43,12 +43,12 @@ final class ExchangeRateService
             throw new DomainException('Solo se admiten las tasas RUB/CUP y CUP/RUB');
         }
 
-        $activeSource = PlatformSettings::get($this->db, 'pricing.exchange_rate_source');
+        $activeSource = $this->activeSourceForPair($baseCurrency, $quoteCurrency);
         $direct = $activeSource === 'admin_override'
             ? $this->findEffective($baseCurrency, $quoteCurrency, self::ADMIN_SOURCE)
             : $this->findEffectiveOfficial($baseCurrency, $quoteCurrency);
         if ($direct === null && $activeSource === 'admin_override') {
-            throw new DomainException('No existe una tasa manual activa para este par. Seleccione la tasa oficial o defina una tasa manual.');
+            throw new DomainException('No existe una tasa manual activa para este par (' . $baseCurrency . '/' . $quoteCurrency . '). Seleccione la tasa oficial o defina una tasa manual.');
         }
         if ($direct === null) {
             try {
@@ -164,7 +164,7 @@ final class ExchangeRateService
             throw $e;
         }
 
-        $activeSource = PlatformSettings::get($this->db, 'pricing.exchange_rate_source');
+        $activeSource = $this->activeSourceForPair($baseCurrency, $quoteCurrency);
         return $this->format($baseCurrency, $quoteCurrency, $this->normalizeRateRow([
             'id' => $this->db->getLastInsertID(),
             'rate' => $rate,
@@ -183,14 +183,38 @@ final class ExchangeRateService
             throw new DomainException('La fuente debe ser official o admin_override.');
         }
         if ($source === 'admin_override' && $this->findEffective($baseCurrency, $quoteCurrency, self::ADMIN_SOURCE) === null) {
-            throw new DomainException('No existe una tasa manual activa para este par.');
+            throw new DomainException('No existe una tasa manual activa para el par ' . $baseCurrency . '/' . $quoteCurrency . '. Defina primero una tasa manual para este par.');
         }
         $this->db->createCommand()->upsert('{{%platform_settings}}', [
-            'setting_key' => 'pricing.exchange_rate_source',
+            'setting_key' => $this->pairSourceKey($baseCurrency, $quoteCurrency),
             'setting_value' => $source,
-        ], ['setting_key' => 'pricing.exchange_rate_source'])->execute();
+            'value_type' => 'enum',
+            'updated_by_user_id' => $userId,
+        ], [
+            'setting_value' => $source,
+            'value_type' => 'enum',
+            'updated_by_user_id' => $userId,
+        ])->execute();
 
         return $this->resolve($baseCurrency, $quoteCurrency);
+    }
+
+    private function pairSourceKey(string $baseCurrency, string $quoteCurrency): string
+    {
+        return 'pricing.exchange_rate_source_' . strtoupper($baseCurrency) . '_' . strtoupper($quoteCurrency);
+    }
+
+    private function activeSourceForPair(string $baseCurrency, string $quoteCurrency): string
+    {
+        $pair = $this->db->createCommand(
+            'SELECT setting_value FROM {{%platform_settings}} WHERE setting_key = :k LIMIT 1',
+            [':k' => $this->pairSourceKey($baseCurrency, $quoteCurrency)]
+        )->queryScalar();
+        if (is_string($pair) && in_array($pair, ['official', 'admin_override'], true)) {
+            return $pair;
+        }
+        $global = PlatformSettings::get($this->db, 'pricing.exchange_rate_source');
+        return in_array($global, ['official', 'admin_override'], true) ? $global : 'official';
     }
 
     public function getRateHistory(string $baseCurrency, string $quoteCurrency, int $limit = 30): array
