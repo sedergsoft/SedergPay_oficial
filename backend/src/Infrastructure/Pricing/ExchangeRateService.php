@@ -164,6 +164,7 @@ final class ExchangeRateService
             throw $e;
         }
 
+        $activeSource = PlatformSettings::get($this->db, 'pricing.exchange_rate_source');
         return $this->format($baseCurrency, $quoteCurrency, $this->normalizeRateRow([
             'id' => $this->db->getLastInsertID(),
             'rate' => $rate,
@@ -171,7 +172,7 @@ final class ExchangeRateService
             'valid_from' => $now->format('Y-m-d H:i:s'),
             'created_at' => $now->format('Y-m-d H:i:s'),
             'manual_override' => true,
-        ]), 'admin_override');
+        ]), $activeSource);
     }
 
     public function setActiveSource(string $source, int $userId, string $baseCurrency = 'RUB', string $quoteCurrency = 'CUP'): array
