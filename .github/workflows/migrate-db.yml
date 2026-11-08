@@ -46,14 +46,13 @@ jobs:
           SEDERG_DB_USER: ${{ secrets.SEDERG_DB_USER }}
           SEDERG_DB_PASSWORD: ${{ secrets.SEDERG_DB_PASSWORD }}
         run: |
-          missing="0"
-          for v in SEDERG_DB_HOST SEDERG_DB_PORT SEDERG_DB_NAME SEDERG_DB_USER SEDERG_DB_PASSWORD; do
-            if [ -z "${!v}" ]; then
-              echo "::error::Falta el secreto ${v} en Settings → Secrets and variables → Actions"
-              missing="1"
-            fi
-          done
-          test "$missing" = "0" || exit 1
+          fail="0"
+          test -n "$SEDERG_DB_HOST"     || { echo "::error::Falta el secreto SEDERG_DB_HOST"; fail="1"; }
+          test -n "$SEDERG_DB_PORT"     || { echo "::error::Falta el secreto SEDERG_DB_PORT"; fail="1"; }
+          test -n "$SEDERG_DB_NAME"     || { echo "::error::Falta el secreto SEDERG_DB_NAME"; fail="1"; }
+          test -n "$SEDERG_DB_USER"     || { echo "::error::Falta el secreto SEDERG_DB_USER"; fail="1"; }
+          test -n "$SEDERG_DB_PASSWORD" || { echo "::error::Falta el secreto SEDERG_DB_PASSWORD"; fail="1"; }
+          test "$fail" = "0" || exit 1
 
       - name: Run migrations
         working-directory: backend
