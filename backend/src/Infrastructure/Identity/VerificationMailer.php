@@ -388,7 +388,12 @@ private function expect($socket, int|array $expectedCode): string
             return $response;
         }
     }
-    throw new RuntimeException('SMTP server rejected command: ' . $response);
+    $detail = trim($response);
+    if ($detail === '') {
+        $meta = stream_get_meta_data($socket);
+        $detail = !empty($meta['timed_out']) ? 'empty response (connection timed out)' : 'empty response';
+    }
+    throw new RuntimeException('SMTP server rejected command: ' . $detail);
 }
 
 private function dotStuff(string $message): string
