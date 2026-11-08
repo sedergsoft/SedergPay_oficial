@@ -19,7 +19,7 @@ jobs:
       - name: Install PostgreSQL driver
         run: |
           apt-get update
-          apt-get install -y --no-interaction --no-install-recommends libzip-dev unzip libpq-dev
+          apt-get install -y --no-install-recommends libzip-dev unzip libpq-dev
           docker-php-ext-install bcmath pdo_pgsql zip
           rm -rf /var/lib/apt/lists/*
 
