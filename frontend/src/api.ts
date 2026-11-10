@@ -163,7 +163,16 @@ export type User = {
   last_name: string;
   role: 'customer' | 'admin';
   status: string;
+  two_factor_enabled?: boolean;
 };
+
+export type LoginChallenge = { requires_2fa: true; challenge: string; public_id: string };
+export type LoginResult = User | LoginChallenge;
+export const isLoginChallenge = (value: LoginResult): value is LoginChallenge => (value as LoginChallenge).requires_2fa === true;
+
+export type SecurityStatus = { public_id: string; email: string; two_factor_enabled: boolean; password_change_available: boolean };
+export type TwoFactorSetup = { secret: string; otpauth_uri: string };
+export type TwoFactorConfirmResult = { enabled: boolean; recovery_codes: string[] };
 
 export type AdminOperation = Remittance & {
   customer_email: string;
@@ -234,9 +243,21 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
-  login: (email: string, password: string) => request<User>('/api/v1/auth/login', {
+  login: (email: string, password: string) => request<LoginResult>('/api/v1/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
+  }),
+  login2FA: (challenge: string, code: string) => request<User>('/api/v1/auth/2fa/login-verify', {
+    method: 'POST',
+    body: JSON.stringify({ challenge, code }),
+  }),
+  forgotPassword: (email: string) => request<{ sent: boolean; dev_reset_token?: string; dev_reset_url?: string; mail_warning?: string }>('/api/v1/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  }),
+  resetPassword: (email: string, token: string, password: string) => request<{ reset: boolean }>('/api/v1/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ email, token, password }),
   }),
   me: (userId: string) => request<User>('/api/v1/auth/me', {
     headers: authHeaders(userId),
@@ -350,5 +371,18 @@ export const api = {
   reconcile: (userId: string, remittanceId: string) => request(`/api/v1/remittances/${remittanceId}/reconcile`, {
     method: 'POST', headers: { ...authHeaders(userId), 'Idempotency-Key': `reconcile-${crypto.randomUUID()}` },
     body: JSON.stringify({ notes: 'Sandbox exact match verified' }),
+  }),
+  securityStatus: (userId: string) => request<SecurityStatus>('/api/v1/account/security', { headers: authHeaders(userId) }),
+  changePassword: (userId: string, currentPassword: string, newPassword: string) => request<{ changed: boolean }>('/api/v1/account/security/change-password', {
+    method: 'POST', headers: authHeaders(userId), body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  }),
+  twoFactorSetup: (userId: string) => request<TwoFactorSetup>('/api/v1/account/security/2fa/setup', {
+    method: 'POST', headers: authHeaders(userId), body: JSON.stringify({}),
+  }),
+  twoFactorConfirm: (userId: string, code: string) => request<TwoFactorConfirmResult>('/api/v1/account/security/2fa/confirm', {
+    method: 'POST', headers: authHeaders(userId), body: JSON.stringify({ code }),
+  }),
+  twoFactorDisable: (userId: string, password: string, code: string) => request<{ enabled: boolean }>('/api/v1/account/security/2fa/disable', {
+    method: 'POST', headers: authHeaders(userId), body: JSON.stringify({ password, code }),
   }),
 };

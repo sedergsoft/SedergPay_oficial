@@ -75,6 +75,61 @@ HTML;
     return false;
 }
 
+public function sendPasswordReset(string $email, string $firstName, string $token, int $ttlMinutes = 30): bool
+{
+    $transport = strtolower(trim((string) (getenv('SEDERG_MAIL_TRANSPORT') ?: 'smtp')));
+    if ($transport === 'log' || $transport === 'file') {
+        $this->logPasswordReset($email, $token, $ttlMinutes);
+        return true;
+    }
+    if ($transport !== 'smtp') {
+        throw new RuntimeException('Only SMTP email transport is allowed');
+    }
+
+    $config = $this->smtpConfig();
+    if ($config['incomplete']) {
+        if ($this->isDevelopmentMode()) {
+            $this->logPasswordReset($email, $token, $ttlMinutes);
+            return true;
+        }
+        throw new RuntimeException('SMTP email configuration is incomplete');
+    }
+
+    $appUrl = rtrim((string) (getenv('SEDERG_APP_URL') ?: 'http://localhost:5173'), '/');
+    $resetUrl = $appUrl . '/?reset_password=1&email=' . rawurlencode($email) . '&token=' . rawurlencode($token);
+    $safeFirstName = htmlspecialchars($firstName, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $safeEmail = htmlspecialchars($email, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $safeUrl = htmlspecialchars($resetUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $logoSrc = $this->logoCid();
+    $ttlMinutes = max(1, $ttlMinutes);
+    $subject = 'Restablece tu contraseña de SEDERG_PAY';
+    $body = "Hola {$firstName},\n\nRestablece tu contraseña con este enlace:\n{$resetUrl}\n\nEl enlace vence en {$ttlMinutes} minutos y solo puede utilizarse una vez.\nSi no solicitaste este cambio, ignora este mensaje.";
+    $html = <<<HTML
+<!doctype html>
+<html lang="es"><body style="margin:0;background:#f8fafc;font-family:'Inter',Arial,Helvetica,sans-serif;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:48px 24px;background:#f8fafc;"><tr><td align="center">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:680px;background:#ffffff;border-radius:30px;overflow:hidden;box-shadow:0 32px 96px rgba(10,43,107,.15);">
+<tr><td style="padding:48px 48px 36px;background:linear-gradient(135deg,#0a2b6c 0%,#1d4ed8 48%,#06b6d4 100%);border-radius:24px 24px 0 0;text-align:center;"><img src="{$logoSrc}" alt="SEDERG_PAY" style="height:56;width:auto;display:block;margin:0 auto 24px;border-radius:8px;" /><p style="margin:0;color:rgba(255,255,255,.9);font-size:14px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;">SEDERG_PAY</p></td></tr>
+<tr><td style="padding:36px 48px 48px;"><p style="margin:0 0 16px;color:#0f172a;font-size:14px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;">Seguridad de cuenta</p><h1 style="margin:0 0 24px;font-size:36px;line-height:1.2;color:#1e293b;">Restablece tu contraseña</h1><p style="margin:0 0 20px;font-size:18px;line-height:1.6;color:#475569;">Hola {$safeFirstName}. Recibimos una solicitud para restablecer la contraseña de {$safeEmail}.</p>
+<table role="presentation" cellspacing="0" cellpadding="0"><tr><td style="border-radius:16px;background:linear-gradient(135deg,#1d4ed8,#06b6d4);box-shadow:0 12px 32px rgba(11,79,156,.35);"><a href="{$safeUrl}" style="display:block;padding:18px 38px;border-radius:16px;color:#ffffff;text-decoration:none;font-size:16px;font-weight:700;">Crear nueva contraseña</a></td></tr></table>
+<p style="margin:24px 0 0;font-size:14px;line-height:1.6;color:#94a3b8;">Este enlace vence en {$ttlMinutes} minutos y solo puede utilizarse una vez. Si no solicitaste este cambio, puedes ignorar este mensaje.</p>
+<p style="margin:0;padding-top:28px;border-top:1px solid #e2e8f0;font-size:12px;line-height:1.6;color:#94a3b8;word-break:break-all;">{$safeUrl}</p>
+</td></tr>
+<tr><td style="padding:24px 48px;background:#f1f5f9;color:#94a3b8;font-size:12px;">SEDERG_PAY<br>Si no solicitaste este cambio, ignora este mensaje.</td></tr>
+</table></td></tr></table></body></html>
+HTML;
+    $this->sendMessage($email, $subject, $body, $html, $config);
+    return false;
+}
+
+private function logPasswordReset(string $email, string $token, int $ttlMinutes): void
+{
+    $appUrl = rtrim((string) (getenv('SEDERG_APP_URL') ?: 'http://localhost:5173'), '/');
+    $resetUrl = $appUrl . '/?reset_password=1&email=' . rawurlencode($email) . '&token=' . rawurlencode($token);
+    $ttlMinutes = max(1, $ttlMinutes);
+    $this->writeDevLog("[SEDERG_PAY][DEV][password-reset] email={$email} ttl_minutes={$ttlMinutes} url={$resetUrl}");
+}
+
 public function sendRemittanceReceipt(string $email, string $firstName, array $remittance): void
 {
     $transport = strtolower(trim((string) (getenv('SEDERG_MAIL_TRANSPORT') ?: 'smtp')));

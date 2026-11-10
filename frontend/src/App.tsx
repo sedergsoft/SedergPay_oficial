@@ -1,6 +1,6 @@
 import { ChangeEvent, FormEvent, createContext, useContext, useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import { api, AdminDashboard, AdminOperation, AdminRate, AdminUser, Beneficiary, ExchangeRate, FundingAccount, FundingMethod, PlatformSetting, Quote, Remittance, RemittanceDetail, User, isDevelopmentAuth, paymentMethods } from './api';
+import { api, AdminDashboard, AdminOperation, AdminRate, AdminUser, Beneficiary, ExchangeRate, FundingAccount, FundingMethod, PlatformSetting, Quote, Remittance, RemittanceDetail, User, isDevelopmentAuth, paymentMethods, isLoginChallenge, SecurityStatus, TwoFactorSetup } from './api';
 import { getInitialLanguage, Language, languageLabels, translate } from './i18n';
 
 const LanguageContext = createContext<Language>('es');
@@ -15,7 +15,7 @@ function getInitialTheme(): Theme {
   return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
-type View = 'summary' | 'beneficiaries' | 'quote' | 'remittances' | 'profile' | 'kyc' | 'admin' | 'funding';
+type View = 'summary' | 'beneficiaries' | 'quote' | 'remittances' | 'profile' | 'security' | 'kyc' | 'admin' | 'funding';
 const storedUserId = isDevelopmentAuth ? localStorage.getItem('sederg_user') ?? '' : '';
 
 export function App() {
@@ -87,7 +87,7 @@ function AppContent({ language, onLanguageChange, theme, onThemeChange }: { lang
         <NavButton icon="home" active={view === 'summary'} onClick={() => setView('summary')}>{translate(language, 'nav.summary')}</NavButton>
         <NavButton icon="users" active={view === 'beneficiaries'} onClick={() => setView('beneficiaries')}>{translate(language, 'nav.beneficiaries')}</NavButton>
         <NavButton icon="send" active={view === 'quote'} onClick={() => setView('quote')}>{translate(language, 'nav.quote')}</NavButton>
-        <NavButton icon="history" active={view === 'remittances'} onClick={() => setView('remittances')}>{translate(language, 'nav.remittances')}</NavButton><NavButton icon="user" active={view === 'profile'} onClick={() => setView('profile')}>{t('nav.profile')}</NavButton><NavButton icon="shield" active={view === 'kyc'} onClick={() => setView('kyc')}>{t('nav.kyc')}</NavButton>
+        <NavButton icon="history" active={view === 'remittances'} onClick={() => setView('remittances')}>{translate(language, 'nav.remittances')}</NavButton><NavButton icon="user" active={view === 'profile'} onClick={() => setView('profile')}>{t('nav.profile')}</NavButton><NavButton icon="lock" active={view === 'security'} onClick={() => setView('security')}>{t('nav.security')}</NavButton><NavButton icon="shield" active={view === 'kyc'} onClick={() => setView('kyc')}>{t('nav.kyc')}</NavButton>
         {user.role === 'admin' && <><NavButton icon="settings" active={view === 'admin'} onClick={() => setView('admin')}>{translate(language, 'nav.admin')}</NavButton><NavButton icon="settings" active={view === 'funding'} onClick={() => setView('funding')}>Métodos de pago</NavButton></>}
         <button className="secondary menu-exit" onClick={signOut}>{translate(language, 'nav.logout')}</button>
       </nav>
@@ -96,7 +96,7 @@ function AppContent({ language, onLanguageChange, theme, onThemeChange }: { lang
         {view === 'summary' && <Summary userId={user.public_id} setView={setView} run={run} />}
         {view === 'beneficiaries' && <Beneficiaries userId={user.public_id} run={run} />}
         {view === 'quote' && <QuotePanel userId={user.public_id} run={run} />}
-        {view === 'remittances' && <Remittances userId={user.public_id} run={run} />}{view === 'profile' && <ProfilePanel userId={user.public_id} run={run} />}{view === 'kyc' && <KycPanel userId={user.public_id} run={run} />}
+        {view === 'remittances' && <Remittances userId={user.public_id} run={run} />}{view === 'profile' && <ProfilePanel userId={user.public_id} run={run} />}{view === 'security' && <SecurityPanel userId={user.public_id} run={run} />}{view === 'kyc' && <KycPanel userId={user.public_id} run={run} />}
         {view === 'admin' && user.role === 'admin' && <AdminOperations userId={user.public_id} run={run} />}{view === 'funding' && user.role === 'admin' && <AdminFundingPanel userId={user.public_id} run={run} />}
         {message && <Alert text={message} />}
       </section>
@@ -300,56 +300,116 @@ function AuthScreen({ language, onLanguageChange, theme, onThemeChange, mode, se
 }) {
   const text = (key: string) => translate(language, key);
   const [verificationEmail, setVerificationEmail] = useState('');
-  const [verificationToken, setVerificationToken] = useState('');
   const [notification, setNotification] = useState('');
   const [activationState, setActivationState] = useState<'idle' | 'activating' | 'success' | 'error'>('idle');
+  const [authMode, setAuthMode] = useState<'login' | 'register' | 'forgot' | 'reset'>(mode);
+  const [twoFactor, setTwoFactor] = useState<{ challenge: string } | null>(null);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetToken, setResetToken] = useState('');
+  const [localBusy, setLocalBusy] = useState(false);
+  const [localMessage, setLocalMessage] = useState('');
+
+  useEffect(() => { if (!twoFactor && (authMode === 'login' || authMode === 'register')) setAuthMode(mode); }, [mode]);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const email = params.get('verify_email');
+    const verifyEmail = params.get('verify_email');
     const token = params.get('token');
-    if (!email || !token) return;
-    setVerificationEmail(email);
+    if (params.get('reset_password') === '1' && token) {
+      setAuthMode('reset');
+      setResetEmail(params.get('email') || '');
+      setResetToken(token);
+      return;
+    }
+    if (!verifyEmail || !token) return;
+    setVerificationEmail(verifyEmail);
     setActivationState('activating');
     void run(async () => {
       try {
-        await api.verifyEmail(email, token);
+        await api.verifyEmail(verifyEmail, token);
         setActivationState('success');
         setNotification(text('auth.activationSuccess'));
         setVerificationEmail('');
-        setVerificationToken('');
         window.history.replaceState({}, '', '/?access=login');
-        setMode('login');
+        setMode('login'); setAuthMode('login');
       } catch (error) {
         setActivationState('error');
         throw error;
       }
     });
   }, []);
+
+  const showMessage = localMessage || message;
+  const effectiveBusy = busy || localBusy;
+
+  const doLocal = async (fn: () => Promise<void>) => {
+    setLocalBusy(true); setLocalMessage('');
+    try { await fn(); }
+    catch (e) { setLocalMessage((e as Error).message); }
+    finally { setLocalBusy(false); }
+  };
+
   return <main className="shell narrow"><Header language={language} onLanguageChange={onLanguageChange} theme={theme} onThemeChange={onThemeChange} /><RateTicker /><section className="auth-card card">
     <button className="back-link" type="button" onClick={onBack}>{text('common.backHome')}</button>
-    <div className="eyebrow">{text('auth.secure')}</div><h1>{mode === 'login' ? text('auth.welcome') : text('auth.create')}</h1>
-    <p className="muted">{isDevelopmentAuth ? text('auth.description') : text('auth.oidcDescription')}</p>
-    <div className="tabs"><button className={mode === 'login' ? 'tab active' : 'tab'} onClick={() => setMode('login')}>{text('common.login')}</button><button className={mode === 'register' ? 'tab active' : 'tab'} onClick={() => setMode('register')}>{text('common.register')}</button></div>
-    {!isDevelopmentAuth && <p className="alert">{text('auth.oidcSetup')}</p>}
+    <div className="eyebrow">{text('auth.secure')}</div>
+    <h1>{authMode === 'forgot' ? text('auth.forgotPasswordTitle') : authMode === 'reset' ? text('auth.resetPasswordTitle') : authMode === 'register' ? text('auth.create') : text('auth.welcome')}</h1>
+    <p className="muted">{authMode === 'forgot' ? text('auth.forgotPasswordHint') : authMode === 'reset' ? text('auth.resetPasswordHint') : isDevelopmentAuth ? text('auth.description') : text('auth.oidcDescription')}</p>
+    {(authMode === 'login' || authMode === 'register') && !twoFactor && <div className="tabs"><button className={authMode === 'login' ? 'tab active' : 'tab'} onClick={() => { setAuthMode('login'); setMode('login'); setLocalMessage(''); }}>{text('common.login')}</button><button className={authMode === 'register' ? 'tab active' : 'tab'} onClick={() => { setAuthMode('register'); setMode('register'); setLocalMessage(''); }}>{text('common.register')}</button></div>}
+    {!isDevelopmentAuth && authMode !== 'reset' && <p className="alert">{text('auth.oidcSetup')}</p>}
     {activationState === 'activating' && <div className="activation-panel"><span className="activation-spinner" /><strong>{text('auth.activating')}</strong><p>{text('auth.verifyingLink')}</p></div>}
     {activationState === 'error' && <div className="notice-box notice-error" role="alert"><Icon name="alert-circle"/><strong>{text('auth.invalidLink')}</strong></div>}
-    {verificationEmail && activationState === 'idle' && <div className="verification-panel"><div className="notice-box notice-info" role="status">{notification || <>{text('auth.verificationSent')} <strong>{verificationEmail}</strong>. {text('auth.checkInbox')}</>}</div><p className="muted">{text('auth.openActivationLink')}</p><button type="button" className="secondary" disabled={busy} onClick={() => void run(async () => { await api.resendVerification(verificationEmail); setNotification(text('auth.resent')); })}>{text('auth.resendLink')}</button></div>}
+    {verificationEmail && activationState === 'idle' && <div className="verification-panel"><div className="notice-box notice-info" role="status">{notification || <>{text('auth.verificationSent')} <strong>{verificationEmail}</strong>. {text('auth.checkInbox')}</>}</div><p className="muted">{text('auth.openActivationLink')}</p><button type="button" className="secondary" disabled={effectiveBusy} onClick={() => void run(async () => { await api.resendVerification(verificationEmail); setNotification(text('auth.resent')); })}>{text('auth.resendLink')}</button></div>}
     {notification && activationState === 'success' && <div className="notice-box notice-success" role="status"><Icon name="check"/><strong>{notification || text('auth.activationSuccess')}</strong></div>}
-    {!verificationEmail && isDevelopmentAuth && mode === 'login' && <form onSubmit={(event) => {
+
+    {isDevelopmentAuth && twoFactor && <form onSubmit={(e) => {
+      e.preventDefault();
+      void doLocal(async () => {
+        const user = await api.login2FA(twoFactor.challenge, twoFactorCode);
+        setTwoFactor(null); setTwoFactorCode('');
+        onAuthenticated(user);
+      });
+    }}><div className="notice-box notice-info" role="status"><Icon name="shield" /><strong>{text('auth.twoFactorTitle')}</strong></div><p className="muted">{text('auth.twoFactorHint')}</p><Field name="code" label={text('auth.twoFactorCode')} value={twoFactorCode} onChange={(e) => setTwoFactorCode((e.target as HTMLInputElement).value)} inputMode="text" placeholder="123456" /><div className="form-actions"><button type="button" className="secondary" onClick={() => { setTwoFactor(null); setTwoFactorCode(''); setLocalMessage(''); }}>{text('auth.backToLogin')}</button><button disabled={effectiveBusy || twoFactorCode.trim().length < 6}>{effectiveBusy ? text('common.validating') : text('auth.verifyCode')}</button></div></form>}
+
+    {!verificationEmail && isDevelopmentAuth && !twoFactor && authMode === 'login' && <><form onSubmit={(event) => {
       event.preventDefault(); const data = new FormData(event.currentTarget);
-      void run(async () => onAuthenticated(await api.login(String(data.get('email')), String(data.get('password')))));
-    }}><Field name="email" label={text('field.email')} type="email" /><Field name="password" label={text('field.password')} type="password" /><button disabled={busy}>{busy ? text('common.validating') : text('common.login')}</button></form>}
-    {!verificationEmail && isDevelopmentAuth && mode === 'register' && <form onSubmit={(event) => {
+      void doLocal(async () => {
+        const result = await api.login(String(data.get('email')), String(data.get('password')));
+        if (isLoginChallenge(result)) { setTwoFactor({ challenge: result.challenge }); setTwoFactorCode(''); setLocalMessage(''); return; }
+        onAuthenticated(result);
+      });
+    }}><Field name="email" label={text('field.email')} type="email" /><Field name="password" label={text('field.password')} type="password" /><button disabled={effectiveBusy}>{effectiveBusy ? text('common.validating') : text('common.login')}</button></form><p style={{ marginTop: 12 }}><button type="button" className="text-button" onClick={() => { setAuthMode('forgot'); setLocalMessage(''); setNotification(''); }}>{text('auth.forgotPassword')}</button></p></>}
+
+    {!verificationEmail && isDevelopmentAuth && !twoFactor && authMode === 'register' && <form onSubmit={(event) => {
       event.preventDefault(); const data = new FormData(event.currentTarget);
       void run(async () => {
         const email = String(data.get('email')); const password = String(data.get('password'));
         const result = await api.register({ email, password, first_name: data.get('first_name'), last_name: data.get('last_name'), residence_country_code: data.get('country'), consent_policy_version: 'v1', accept_terms: true, accept_privacy: true });
         setVerificationEmail(email);
-        setVerificationToken('');
         setNotification(`${text('auth.accountCreated')} ${result.email}.`);
       });
-    }}><Field name="first_name" label={text('field.firstName')} /><Field name="last_name" label={text('field.lastName')} /><Field name="email" label={text('field.email')} type="email" /><Field name="password" label={text('field.passwordMin')} type="password" /><label>{text('field.residenceCountry')}<select name="country" defaultValue="RU"><option value="RU">{text('country.russia')}</option><option value="CU">{text('country.cuba')}</option></select></label><button disabled={busy}>{busy ? text('common.creating') : text('common.register')}</button></form>}
-    {message && <Alert text={message} />}
+    }}><Field name="first_name" label={text('field.firstName')} /><Field name="last_name" label={text('field.lastName')} /><Field name="email" label={text('field.email')} type="email" /><Field name="password" label={text('field.passwordMin')} type="password" /><label>{text('field.residenceCountry')}<select name="country" defaultValue="RU"><option value="RU">{text('country.russia')}</option><option value="CU">{text('country.cuba')}</option></select></label><button disabled={effectiveBusy}>{effectiveBusy ? text('common.creating') : text('common.register')}</button></form>}
+
+    {isDevelopmentAuth && authMode === 'forgot' && <form onSubmit={(e) => {
+      e.preventDefault(); const email = String(new FormData(e.currentTarget).get('email') || '');
+      void doLocal(async () => {
+        const res = await api.forgotPassword(email);
+        setNotification(res.dev_reset_url ? `${text('auth.resetLinkSent')} ${res.dev_reset_url}` : text('auth.resetLinkSent'));
+      });
+    }}><Field name="email" label={text('field.email')} type="email" defaultValue={resetEmail} /><div className="form-actions"><button type="button" className="secondary" onClick={() => { setAuthMode('login'); setMode('login'); setLocalMessage(''); setNotification(''); }}>{text('auth.backToLogin')}</button><button disabled={effectiveBusy}>{text('auth.sendResetLink')}</button></div></form>}
+
+    {authMode === 'reset' && <form onSubmit={(e) => {
+      e.preventDefault(); const d = new FormData(e.currentTarget); const email = String(d.get('email') || resetEmail); const token = String(d.get('token') || resetToken); const password = String(d.get('password') || '');
+      void doLocal(async () => {
+        await api.resetPassword(email, token, password);
+        setNotification(text('auth.resetSuccess'));
+        window.history.replaceState({}, '', '/?access=login');
+        setAuthMode('login'); setMode('login'); setResetToken('');
+      });
+    }}><input type="hidden" name="token" value={resetToken} /><Field name="email" label={text('field.email')} type="email" defaultValue={resetEmail} /><Field name="password" label={text('auth.newPassword')} type="password" /><div className="form-actions"><button type="button" className="secondary" onClick={() => { setAuthMode('login'); setMode('login'); window.history.replaceState({}, '', '/?access=login'); }}>{text('auth.backToLogin')}</button><button disabled={effectiveBusy}>{text('auth.resetPassword')}</button></div></form>}
+
+    {notification && !verificationEmail && activationState !== 'success' && <div className="notice-box notice-success" role="status"><Icon name="check"/><strong style={{ wordBreak: 'break-word' }}>{notification}</strong></div>}
+    {showMessage && <Alert text={showMessage} />}
   </section></main>;
 }
 
@@ -415,6 +475,65 @@ function ProfilePanel({userId,run}:{userId:string;run:(action:()=>Promise<void>)
     <form className="modern-form" onSubmit={handleSave}><div className="form-grid"><Field name="first_name" label={t('field.firstName')} defaultValue={profile.first_name} error={fieldErrors.first_name}/><Field name="last_name" label={t('field.lastName')} defaultValue={profile.last_name} error={fieldErrors.last_name}/><Field name="middle_name" label={t('field.middleName')} required={false} defaultValue={profile.middle_name||''} error={fieldErrors.middle_name}/><label>Correo electrónico<input type="email" value={profile.email} disabled/></label><Field name="phone_e164" label={t('field.phone')} type="tel" required={false} defaultValue={profile.phone_e164||''} error={fieldErrors.phone_e164}/><Field name="date_of_birth" label={t('field.birthDate')} type="date" required={false} defaultValue={profile.date_of_birth||''} error={fieldErrors.date_of_birth}/><label className={fieldErrors.residence_country_code ? 'field-error' : undefined}>{t('field.residenceCountry')}<select name="residence_country_code" defaultValue={profile.residence_country_code||'RU'}><option value="RU">🇷🇺 Rusia</option><option value="CU">🇨🇺 Cuba</option></select>{fieldErrors.residence_country_code && <small className="field-error-message" id="residence_country_code-error" role="alert">{fieldErrors.residence_country_code}</small>}</label><label className={fieldErrors.nationality_country_code ? 'field-error' : undefined}>{t('field.nationality')}<select name="nationality_country_code" defaultValue={profile.nationality_country_code||'CU'}><option value="CU">🇨🇺 {t('country.cuba')}</option><option value="RU">🇷🇺 {t('country.russia')}</option></select>{fieldErrors.nationality_country_code && <small className="field-error-message" id="nationality_country_code-error" role="alert">{fieldErrors.nationality_country_code}</small>}</label><Field name="address_line" label={t('field.address')} required={false} defaultValue={profile.address_line||''} error={fieldErrors.address_line}/><Field name="city" label={t('field.city')} required={false} defaultValue={profile.city||''} error={fieldErrors.city}/><Field name="postal_code" label={t('field.postalCode')} required={false} defaultValue={profile.postal_code||''} error={fieldErrors.postal_code}/></div><div className="form-actions"><button type="button" className="secondary" onClick={()=>setEditing(false)} disabled={saving}>{t('profile.cancel')}</button><button type="submit" disabled={saving}>{saving?'Guardando…':<><Icon name="check"/>{t('common.saveChanges')}</>}</button></div></form></section>
   )}</div>;
 }
+
+function SecurityPanel({ userId, run }: { userId: string; run: (action: () => Promise<void>) => Promise<void> }) {
+  const t = useT();
+  const [status, setStatus] = useState<SecurityStatus | null>(null);
+  const [notice, setNotice] = useState('');
+  const [noticeType, setNoticeType] = useState<'success' | 'error' | 'info'>('info');
+  const [busy, setBusy] = useState(false);
+  const [setup, setSetup] = useState<TwoFactorSetup | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState('');
+  const [confirmCode, setConfirmCode] = useState('');
+  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
+  const [showDisable, setShowDisable] = useState(false);
+
+  const refresh = () => run(async () => setStatus(await api.securityStatus(userId)));
+  useEffect(() => { void refresh(); }, [userId]);
+  useEffect(() => {
+    if (!setup?.otpauth_uri) { setQrDataUrl(''); return; }
+    void QRCode.toDataURL(setup.otpauth_uri, { width: 220, margin: 1 }).then(setQrDataUrl).catch(() => setQrDataUrl(''));
+  }, [setup?.otpauth_uri]);
+
+  const act = async (fn: () => Promise<void>) => {
+    setBusy(true); setNotice('');
+    try { await fn(); }
+    catch (e) { setNotice((e as Error).message); setNoticeType('error'); }
+    finally { setBusy(false); }
+  };
+
+  if (!status) return <section className="card"><p className="muted">{t('common.loading')}</p></section>;
+
+  return <div className="feature-view">
+    <div className="view-heading"><div><span className="eyebrow">{t('nav.security')}</span><h2>{t('security.title')}</h2><p className="muted">{t('security.description')}</p></div><span className={`status-pill ${status.two_factor_enabled ? 'status-success' : 'status-warning'}`}><Icon name="shield" /> {status.two_factor_enabled ? t('security.twoFactorEnabled') : t('security.twoFactorDisabled')}</span></div>
+    {notice && <div className={`notice-box notice-${noticeType}`} role="status"><Icon name={noticeType === 'error' ? 'alert-circle' : 'check'} /><strong>{notice}</strong></div>}
+    {recoveryCodes.length > 0 && <section className="card"><div className="section-heading"><div><span className="eyebrow">2FA</span><h3>{t('security.recoveryCodes')}</h3></div></div><p className="muted">{t('security.recoveryCodesHint')}</p><div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', marginTop: 12 }}>{recoveryCodes.map(c => <code key={c} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border, #e2e8f0)', textAlign: 'center' }}>{c}</code>)}</div><div className="form-actions"><button type="button" className="secondary" onClick={() => setRecoveryCodes([])}>OK</button></div></section>}
+
+    <section className="card">
+      <div className="section-heading"><div><span className="eyebrow">{t('security.password')}</span><h3>{t('security.changePassword')}</h3></div><span className="section-icon"><Icon name="lock" /></span></div>
+      {!status.password_change_available ? <p className="muted">{t('security.oidcPasswordNote')}</p> : <form className="modern-form" onSubmit={(e) => {
+        e.preventDefault(); const d = new FormData(e.currentTarget); const current = String(d.get('current_password') || ''); const next = String(d.get('new_password') || '');
+        void act(async () => { await api.changePassword(userId, current, next); (e.target as HTMLFormElement).reset(); setNotice(t('security.passwordChanged')); setNoticeType('success'); });
+      }}><div className="form-grid"><Field name="current_password" label={t('security.currentPassword')} type="password" /><Field name="new_password" label={t('security.newPassword')} type="password" placeholder="••••••••••••" /></div><div className="form-actions"><button disabled={busy}>{t('security.changePassword')}</button></div></form>}
+    </section>
+
+    <section className="card">
+      <div className="section-heading"><div><span className="eyebrow">2FA</span><h3>{t('security.twoFactor')}</h3></div><span className="section-icon"><Icon name="shield" /></span></div>
+      {!status.two_factor_enabled ? <>
+        {!setup ? <div className="form-actions"><button disabled={busy} onClick={() => void act(async () => { setSetup(await api.twoFactorSetup(userId)); setConfirmCode(''); setNotice(''); })}>{t('security.enable2fa')}</button></div>
+          : <div><p className="muted">{t('security.setup2faHint')}</p>{qrDataUrl && <img src={qrDataUrl} alt="2FA QR" width={220} height={220} style={{ borderRadius: 12, background: '#fff', padding: 8 }} />}<p><small>{t('security.manualKey')}: <code style={{ wordBreak: 'break-all' }}>{setup.secret}</code></small></p>
+            <form className="modern-form" onSubmit={(e) => { e.preventDefault(); void act(async () => { const res = await api.twoFactorConfirm(userId, confirmCode); setRecoveryCodes(res.recovery_codes); setSetup(null); setConfirmCode(''); setNotice(t('security.twoFactorEnabled')); setNoticeType('success'); await refresh(); }); }}><div className="form-grid"><Field name="code" label={t('auth.twoFactorCode')} value={confirmCode} onChange={(e) => setConfirmCode((e.target as HTMLInputElement).value)} inputMode="numeric" placeholder="123456" /></div><div className="form-actions"><button type="button" className="secondary" onClick={() => setSetup(null)}>{t('common.cancel')}</button><button disabled={busy || confirmCode.trim().length < 6}>{t('security.confirm2fa')}</button></div></form></div>}
+      </> : <>
+        {!showDisable ? <div className="form-actions"><button className="secondary" disabled={busy} onClick={() => setShowDisable(true)}>{t('security.disable2fa')}</button></div>
+          : <form className="modern-form" onSubmit={(e) => {
+            e.preventDefault(); const d = new FormData(e.currentTarget); const password = String(d.get('password') || ''); const code = String(d.get('code') || '');
+            void act(async () => { await api.twoFactorDisable(userId, password, code); setShowDisable(false); setNotice(t('security.twoFactorDisabled')); setNoticeType('success'); await refresh(); });
+          }}><p className="muted">{t('security.disableHint')}</p><div className="form-grid"><Field name="password" label={t('security.currentPassword')} type="password" /><Field name="code" label={t('auth.twoFactorCode')} inputMode="text" placeholder="123456 / XXXXX-XXXXX" /></div><div className="form-actions"><button type="button" className="secondary" onClick={() => setShowDisable(false)}>{t('common.cancel')}</button><button disabled={busy}>{t('security.disable2fa')}</button></div></form>}
+      </>}
+    </section>
+  </div>;
+}
+
 function KycPanel({userId,run}:{userId:string;run:(action:()=>Promise<void>)=>Promise<void>}){
   const t = useT();
  const [kyc,setKyc]=useState<any>(null);const refresh=()=>run(async()=>setKyc(await api.kyc(userId)));useEffect(()=>{refresh();},[userId]);
