@@ -1,7 +1,7 @@
 services:
   backend:
     environment:
-      SEDERG_AUTH_MODE: production
+      SEDERG_AUTH_MODE: ${SEDERG_AUTH_MODE:-production}
       SEDERG_CLAMD_HOST: clamav
       SEDERG_CLAMD_PORT: 3310
       SEDERG_PII_KEY: ${SEDERG_PII_KEY:?SEDERG_PII_KEY is required in production}

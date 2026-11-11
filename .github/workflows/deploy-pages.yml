@@ -36,20 +36,24 @@ jobs:
       - name: Build SPA
         working-directory: frontend
         env:
-          # Configurar en Settings → Secrets and variables → Actions → Variables
+          # Configurar en Settings → Secrets and variables → Actions → Variables.
+          # La variable del repo tiene prioridad; DEFAULT_API_BASE_URL es el respaldo.
           VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
           VITE_AUTH_MODE: ${{ vars.VITE_AUTH_MODE }}
           VITE_UI_PREVIEW: ${{ vars.VITE_UI_PREVIEW }}
+          DEFAULT_API_BASE_URL: https://5-22-219-30.sslip.io
         run: |
           if [ -z "$VITE_API_BASE_URL" ] && [ "$VITE_UI_PREVIEW" != "true" ]; then
+            VITE_API_BASE_URL="$DEFAULT_API_BASE_URL"
+            echo "::notice::VITE_API_BASE_URL no configurada en el repo; se usa $DEFAULT_API_BASE_URL"
+          fi
+          if [ -z "$VITE_API_BASE_URL" ]; then
             echo "::error::VITE_API_BASE_URL no está configurada. Define la variable del repo (Settings → Secrets and variables → Actions → Variables) o VITE_UI_PREVIEW=true para publicar solo la UI en modo development."
             exit 1
           fi
           : "${VITE_AUTH_MODE:=development}"
-          if [ -z "$VITE_API_BASE_URL" ]; then
-            echo "::warning::Publicando vista previa de la UI sin API real (VITE_AUTH_MODE=development)."
-          fi
-          VITE_AUTH_MODE="$VITE_AUTH_MODE" npm run build
+          echo "::notice::Publicando la UI con VITE_API_BASE_URL=$VITE_API_BASE_URL y VITE_AUTH_MODE=$VITE_AUTH_MODE"
+          VITE_API_BASE_URL="$VITE_API_BASE_URL" VITE_AUTH_MODE="$VITE_AUTH_MODE" npm run build
 
       - name: SPA fallback (404.html)
         run: cp dist/index.html dist/404.html

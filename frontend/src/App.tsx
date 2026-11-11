@@ -895,9 +895,24 @@ function StatusBadge({status}:{status:string}) {
 function NavButton({ active, onClick, children, icon }: { active: boolean; onClick: () => void; children: string; icon?: string }) { return <button className={active ? 'nav-button active' : 'nav-button'} onClick={onClick}>{icon && <Icon name={icon} />}<span>{children}</span></button>; }
 function Logo({ language, monochrome = false }: { language: Language; monochrome?: boolean }) {
   const slogan = translate(language, 'brand.slogan');
-  const logoFile = monochrome ? "sederg-pay-logo-inverted.png" : "sederg-pay-logo.png";
+  // El repositorio solo publica los logotipos en SVG (no hay PNG), por eso se
+  // usa el horizontal y, si falla, se cae al isotipo. La variante monocroma
+  // se aplica con el filtro CSS de .logo-monochrome.
+  const logoFile = "sederg-pay-horizontal.svg";
+  const logoFallback = "sederg-pay-isotipo.svg";
   return <div className={monochrome ? 'logo logo-monochrome' : 'logo'} aria-label={`SEDERG_PAY — ${slogan}`}>
-    <img className="logo-brand-image" src={import.meta.env.BASE_URL + "assets/sederg-pay/logos/" + logoFile} alt="SEDERG_PAY" />
+    <img
+      className="logo-brand-image"
+      src={import.meta.env.BASE_URL + "assets/sederg-pay/logos/" + logoFile}
+      alt="SEDERG_PAY"
+      onError={(event) => {
+        const image = event.currentTarget;
+        if (!image.dataset.fallback) {
+          image.dataset.fallback = '1';
+          image.src = import.meta.env.BASE_URL + "assets/sederg-pay/logos/" + logoFallback;
+        }
+      }}
+    />
     <span className="sr-only">{slogan}</span>
   </div>;
 }

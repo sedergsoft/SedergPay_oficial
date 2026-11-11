@@ -49,7 +49,7 @@ jobs:
             cd "$HOME/sederg-pay"
             umask 077
             cat > .env
-            docker compose -f docker-compose.yml -f docker-compose.production.yml up -d --build postgres redis
+            docker compose -f docker-compose.yml -f docker-compose.production.yml up -d --build postgres clamav
             docker compose -f docker-compose.yml -f docker-compose.production.yml run --rm backend php yii migrate --migrationPath=@app/migrations --interactive=0
             docker compose -f docker-compose.yml -f docker-compose.production.yml up -d --build backend caddy
           '
