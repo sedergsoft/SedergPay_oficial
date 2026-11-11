@@ -135,6 +135,14 @@ Ventaja: cero mantenimiento y cero coste. Inconveniente: la URL cambia si
 cambia la IP del servidor y el dominio no es "de marca" para un piloto
 comercial.
 
+> ⚠️ **Limitación medida (2026-11-11):** los *runners* de GitHub Actions (IP de
+> Azure) **no consiguen completar el TLS** contra `*.sslip.io`
+> (`tlsv1 alert internal error`): el tráfico se corta antes de llegar a Caddy.
+> Los navegadores de los usuarios y el propio servidor sí acceden con normalidad.
+> Por eso el workflow verifica la API **desde el servidor** y no desde el runner.
+> Para una URL estable y sin estas limitaciones, usa **DuckDNS** o un dominio
+> propio (opciones A y B).
+
 ### Opción A — DuckDNS (recomendada para demo)
 
 1. Crea `sederg-pay.duckdns.org` en <https://www.duckdns.org> y copia el token.

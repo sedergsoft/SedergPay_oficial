@@ -119,19 +119,22 @@ jobs:
 
       - name: Verificar la API pública
         env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL }}
         run: |
           set -uo pipefail
           url="${PUBLIC_API_URL:-https://5-22-219-30.sslip.io}"
           echo "Comprobando $url/health"
-          for i in $(seq 1 12); do
-            if curl -fsS --connect-timeout 10 --max-time 30 "$url/health"; then
-              echo ""
-              echo "API pública operativa"
-              exit 0
-            fi
-            echo "::warning::health check $i/12 sin respuesta; reintento en 10 s"
-            sleep 10
-          done
-          echo "::error::La API pública no respondió en $url/health"
-          exit 1
+          # La comprobacion se hace desde el servidor: los runners de GitHub
+          # (IP de Azure) pueden ser bloqueados por el proveedor de red al
+          # conectar con sslip.io, y el trafico nunca llega a Caddy.
+          if ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes \
+               "$DEPLOY_USER@$DEPLOY_HOST" \
+               "for i in \$(seq 1 12); do if curl -fsS --connect-timeout 5 --max-time 20 '$url/health'; then exit 0; fi; sleep 5; done; exit 1"; then
+            echo ""
+            echo "API pública operativa"
+          else
+            echo "::error::La API pública no respondió en $url/health"
+            exit 1
+          fi
