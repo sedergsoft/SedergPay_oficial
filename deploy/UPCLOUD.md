@@ -356,6 +356,26 @@ $m = new app\Infrastructure\Identity\VerificationMailer();
 var_dump($m->send(getenv("SEDERG_MAIL_FROM"), "Prueba", "token-de-prueba", 30));'
 ```
 
+### ⚠️ Brevo exige autorizar la IP de salida
+
+Las **claves de API** de Brevo (`xkeysib-…`) solo funcionan desde IPs autorizadas.
+Si no lo están, la API responde:
+
+```json
+{"message":"We have detected you are using an unrecognised IP address 5.22.219.30.
+If you performed this action make sure to add the new IP address in this link:
+https://app.brevo.com/security/authorised_ips","code":"unauthorized"}
+```
+
+Solución: en <https://app.brevo.com/security/authorised_ips> añadir la IP pública del
+servidor (`5.22.219.30`) — o borrar la lista para permitir cualquier origen.
+
+> Las **claves SMTP** (`xsmtpsib-…`) no tienen esa restricción, pero no sirven para la
+> API y el servidor no puede usarlas porque UpCloud bloquea el egress SMTP.
+>
+> Mientras la IP no esté autorizada, el backend funciona en modo degradado: registra el
+> error en el log (`[SEDERG_PAY][DEV][mail-error]`) y el alta de usuario no se rompe.
+
 ### Si UpCloud habilita el SMTP
 
 Si en el futuro UpCloud abre el egress SMTP (suele ocurrir al verificar la cuenta),
