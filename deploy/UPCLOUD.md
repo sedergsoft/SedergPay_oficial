@@ -190,6 +190,8 @@ Valores mínimos que debes revisar:
 | `SEDERG_DB_DSN` | `pgsql:host=postgres;port=5432;dbname=sederg_pay` (o pgwire de TiDB con `sslmode=require`) |
 | `SEDERG_CORS_ORIGINS` | `https://5-22-219-30.sslip.io,https://sedergsoft.github.io` |
 | `SEDERG_APP_URL` | `https://5-22-219-30.sslip.io/` (origen del enlace de verificación) |
+| `SEDERG_MAIL_TRANSPORT` | `api` en la nube (ver §8.1), `smtp` en local |
+| `SEDERG_MAIL_API_KEY` | Clave de API de Brevo (`xkeysib-…`), **no** la clave SMTP |
 | `SEDERG_AUTH_MODE` | `development` (sandbox) / `production` (piloto) |
 | `SEDERG_KYC_REQUIRED` | `0` (sandbox) / `1` (piloto, exige ClamAV) |
 
@@ -293,6 +295,65 @@ Añade rotación (7 días) y copia fuera del servidor (UpCloud Object Storage de
 ```bash
 docker compose ... exec -T postgres pg_restore -U sederg_app -d sederg_pay_nuevo --clean < backup.dump
 ```
+
+---
+
+## 8.1 Correo: por qué la nube usa API y no SMTP
+
+Diagnóstico ejecutado en el servidor (2026-11-11):
+
+```text
+smtp-relay.brevo.com:587  → sin respuesta
+smtp-relay.brevo.com:2525 → sin respuesta
+smtp-relay.brevo.com:25   → sin respuesta
+smtp.gmail.com:587        → sin respuesta
+api.github.com:443        → ABIERTO
+```
+
+UpCloud **bloquea todo el tráfico SMTP saliente** en las cuentas *trial* (25, 465, 587 y 2525),
+mientras que HTTPS funciona con normalidad. Por eso los correos de verificación y de
+notificación no llegaban: el despliegue estaba además en `SEDERG_MAIL_TRANSPORT=log`.
+
+### Solución implementada
+
+`VerificationMailer` admite tres transportes:
+
+| Transporte | Cómo funciona | Cuándo usarlo |
+|---|---|---|
+| `smtp` | Conexión SMTP directa con `STARTTLS` (o `ssl`/`none`) | Entornos con salida SMTP libre (local, redes propias) |
+| `api` | `POST` JSON sobre HTTPS a `https://api.brevo.com/v3/smtp/email` | **Nube (UpCloud trial)**: funciona por 443 |
+| `log` | No envía nada; el enlace de verificación queda en el log del backend | Sandbox local sin credenciales |
+
+Configuración para la nube:
+
+```bash
+SEDERG_MAIL_TRANSPORT=api
+SEDERG_MAIL_API_URL=https://api.brevo.com/v3/smtp/email
+SEDERG_MAIL_API_KEY=xkeysib-...      # clave de API de Brevo (NO la clave SMTP xsmtpsib-)
+SEDERG_MAIL_API_KEY_HEADER=api-key
+SEDERG_MAIL_FROM=remitente@tu-dominio
+SEDERG_MAIL_FROM_NAME=SEDERG_PAY
+```
+
+> La clave SMTP de Brevo (`xsmtpsib-…`) **no** sirve para la API: devuelve
+> `401 {"message":"Key not found"}`. Hay que crear una *API key* en
+> *Brevo → SMTP & API → API Keys*.
+
+### Comprobación
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.production.yml exec -T backend php -r '
+require "/app/vendor/autoload.php";
+$m = new app\Infrastructure\Identity\VerificationMailer();
+var_dump($m->send(getenv("SEDERG_MAIL_FROM"), "Prueba", "token-de-prueba", 30));'
+```
+
+### Si UpCloud habilita el SMTP
+
+Si en el futuro UpCloud abre el egress SMTP (suele ocurrir al verificar la cuenta),
+basta con cambiar `SEDERG_MAIL_TRANSPORT=smtp` y rellenar `SEDERG_MAIL_USERNAME`,
+`SEDERG_MAIL_PASSWORD`, `SEDERG_MAIL_HOST`, `SEDERG_MAIL_PORT` y
+`SEDERG_MAIL_ENCRYPTION`.
 
 ---
 

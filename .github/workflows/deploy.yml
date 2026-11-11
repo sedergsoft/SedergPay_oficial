@@ -121,8 +121,17 @@ jobs:
         env:
           PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           url="${PUBLIC_API_URL:-https://5-22-219-30.sslip.io}"
           echo "Comprobando $url/health"
-          curl -fsS --retry 6 --retry-delay 5 --retry-connrefused --max-time 20 "$url/health"
-          echo ""
+          for i in $(seq 1 12); do
+            if curl -fsS --connect-timeout 10 --max-time 30 "$url/health"; then
+              echo ""
+              echo "API pública operativa"
+              exit 0
+            fi
+            echo "::warning::health check $i/12 sin respuesta; reintento en 10 s"
+            sleep 10
+          done
+          echo "::error::La API pública no respondió en $url/health"
+          exit 1
