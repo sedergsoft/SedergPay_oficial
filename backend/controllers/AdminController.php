@@ -289,6 +289,86 @@ final class AdminController extends Controller
         )->queryAll()];
     }
 
+    /** Descargar un documento KYC específico (archivo descifrado). */
+    public function actionKycDownload(string $publicId): array
+    {
+        $auth = new UserAuthenticator(Yii::$app->db);
+        $reviewerId = $auth->userId();
+        $auth->requireRole('admin');
+        if (!preg_match('/^[0-9a-f-]{36}$/i', $publicId)) {
+            throw new BadRequestHttpException('Invalid KYC document identifier');
+        }
+
+        $doc = Yii::$app->db->createCommand(
+            'SELECT d.id,d.storage_key,d.original_name,d.mime_type,d.file_size,d.sha256,k.public_id AS case_public_id
+             FROM {{%kyc_documents}} d
+             INNER JOIN {{%kyc_cases}} k ON k.id=d.kyc_case_id
+             WHERE d.public_id=:id LIMIT 1',
+            [':id' => $publicId]
+        )->queryOne();
+        if ($doc === false) {
+            throw new BadRequestHttpException('KYC document not found');
+        }
+
+        $root = realpath((string) getenv('SEDERG_PRIVATE_STORAGE_PATH'));
+        $path = $root === false ? false : realpath($root . DIRECTORY_SEPARATOR . $doc['storage_key']);
+        if ($path === false || !str_starts_with($path, $root . DIRECTORY_SEPARATOR) || !is_file($path)) {
+            throw new BadRequestHttpException('KYC file is unavailable');
+        }
+
+        $key = (string) getenv('SEDERG_PII_KEY');
+        if (strlen($key) < 32) {
+            throw new \yii\web\ServerErrorHttpException('KYC encryption key is not configured');
+        }
+        $encrypted = file_get_contents($path);
+        $content = $encrypted === false ? false : Yii::$app->security->decryptByKey($encrypted, $key);
+        if ($content === false || strlen($content) !== (int) $doc['file_size'] || !hash_equals((string) $doc['sha256'], hash('sha256', $content))) {
+            throw new \yii\web\ServerErrorHttpException('KYC document integrity or decryption check failed');
+        }
+
+        Yii::$app->db->createCommand()->insert('{{%audit_logs}}', [
+            'actor_user_id' => $reviewerId,
+            'action' => 'kyc.document.downloaded',
+            'entity_type' => 'kyc_document',
+            'entity_id' => $publicId,
+            'ip_address' => Yii::$app->request->userIP,
+            'user_agent' => substr((string) Yii::$app->request->userAgent, 0, 500),
+            'after_data' => new JsonExpression(['case_public_id' => $doc['case_public_id']]),
+        ])->execute();
+
+        Yii::$app->response->headers->set('X-Content-Type-Options', 'nosniff');
+        Yii::$app->response->headers->set('Cache-Control', 'no-store, private');
+        return Yii::$app->response->sendContentAsFile(
+            $content,
+            basename((string) $doc['original_name']),
+            ['mimeType' => $doc['mime_type'], 'inline' => false]
+        );
+    }
+
+    public function actionUserToggle(string $publicId): array
+    {
+        $auth = new UserAuthenticator(Yii::$app->db);
+        $auth->requireRole('admin');
+        if (!preg_match('/^[0-9a-f-]{36}$/i', $publicId)) {
+            throw new BadRequestHttpException('Invalid user identifier');
+        }
+
+        $user = Yii::$app->db->createCommand(
+            'SELECT public_id, email, role, status FROM {{%users}} WHERE public_id=:id LIMIT 1',
+            [':id' => $publicId]
+        )->queryOne();
+        if ($user === false) {
+            throw new NotFoundHttpException('User not found');
+        }
+
+        $newStatus = ($user['status'] === 'active') ? 'suspended' : 'active';
+        Yii::$app->db->createCommand()
+            ->update('{{%users}}', ['status' => $newStatus], ['public_id' => $publicId])
+            ->execute();
+
+        return ['public_id' => $publicId, 'status' => $newStatus];
+    }
+
     public function actionKycDocument(string $publicId)
     {
         $auth = new UserAuthenticator(Yii::$app->db);
