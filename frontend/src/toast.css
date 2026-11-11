@@ -1,0 +1,27 @@
+
+/* ============================================================================
+   Avisos emergentes (toasts)
+   ========================================================================== */
+.toast-stack{position:fixed;right:18px;bottom:18px;z-index:1200;display:flex;flex-direction:column;gap:10px;width:min(420px,calc(100vw - 32px));pointer-events:none}
+.toast{display:flex;align-items:flex-start;gap:12px;padding:14px 14px 14px 16px;border-radius:16px;border:1px solid var(--line);background:var(--surface-0);color:var(--ink-900);box-shadow:0 18px 48px rgba(10,30,64,.22);pointer-events:auto;animation:toast-in .22s ease-out}
+.toast-icon{display:grid;place-items:center;flex:0 0 auto;width:28px;height:28px;border-radius:9px;background:var(--indigo-100);color:var(--indigo-700)}
+.toast-icon .ui-icon{width:16px;height:16px}
+.toast-message{flex:1 1 auto;font-size:.9rem;line-height:1.45;overflow-wrap:anywhere}
+.toast-close{flex:0 0 auto;width:26px;height:26px;border-radius:8px;border:0;background:transparent;color:var(--ink-400);font-size:1.1rem;line-height:1;cursor:pointer}
+.toast-close:hover{background:var(--surface-1);color:var(--ink-700)}
+.toast-success{border-left:4px solid var(--green-600,#00C553)}
+.toast-success .toast-icon{background:rgba(0,197,83,.14);color:var(--green-600,#00A046)}
+.toast-error{border-left:4px solid var(--red-600,#E53935)}
+.toast-error .toast-icon{background:rgba(229,57,53,.14);color:var(--red-600,#C62828)}
+.toast-warning{border-left:4px solid var(--amber-500,#F0A020)}
+.toast-warning .toast-icon{background:rgba(240,160,32,.16);color:#B9781A}
+.toast-info{border-left:4px solid var(--indigo-600,#0B4F9C)}
+@keyframes toast-in{from{opacity:0;transform:translateY(12px) scale(.98)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.toast{animation:none}}
+@media(max-width:640px){.toast-stack{left:12px;right:12px;bottom:12px;width:auto}}
+
+/* Botones de accion destructiva */
+button.danger,.danger{background:var(--red-600,#E53935);border-color:var(--red-600,#E53935);color:#fff}
+button.danger:hover,.danger:hover{background:#C62828;border-color:#C62828}
+.compact-button.danger{background:rgba(229,57,53,.12);border-color:rgba(229,57,53,.35);color:var(--red-600,#C62828)}
+.compact-button.danger:hover{background:rgba(229,57,53,.2)}

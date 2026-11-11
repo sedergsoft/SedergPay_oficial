@@ -67,6 +67,7 @@ return [
                 'GET api/v1/beneficiaries' => 'beneficiary/index',
                 'GET api/v1/beneficiaries/<publicId:[0-9a-fA-F-]{36}>' => 'beneficiary/view',
                 'PUT api/v1/beneficiaries/<publicId:[0-9a-fA-F-]{36}>' => 'beneficiary/update',
+'DELETE api/v1/beneficiaries/<publicId:[0-9a-fA-F-]{36}>' => 'beneficiary/delete',
                 'GET api/v1/profile' => 'profile/view',
                 'PUT api/v1/profile' => 'profile/update',
                 'GET api/v1/kyc' => 'kyc/view',

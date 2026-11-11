@@ -9,6 +9,7 @@ use app\Infrastructure\Pricing\QuoteRepository;
 use app\Infrastructure\Pricing\ExchangeRateService;
 use app\Infrastructure\Auth\UserAuthenticator;
 use app\Infrastructure\Configuration\PlatformSettings;
+use app\Infrastructure\Compliance\KycDailyLimit;
 use DomainException;
 use Yii;
 use yii\filters\ContentNegotiator;
@@ -128,6 +129,12 @@ final class QuoteController extends Controller
         }
 
         try {
+            // Limite diario para usuarios con el KYC sin verificar.
+            (new KycDailyLimit(Yii::$app->db))->assertWithinLimit(
+                $userId,
+                (string) $payload['send_amount'],
+                (string) $payload['send_currency']
+            );
             $exchangeRate = (new ExchangeRateService(Yii::$app->db))->resolve(
                 $payload['send_currency'],
                 $payload['receive_currency']

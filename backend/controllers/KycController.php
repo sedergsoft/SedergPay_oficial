@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace app\controllers;
 
 use app\Infrastructure\Auth\UserAuthenticator;
+use app\Infrastructure\Compliance\KycDailyLimit;
 use app\Infrastructure\Kyc\KycDocumentSecurity;
 use Yii;
 use yii\filters\ContentNegotiator;
@@ -50,8 +51,11 @@ final class KycController extends Controller
             [':id' => $userId]
         )->queryOne();
 
+        // Limite diario de envios mientras el KYC no este verificado.
+        $dailyLimit = (new KycDailyLimit(Yii::$app->db))->status($userId);
+
         if ($case === false) {
-            return ['status' => 'not_started', 'documents' => []];
+            return ['status' => 'not_started', 'documents' => [], 'daily_limit' => $dailyLimit];
         }
 
         $case['documents'] = Yii::$app->db->createCommand(
@@ -61,6 +65,7 @@ final class KycController extends Controller
              ORDER BY created_at',
             [':id' => $userId]
         )->queryAll();
+        $case['daily_limit'] = $dailyLimit;
 
         return $case;
     }

@@ -124,9 +124,19 @@ final class BeneficiaryRepository
         ], ['public_id' => $publicId, 'sender_user_id' => $userId])->execute();
     }
 
-    public function findForUser(string $publicId, int $userId): ?array
+    /**
+     * Borrado logico: el beneficiario conserva su historial pero deja de
+     * ofrecerse en las cotizaciones.
+     */
+    public function softDeleteForUser(string $publicId, int $userId): bool
     {
-        $row = $this->db->createCommand(
+        return $this->db->createCommand()->update('{{%beneficiaries}}', [
+            'status' => 'deleted',
+        ], ['public_id' => $publicId, 'sender_user_id' => $userId, 'status' => 'active'])->execute() > 0;
+    }
+
+    public function findForUser(string $publicId, int $userId): ?array
+    {        $row = $this->db->createCommand(
             'SELECT b.public_id, c.iso2 AS country_code, b.first_name, b.last_name,
                     b.phone_e164, b.email, b.payout_method_code, b.payout_provider,
                     b.payout_account_last4, b.payout_card_last4, b.status, b.created_at, b.updated_at

@@ -7,6 +7,7 @@ namespace app\controllers;
 use app\Infrastructure\Remittance\RemittanceRepository;
 use app\Infrastructure\Auth\UserAuthenticator;
 use app\Infrastructure\Configuration\PlatformSettings;
+use app\Infrastructure\Compliance\KycDailyLimit;
 use app\Infrastructure\Identity\VerificationMailer;
 use Yii;
 use yii\filters\ContentNegotiator;
@@ -99,6 +100,18 @@ final class RemittanceController extends Controller
         }
         if (!in_array($quote['payout_method_code'], ['cash_pickup', 'bank_account', 'card_transfer'], true)) {
             throw new UnprocessableEntityHttpException('Unsupported payout method');
+        }
+
+        // Limite diario para usuarios con el KYC sin verificar: se comprueba
+        // sobre la cotizacion (importe y moneda de envio).
+        try {
+            (new KycDailyLimit(Yii::$app->db))->assertWithinLimit(
+                $userId,
+                (string) $quote['send_amount'],
+                (string) $quote['send_currency']
+            );
+        } catch (\DomainException $exception) {
+            throw new UnprocessableEntityHttpException($exception->getMessage(), 0, $exception);
         }
 
         $direction = $repository->findDirection((int) $quote['source_country_id'], (int) $quote['destination_country_id']);

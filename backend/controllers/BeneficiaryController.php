@@ -195,6 +195,46 @@ final class BeneficiaryController extends Controller
         return $repository->findForUser($publicId, $userId) ?? [];
     }
 
+    /**
+     * Borrado logico de un beneficiario del usuario.
+     */
+    public function actionDelete(string $publicId): array
+    {
+        $userId = $this->authenticatedUserId();
+        if (!preg_match('/^[0-9a-f-]{36}$/i', $publicId)) {
+            throw new NotFoundHttpException('Beneficiary not found');
+        }
+        $repository = new BeneficiaryRepository(Yii::$app->db);
+        $current = $repository->findForUser($publicId, $userId);
+        if ($current === null) {
+            throw new NotFoundHttpException('Beneficiary not found');
+        }
+        $tx = Yii::$app->db->beginTransaction();
+        try {
+            $repository->softDeleteForUser($publicId, $userId);
+            Yii::$app->db->createCommand()->insert('{{%audit_logs}}', [
+                'actor_user_id' => $userId,
+                'action' => 'beneficiary.deleted',
+                'entity_type' => 'beneficiary',
+                'entity_id' => $publicId,
+                'ip_address' => Yii::$app->request->userIP,
+                'user_agent' => substr((string) Yii::$app->request->userAgent, 0, 500),
+                'after_data' => new \yii\db\JsonExpression([
+                    'first_name' => $current['first_name'] ?? null,
+                    'last_name' => $current['last_name'] ?? null,
+                ]),
+            ])->execute();
+            $tx->commit();
+        } catch (\Throwable $exception) {
+            if ($tx->getIsActive()) {
+                $tx->rollBack();
+            }
+            throw $exception;
+        }
+
+        return ['public_id' => $publicId, 'status' => 'deleted'];
+    }
+
     private function authenticatedUserId(): int
     {
         return (new UserAuthenticator(Yii::$app->db))->userId();

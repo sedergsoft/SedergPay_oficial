@@ -19,7 +19,9 @@ if ($origin !== '' && in_array($origin, $allowedOrigins, true)) {
     header('Vary: Origin');
     header('Access-Control-Allow-Credentials: false');
     header('Access-Control-Allow-Headers: Authorization, Content-Type, Idempotency-Key, X-User-Public-Id');
-    header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+    // PUT/PATCH/DELETE son necesarios para el perfil del usuario y la
+    // gestion de beneficiarios (edicion y borrado).
+    header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
 }
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);

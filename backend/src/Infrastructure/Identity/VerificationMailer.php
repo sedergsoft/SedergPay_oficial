@@ -36,7 +36,7 @@ public function send(string $email, string $firstName, string $token, int $ttlMi
     $safeFirstName = htmlspecialchars($firstName, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     $safeEmail = htmlspecialchars($email, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     $safeUrl = htmlspecialchars($verificationUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-    $logoSrc = $this->logoCid();
+    $logoSrc = $this->logoSource();
     $ttlMinutes = max(1, $ttlMinutes);
     $ttlText = $ttlMinutes . ' minutos';
     $subject = 'Activa tu cuenta de SEDERG_PAY';
@@ -103,7 +103,7 @@ public function sendPasswordReset(string $email, string $firstName, string $toke
     $safeFirstName = htmlspecialchars($firstName, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     $safeEmail = htmlspecialchars($email, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     $safeUrl = htmlspecialchars($resetUrl, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-    $logoSrc = $this->logoCid();
+    $logoSrc = $this->logoSource();
     $ttlMinutes = max(1, $ttlMinutes);
     $subject = 'Restablece tu contraseña de SEDERG_PAY';
     $body = "Hola {$firstName},\n\nRestablece tu contraseña con este enlace:\n{$resetUrl}\n\nEl enlace vence en {$ttlMinutes} minutos y solo puede utilizarse una vez.\nSi no solicitaste este cambio, ignora este mensaje.";
@@ -199,7 +199,7 @@ public function sendRemittanceReceipt(string $email, string $firstName, array $r
     $safeFirstName = $esc($firstName);
     $safeReference = $esc((string) ($remittance['reference'] ?? ''));
     $safeQrPayload = $esc((string) ($remittance['payment_qr_payload'] ?? ''));
-    $logoSrc = $this->logoCid();
+    $logoSrc = $this->logoSource();
     $html = <<<HTML
 <!doctype html><html lang="es"><body style="margin:0;background:#eef3fa;color:#0f1f3d;font-family:'Inter',Arial,Helvetica,sans-serif;">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:36px 12px;background:#eef3fa;"><tr><td align="center">
@@ -312,27 +312,49 @@ private function buildVerificationUrl(string $email, string $token): string
 
 private function getLogoImage(): ?array
 {
-    $path = __DIR__ . '/../../../web/assets/sederg-pay-logo.png';
-    if (!is_file($path)) {
-        return null;
-    }
-    $data = @file_get_contents($path);
-    if ($data === false) {
-        return null;
-    }
-    return [
-        'cid' => 'logo',
-        'data' => $data,
-        'mime' => 'image/png',
+    // El logotipo se busca primero en una ruta versionada (resources/brand) y
+    // despues en los assets publicados de Yii. La version invertida se usa en
+    // las cabeceras oscuras de los correos.
+    $candidates = [
+        __DIR__ . '/../../../resources/brand/sederg-pay-logo-inverted.png',
+        __DIR__ . '/../../../resources/brand/sederg-pay-logo.png',
+        __DIR__ . '/../../../web/assets/sederg-pay-logo-inverted.png',
+        __DIR__ . '/../../../web/assets/sederg-pay-logo.png',
     ];
+    foreach ($candidates as $path) {
+        if (!is_file($path)) {
+            continue;
+        }
+        $data = @file_get_contents($path);
+        if ($data === false || $data === '') {
+            continue;
+        }
+
+        return [
+            'cid' => 'logo',
+            'data' => $data,
+            'mime' => 'image/png',
+            'path' => $path,
+        ];
+    }
+
+    return null;
 }
 
-private function logoCid(): string
+/**
+ * Devuelve el origen de la imagen del logotipo.
+ *
+ * Se incrusta como data URI (no como cid) porque muchos clientes de correo
+ * no renderizan imagenes cid y el logotipo se veria roto o invisible. Si no
+ * hay fichero disponible, se usa el logotipo embebido en el propio codigo.
+ */
+private function logoSource(): string
 {
     $logo = $this->getLogoImage();
     if ($logo !== null) {
-        return 'cid:' . $logo['cid'];
+        return 'data:image/png;base64,' . base64_encode($logo['data']);
     }
+
     return 'data:image/png;base64,' . self::LOGO_BASE64;
 }
 
@@ -484,23 +506,8 @@ private function buildMimeMessage(string $from, string $to, string $subject, str
     ];
 
     $logo = $this->getLogoImage();
-    if ($logo !== null) {
-        $relBoundary = '=_sederg_rel_' . bin2hex(random_bytes(12));
-        $headers[] = 'Content-Type: multipart/related; boundary="' . $relBoundary . '"; type="multipart/alternative"';
-        $payload = "--{$relBoundary}\r\n"
-            . "Content-Type: multipart/alternative; boundary=\"{$altBoundary}\"\r\n\r\n"
-            . $alternative . "\r\n\r\n"
-            . "--{$relBoundary}\r\n"
-            . "Content-Type: {$logo['mime']}; name=\"logo.png\"\r\n"
-            . "Content-Transfer-Encoding: base64\r\n"
-            . "Content-ID: <{$logo['cid']}>\r\n"
-            . "Content-Disposition: inline; filename=\"logo.png\"\r\n\r\n"
-            . chunk_split(base64_encode($logo['data'])) . "\r\n"
-            . "--{$relBoundary}--";
-        return implode("\r\n", $headers) . "\r\n\r\n" . $payload;
-    }
-
     $headers[] = 'Content-Type: multipart/alternative; boundary="' . $altBoundary . '"';
+
     return implode("\r\n", $headers) . "\r\n\r\n" . $alternative;
 }
 

@@ -306,6 +306,7 @@ export const api = {
     headers: authHeaders(userId),
   }),
   updateBeneficiary: (userId: string, publicId: string, body: Record<string, unknown>) => request<Beneficiary>('/api/v1/beneficiaries/' + publicId, { method: 'PUT', headers: authHeaders(userId), body: JSON.stringify(body) }),
+  deleteBeneficiary: (userId: string, publicId: string) => request<{ public_id: string; status: string }>('/api/v1/beneficiaries/' + publicId, { method: 'DELETE', headers: authHeaders(userId) }),
   createBeneficiary: (userId: string, body: Record<string, unknown>) => request<Beneficiary>('/api/v1/beneficiaries', {
     method: 'POST',
     headers: { ...authHeaders(userId), 'Idempotency-Key': `beneficiary-${crypto.randomUUID()}` },
