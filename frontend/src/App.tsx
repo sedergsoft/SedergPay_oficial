@@ -1,6 +1,6 @@
 import { ChangeEvent, FormEvent, createContext, useContext, useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import { api, AdminDashboard, AdminOperation, AdminRate, AdminUser, Beneficiary, ExchangeRate, FundingAccount, FundingMethod, PlatformSetting, Quote, Remittance, RemittanceDetail, User, isDevelopmentAuth, paymentMethods, isLoginChallenge, SecurityStatus, TwoFactorSetup } from './api';
+import { api, AdminDashboard, AdminOperation, AdminRate, AdminUser, Beneficiary, ExchangeRate, FundingAccount, FundingMethod, PlatformSetting, Quote, Remittance, RemittanceDetail, User, isDevelopmentAuth, paymentMethods, isLoginChallenge, isEmailVerificationRequired, SecurityStatus, TwoFactorSetup } from './api';
 import { getInitialLanguage, Language, languageLabels, translate } from './i18n';
 
 const LanguageContext = createContext<Language>('es');
@@ -309,6 +309,12 @@ function AuthScreen({ language, onLanguageChange, theme, onThemeChange, mode, se
   const [resetToken, setResetToken] = useState('');
   const [localBusy, setLocalBusy] = useState(false);
   const [localMessage, setLocalMessage] = useState('');
+  // Ventana de verificacion: se abre cuando el login detecta una cuenta
+  // registrada cuyo correo todavia no ha sido verificado.
+  const [verifyPrompt, setVerifyPrompt] = useState<{ email: string } | null>(null);
+  const [verifyEmail, setVerifyEmail] = useState('');
+  const [verifyNotice, setVerifyNotice] = useState('');
+  const [verifyBusy, setVerifyBusy] = useState(false);
 
   useEffect(() => { if (!twoFactor && (authMode === 'login' || authMode === 'register')) setAuthMode(mode); }, [mode]);
 
@@ -374,9 +380,24 @@ function AuthScreen({ language, onLanguageChange, theme, onThemeChange, mode, se
     {!verificationEmail && isDevelopmentAuth && !twoFactor && authMode === 'login' && <><form onSubmit={(event) => {
       event.preventDefault(); const data = new FormData(event.currentTarget);
       void doLocal(async () => {
-        const result = await api.login(String(data.get('email')), String(data.get('password')));
-        if (isLoginChallenge(result)) { setTwoFactor({ challenge: result.challenge }); setTwoFactorCode(''); setLocalMessage(''); return; }
-        onAuthenticated(result);
+        const email = String(data.get('email'));
+        const password = String(data.get('password'));
+        try {
+          const result = await api.login(email, password);
+          if (isLoginChallenge(result)) { setTwoFactor({ challenge: result.challenge }); setTwoFactorCode(''); setLocalMessage(''); return; }
+          onAuthenticated(result);
+        } catch (error) {
+          if (isEmailVerificationRequired(error)) {
+            // La cuenta existe pero el correo no esta verificado: se abre la
+            // ventana para reenviar la verificacion.
+            setLocalMessage('');
+            setVerifyNotice('');
+            setVerifyEmail(email);
+            setVerifyPrompt({ email });
+            return;
+          }
+          throw error;
+        }
       });
     }}><Field name="email" label={text('field.email')} type="email" /><Field name="password" label={text('field.password')} type="password" /><button disabled={effectiveBusy}>{effectiveBusy ? text('common.validating') : text('common.login')}</button></form><p style={{ marginTop: 12 }}><button type="button" className="text-button" onClick={() => { setAuthMode('forgot'); setLocalMessage(''); setNotification(''); }}>{text('auth.forgotPassword')}</button></p></>}
 
@@ -410,6 +431,36 @@ function AuthScreen({ language, onLanguageChange, theme, onThemeChange, mode, se
 
     {notification && !verificationEmail && activationState !== 'success' && <div className="notice-box notice-success" role="status"><Icon name="check"/><strong style={{ wordBreak: 'break-word' }}>{notification}</strong></div>}
     {showMessage && <Alert text={showMessage} />}
+    {verifyPrompt && <div className="details-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) { setVerifyPrompt(null); setVerifyNotice(''); } }}>
+      <section className="details-modal card" role="dialog" aria-modal="true" aria-labelledby="verify-required-title">
+        <div className="section-heading details-modal-heading">
+          <div><span className="eyebrow">{text('auth.verifyAccount')}</span><h2 id="verify-required-title">{text('auth.verifyRequiredTitle')}</h2></div>
+          <button type="button" className="secondary compact-button" onClick={() => { setVerifyPrompt(null); setVerifyNotice(''); }}>{text('common.close')}</button>
+        </div>
+        <p className="muted">{text('auth.verifyRequiredHint')}</p>
+        <form className="modern-form" onSubmit={(event) => {
+          event.preventDefault();
+          const email = verifyEmail.trim();
+          if (!email) return;
+          setVerifyBusy(true); setVerifyNotice('');
+          void api.resendVerification(email)
+            .then((result) => {
+              setVerifyNotice(result.dev_verification_url
+                ? `${text('auth.verificationSent')} ${email}. ${text('auth.checkInbox')} ${result.dev_verification_url}`
+                : `${text('auth.verificationRequested')} ${email}.`);
+            })
+            .catch((error) => { setVerifyNotice((error as Error).message); })
+            .finally(() => setVerifyBusy(false));
+        }}>
+          <Field name="verify_email" label={text('field.email')} type="email" value={verifyEmail} onChange={(event) => setVerifyEmail((event.target as HTMLInputElement).value)} placeholder="nombre@correo.com" />
+          <div className="form-actions">
+            <button disabled={verifyBusy || !verifyEmail.trim()}>{verifyBusy ? text('common.validating') : text('auth.sendVerification')}</button>
+            <button type="button" className="secondary" onClick={() => { setVerifyPrompt(null); setVerifyNotice(''); }}>{text('common.cancel')}</button>
+          </div>
+        </form>
+        {verifyNotice && <div className="notice-box notice-success" role="status"><Icon name="check"/><strong style={{ wordBreak: 'break-word' }}>{verifyNotice}</strong></div>}
+      </section>
+    </div>}
   </section></main>;
 }
 

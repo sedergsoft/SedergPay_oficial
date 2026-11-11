@@ -223,6 +223,24 @@ export type PlatformSetting = {
   updated_at: string | null;
 };
 
+export class ApiError extends Error {
+  status: number;
+  body: Record<string, unknown>;
+  constructor(message: string, status: number, body: Record<string, unknown>) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.body = body;
+  }
+}
+
+/** True cuando el backend pide verificar el correo antes de iniciar sesion. */
+export const isEmailVerificationRequired = (error: unknown): boolean => {
+  if (!(error instanceof ApiError)) return false;
+  return error.body?.email_verification_required === true
+    || /verify your email/i.test(error.message || '');
+};
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!isDevelopmentAuth && apiBase === '') {
     throw new Error('La API no está configurada. Define VITE_API_BASE_URL en el despliegue.');
@@ -237,7 +255,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(body.message ?? body.name ?? `HTTP ${response.status}`);
+    throw new ApiError(body.message ?? body.name ?? `HTTP ${response.status}`, response.status, body);
   }
   return body as T;
 }
@@ -266,7 +284,7 @@ export const api = {
     method: 'POST',
     body: JSON.stringify({ email, token }),
   }),
-  resendVerification: (email: string) => request<{ verification_sent: boolean }>('/api/v1/auth/resend-verification', {
+  resendVerification: (email: string) => request<{ verification_sent: boolean; dev_verification_token?: string; dev_verification_url?: string; mail_warning?: string }>('/api/v1/auth/resend-verification', {
     method: 'POST',
     body: JSON.stringify({ email }),
   }),

@@ -54,7 +54,14 @@ final class AuthController extends Controller
             throw new ForbiddenHttpException('Invalid email or password');
         }
         if ($user['status'] !== 'active' || $user['email_verified_at'] === null) {
-            throw new ForbiddenHttpException('Verify your email before signing in');
+            // La cuenta existe y la contraseña es correcta, pero el correo no
+            // esta verificado. Se responde con una senal legible por el cliente
+            // para que abra la ventana de reenvio de verificacion.
+            Yii::$app->response->statusCode = 403;
+            return [
+                'email_verification_required' => true,
+                'message' => 'Verify your email before signing in',
+            ];
         }
 
         $twoFactorEnabled = !empty($user['two_factor_enabled']) && $user['two_factor_confirmed_at'] !== null;
