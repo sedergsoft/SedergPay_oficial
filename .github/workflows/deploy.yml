@@ -1,4 +1,4 @@
-name: Deploy backend to free VM (opcional)
+name: Deploy backend to UpCloud
 
 on:
   push:
@@ -6,8 +6,22 @@ on:
     paths:
       - 'backend/**'
       - 'docker-compose*.yml'
+      - 'deploy/**'
       - '.github/workflows/deploy.yml'
   workflow_dispatch:
+    inputs:
+      full_rebuild:
+        description: 'Reconstruir la imagen del backend sin caché'
+        type: boolean
+        default: false
+      skip_migrations:
+        description: 'Omitir las migraciones (solo si ya están aplicadas)'
+        type: boolean
+        default: false
+      restore_env:
+        description: 'Restaurar .env desde el secret DEPLOY_ENV'
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -18,38 +32,97 @@ concurrency:
 
 jobs:
   backend:
-    name: Deploy backend to free VM
+    name: Desplegar backend en UpCloud
     if: ${{ vars.VM_DEPLOY == 'true' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: sederg-production
+    defaults:
+      run:
+        shell: bash
+
     steps:
       - uses: actions/checkout@v4
-      - name: Install SSH key
+
+      - name: Preparar acceso SSH
         env:
           SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
         run: |
+          set -euo pipefail
+          if [ -z "$SSH_KEY" ] || [ -z "$KNOWN_HOSTS" ]; then
+            echo "::error::Faltan los secrets DEPLOY_SSH_KEY o DEPLOY_SSH_KNOWN_HOSTS."
+            exit 1
+          fi
           install -m 700 -d ~/.ssh
-          printf '%s\n' "$SSH_KEY" > ~/.ssh/sederg-pay
-          chmod 600 ~/.ssh/sederg-pay
-      - name: Deploy source and restart Docker stack
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Comprobar conectividad con el servidor
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            'echo "Servidor: $(hostname)"; docker --version; docker compose version; free -m | head -2'
+
+      - name: Sincronizar código (rsync incremental)
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          set -euo pipefail
+          rsync -az --delete \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude 'frontend/node_modules/' \
+            --exclude 'frontend/dist/' \
+            --exclude 'backend/vendor/' \
+            --exclude 'backend/runtime/' \
+            --exclude 'docs/' \
+            --exclude '*.docx' \
+            --exclude '.env' \
+            --exclude '*.log' \
+            -e "ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes" \
+            ./ "$DEPLOY_USER@$DEPLOY_HOST:~/sederg-pay/"
+
+      - name: Restaurar .env (opcional)
+        if: ${{ inputs.restore_env == true }}
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_ENV: ${{ secrets.DEPLOY_ENV }}
         run: |
-          if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_USER" ] || [ -z "$DEPLOY_ENV" ]; then
-            echo "::error::Faltan DEPLOY_HOST, DEPLOY_USER o DEPLOY_ENV."
-            exit 1
+          set -euo pipefail
+          if [ -z "$DEPLOY_ENV" ]; then
+            echo "::notice::DEPLOY_ENV vacío: se conserva el .env del servidor."
+            exit 0
           fi
-          tar --exclude=.git --exclude=frontend/node_modules --exclude=backend/vendor -czf /tmp/sederg-pay.tar.gz .
-          scp -o StrictHostKeyChecking=no -i ~/.ssh/sederg-pay /tmp/sederg-pay.tar.gz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/sederg-pay.tar.gz"
-          printf '%s\n' "$DEPLOY_ENV" | ssh -o StrictHostKeyChecking=no -i ~/.ssh/sederg-pay "$DEPLOY_USER@$DEPLOY_HOST" '
-            set -eu
-            mkdir -p "$HOME/sederg-pay"
-            tar -xzf /tmp/sederg-pay.tar.gz -C "$HOME/sederg-pay"
-            cd "$HOME/sederg-pay"
-            umask 077
-            cat > .env
-            docker compose -f docker-compose.yml -f docker-compose.production.yml up -d --build postgres clamav
-            docker compose -f docker-compose.yml -f docker-compose.production.yml run --rm backend php yii migrate --migrationPath=@app/migrations --interactive=0
-            docker compose -f docker-compose.yml -f docker-compose.production.yml up -d --build backend caddy
-          '
+          printf '%s\n' "$DEPLOY_ENV" | ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" 'umask 077; cat > ~/sederg-pay/.env; chmod 600 ~/sederg-pay/.env; echo ".env restaurado"'
+
+      - name: Desplegar en el servidor
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          FULL_REBUILD: ${{ inputs.full_rebuild }}
+          SKIP_MIGRATIONS: ${{ inputs.skip_migrations }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "cd ~/sederg-pay && bash deploy/deploy-upcloud.sh --full-rebuild=${FULL_REBUILD:-false} --skip-migrations=${SKIP_MIGRATIONS:-false}"
+
+      - name: Verificar la API pública
+        env:
+          PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL }}
+        run: |
+          set -euo pipefail
+          url="${PUBLIC_API_URL:-https://5-22-219-30.sslip.io}"
+          echo "Comprobando $url/health"
+          curl -fsS --retry 6 --retry-delay 5 --retry-connrefused --max-time 20 "$url/health"
+          echo ""

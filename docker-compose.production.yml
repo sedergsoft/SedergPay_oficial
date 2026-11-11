@@ -10,6 +10,12 @@ services:
     ports: !reset []
     volumes: !reset
       - sederg_private_data:/var/lib/sederg-private
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://127.0.0.1:8080/health') ? 0 : 1);"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
     restart: unless-stopped
   clamav:
     ports: !reset []
@@ -30,7 +36,9 @@ services:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
-    depends_on: [backend]
+    depends_on:
+      backend:
+        condition: service_healthy
     restart: unless-stopped
 volumes:
   caddy_data:

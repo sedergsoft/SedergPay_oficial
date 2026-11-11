@@ -113,8 +113,9 @@ final class RegistrationController extends Controller
             if ($transaction->getIsActive()) {
                 $transaction->rollBack();
             }
-            if ($exception instanceof \RuntimeException && str_starts_with($exception->getMessage(), 'SMTP')) {
-                throw new HttpException(503, 'No se pudo enviar el correo de verificación. Configura el SMTP e inténtalo de nuevo.', 0, $exception);
+            $message = $exception instanceof \RuntimeException ? $exception->getMessage() : '';
+            if (str_starts_with($message, 'SMTP') || str_starts_with($message, 'MAIL')) {
+                throw new HttpException(503, 'No se pudo enviar el correo de verificación. Configura el SMTP o la API de correo e inténtalo de nuevo.', 0, $exception);
             }
             if ($exception instanceof \yii\db\IntegrityException) {
                 throw new ConflictHttpException('Email or phone is already registered');

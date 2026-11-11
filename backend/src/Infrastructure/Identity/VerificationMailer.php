@@ -12,22 +12,24 @@ private const LOGO_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAALQAAACKCAIAAACM3/e4AAAAAXN
 
 public function send(string $email, string $firstName, string $token, int $ttlMinutes = 30): bool
 {
-    $transport = strtolower(trim((string) (getenv('SEDERG_MAIL_TRANSPORT') ?: 'smtp')));
+    $transport = $this->transport();
     if ($transport === 'log' || $transport === 'file') {
         $this->logVerification($email, $token, $ttlMinutes);
         return true;
     }
-    if ($transport !== 'smtp') {
-        throw new RuntimeException('Only SMTP email transport is allowed');
+    if (!in_array($transport, ['smtp', 'api'], true)) {
+        throw new RuntimeException('Only SMTP or API email transport is allowed');
     }
 
-    $config = $this->smtpConfig();
-    if ($config['incomplete']) {
+    $config = $this->mailConfig();
+    if ($this->isIncomplete($transport, $config)) {
         if ($this->isDevelopmentMode()) {
             $this->logVerification($email, $token, $ttlMinutes);
             return true;
         }
-        throw new RuntimeException('SMTP email configuration is incomplete');
+        throw new RuntimeException($transport === 'api'
+            ? 'MAIL API configuration is incomplete'
+            : 'SMTP email configuration is incomplete');
     }
 
     $verificationUrl = $this->buildVerificationUrl($email, $token);
@@ -71,28 +73,29 @@ public function send(string $email, string $firstName, string $token, int $ttlMi
 </body>
 </html>
 HTML;
-    $this->sendMessage($email, $subject, $body, $html, $config);
-    return false;
+    return $this->deliver($email, $subject, $body, $html, $config);
 }
 
 public function sendPasswordReset(string $email, string $firstName, string $token, int $ttlMinutes = 30): bool
 {
-    $transport = strtolower(trim((string) (getenv('SEDERG_MAIL_TRANSPORT') ?: 'smtp')));
+    $transport = $this->transport();
     if ($transport === 'log' || $transport === 'file') {
         $this->logPasswordReset($email, $token, $ttlMinutes);
         return true;
     }
-    if ($transport !== 'smtp') {
-        throw new RuntimeException('Only SMTP email transport is allowed');
+    if (!in_array($transport, ['smtp', 'api'], true)) {
+        throw new RuntimeException('Only SMTP or API email transport is allowed');
     }
 
-    $config = $this->smtpConfig();
-    if ($config['incomplete']) {
+    $config = $this->mailConfig();
+    if ($this->isIncomplete($transport, $config)) {
         if ($this->isDevelopmentMode()) {
             $this->logPasswordReset($email, $token, $ttlMinutes);
             return true;
         }
-        throw new RuntimeException('SMTP email configuration is incomplete');
+        throw new RuntimeException($transport === 'api'
+            ? 'MAIL API configuration is incomplete'
+            : 'SMTP email configuration is incomplete');
     }
 
     $appUrl = rtrim((string) (getenv('SEDERG_APP_URL') ?: 'http://localhost:5173'), '/');
@@ -118,8 +121,7 @@ public function sendPasswordReset(string $email, string $firstName, string $toke
 <tr><td style="padding:24px 48px;background:#f1f5f9;color:#94a3b8;font-size:12px;">SEDERG_PAY<br>Si no solicitaste este cambio, ignora este mensaje.</td></tr>
 </table></td></tr></table></body></html>
 HTML;
-    $this->sendMessage($email, $subject, $body, $html, $config);
-    return false;
+    return $this->deliver($email, $subject, $body, $html, $config);
 }
 
 private function logPasswordReset(string $email, string $token, int $ttlMinutes): void
@@ -132,15 +134,18 @@ private function logPasswordReset(string $email, string $token, int $ttlMinutes)
 
 public function sendRemittanceReceipt(string $email, string $firstName, array $remittance): void
 {
-    $transport = strtolower(trim((string) (getenv('SEDERG_MAIL_TRANSPORT') ?: 'smtp')));
-    $config = $this->smtpConfig();
-    $canSendSmtp = $transport === 'smtp' && !$config['incomplete'];
-    if (!$canSendSmtp) {
+    $transport = $this->transport();
+    $config = $this->mailConfig();
+    $canSend = ($transport === 'smtp' && !$config['smtp_incomplete'])
+        || ($transport === 'api' && !$config['api_incomplete']);
+    if (!$canSend) {
         if ($transport === 'log' || $transport === 'file' || $this->isDevelopmentMode()) {
             $this->logGeneric($email, 'remittance-receipt', 'Comprobante de remesa ' . (string) ($remittance['reference'] ?? ''));
             return;
         }
-        throw new RuntimeException('SMTP email configuration is incomplete');
+        throw new RuntimeException($transport === 'api'
+            ? 'MAIL API configuration is incomplete'
+            : 'SMTP email configuration is incomplete');
     }
 
     $esc = static fn(mixed $v): string => htmlspecialchars((string) $v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
@@ -213,10 +218,50 @@ public function sendRemittanceReceipt(string $email, string $firstName, array $r
 <tr><td style="padding:20px 40px;background:#f4f7fc;color:#71809d;font-size:12px;border-top:1px solid #e1e7f3;">SEDERG_PAY — Conserva este comprobante para dar seguimiento a tu remesa.</td></tr>
 </table></td></tr></table></body></html>
 HTML;
-    $this->sendMessage($email, $subject, $body, $html, $config);
+    $this->deliver($email, $subject, $body, $html, $config);
 }
 
 private function smtpConfig(): array
+{
+    return $this->mailConfig();
+}
+
+private function transport(): string
+{
+    return strtolower(trim((string) (getenv('SEDERG_MAIL_TRANSPORT') ?: 'smtp')));
+}
+
+private function isIncomplete(string $transport, array $config): bool
+{
+    if ($transport === 'api') {
+        return !empty($config['api_incomplete']);
+    }
+
+    return !empty($config['smtp_incomplete']);
+}
+
+/**
+ * Envia el mensaje y, en modo sandbox, evita que un fallo de entrega rompa el
+ * flujo del usuario: la traza queda en el log de desarrollo.
+ */
+private function deliver(string $email, string $subject, string $body, string $html, array $config): bool
+{
+    try {
+        $this->sendMessage($email, $subject, $body, $html, $config);
+
+        return false;
+    } catch (\Throwable $exception) {
+        if (!$this->isDevelopmentMode()) {
+            throw $exception;
+        }
+        $this->writeDevLog('[SEDERG_PAY][DEV][mail-error] ' . $exception->getMessage());
+        $this->logGeneric($email, 'mail-fallback', 'No se pudo enviar el correo: ' . $subject);
+
+        return true;
+    }
+}
+
+private function mailConfig(): array
 {
     $host = trim((string) getenv('SEDERG_MAIL_HOST'));
     $port = (int) (getenv('SEDERG_MAIL_PORT') ?: 587);
@@ -228,12 +273,26 @@ private function smtpConfig(): array
     if ($encryption === 'none' || $encryption === '') {
         $encryption = 'none';
     }
-    $incomplete = $host === ''
+    $smtpIncomplete = $host === ''
         || $from === '' || !filter_var($from, FILTER_VALIDATE_EMAIL)
         || $port < 1 || $port > 65535
         || !in_array($encryption, ['tls', 'ssl', 'none'], true)
         || ($auth && ($username === '' || $password === ''));
-    return compact('host', 'port', 'username', 'password', 'from', 'encryption', 'incomplete', 'auth');
+
+    $apiUrl = trim((string) getenv('SEDERG_MAIL_API_URL')) ?: 'https://api.brevo.com/v3/smtp/email';
+    $apiKey = trim((string) getenv('SEDERG_MAIL_API_KEY'));
+    $apiKeyHeader = trim((string) getenv('SEDERG_MAIL_API_KEY_HEADER')) ?: 'api-key';
+    $fromName = trim((string) getenv('SEDERG_MAIL_FROM_NAME')) ?: 'SEDERG_PAY';
+    $apiIncomplete = $apiKey === '' || $from === '' || !filter_var($from, FILTER_VALIDATE_EMAIL);
+
+    return compact('host', 'port', 'username', 'password', 'from', 'encryption', 'auth') + [
+        'smtp_incomplete' => $smtpIncomplete,
+        'api_incomplete' => $apiIncomplete,
+        'api_url' => $apiUrl,
+        'api_key' => $apiKey,
+        'api_key_header' => $apiKeyHeader,
+        'from_name' => $fromName,
+    ];
 }
 
 private function buildVerificationUrl(string $email, string $token): string
@@ -279,8 +338,16 @@ private function logoCid(): string
 
 private function sendMessage(string $email, string $subject, string $body, string $html, ?array $config = null): void
 {
-    $config = $config ?? $this->smtpConfig();
-    if (!empty($config['incomplete'])) {
+    $config = $config ?? $this->mailConfig();
+    if ($this->transport() === 'api') {
+        if (!empty($config['api_incomplete'])) {
+            throw new RuntimeException('MAIL API configuration is incomplete');
+        }
+        $this->sendViaApi($email, $subject, $body, $html, $config);
+
+        return;
+    }
+    if (!empty($config['smtp_incomplete'])) {
         throw new RuntimeException('SMTP email configuration is incomplete');
     }
     $host = $config['host'];
@@ -322,6 +389,76 @@ private function sendMessage(string $email, string $subject, string $body, strin
     } finally {
         fclose($socket);
     }
+}
+
+/**
+ * Envia el mensaje por una API HTTPS del proveedor de correo (Brevo y compatibles).
+ * Necesario en nubes que bloquean el trafico SMTP saliente, como UpCloud en trial.
+ */
+private function sendViaApi(string $email, string $subject, string $body, string $html, array $config): void
+{
+    $parts = parse_url((string) $config['api_url']);
+    $scheme = $parts['scheme'] ?? '';
+    $host = $parts['host'] ?? '';
+    $path = ($parts['path'] ?? '/') . (isset($parts['query']) ? '?' . $parts['query'] : '');
+    $port = (int) ($parts['port'] ?? 443);
+    if ($scheme !== 'https' || $host === '') {
+        throw new RuntimeException('MAIL API configuration is invalid');
+    }
+
+    $payload = json_encode([
+        'sender' => ['email' => (string) $config['from'], 'name' => (string) $config['from_name']],
+        'to' => [['email' => $email]],
+        'subject' => $subject,
+        'htmlContent' => $html,
+        'textContent' => $body,
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if (!is_string($payload)) {
+        throw new RuntimeException('MAIL API payload encoding failed');
+    }
+
+    $socket = @stream_socket_client("ssl://{$host}:{$port}", $errorCode, $errorMessage, 20, STREAM_CLIENT_CONNECT);
+    if (!is_resource($socket)) {
+        throw new RuntimeException("MAIL API connection failed: {$errorMessage} ({$errorCode})");
+    }
+    stream_set_timeout($socket, 25);
+    try {
+        $request = "POST {$path} HTTP/1.1\r\n"
+            . "Host: {$host}\r\n"
+            . "Accept: application/json\r\n"
+            . "Content-Type: application/json\r\n"
+            . 'Content-Length: ' . strlen($payload) . "\r\n"
+            . $config['api_key_header'] . ': ' . $config['api_key'] . "\r\n"
+            . "User-Agent: SEDERG_PAY/1.0\r\n"
+            . "Connection: close\r\n\r\n"
+            . $payload;
+        fwrite($socket, $request);
+        $response = '';
+        while (!feof($socket)) {
+            $chunk = fread($socket, 8192);
+            if ($chunk === false || $chunk === '') {
+                break;
+            }
+            $response .= $chunk;
+        }
+    } finally {
+        fclose($socket);
+    }
+
+    if (!preg_match('#^HTTP/1\.[01]\s+(\d{3})#', $response, $matches)) {
+        throw new RuntimeException('MAIL API returned an invalid response');
+    }
+    $status = (int) $matches[1];
+    if ($status >= 200 && $status < 300) {
+        return;
+    }
+    $separator = strpos($response, "\r\n\r\n");
+    $errorBody = $separator === false ? '' : substr($response, $separator + 4);
+    $decoded = json_decode($errorBody, true);
+    $detail = is_array($decoded)
+        ? (string) ($decoded['message'] ?? $decoded['code'] ?? '')
+        : substr($errorBody, 0, 200);
+    throw new RuntimeException("MAIL API rejected the message ({$status}): {$detail}");
 }
 
 private function buildMimeMessage(string $from, string $to, string $subject, string $body, string $html): string
