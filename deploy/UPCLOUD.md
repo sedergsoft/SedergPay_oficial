@@ -286,23 +286,47 @@ Borra `VITE_UI_PREVIEW` y relanza *Deploy frontend to GitHub Pages*.
 
 Cubre la VM completa, incluidos los volúmenes Docker.
 
-### Opción B — dump lógico diario
+### Opción B — dump lógico diario (implementado y probado)
+
+Scripts incluidos en el repositorio:
+
+| Script | Función |
+|---|---|
+| `deploy/backup-postgres.sh` | `pg_dump -Fc` + verificación de integridad + rotación (7 días por defecto, `--keep N`) |
+| `deploy/restore-postgres.sh` | Restaura un dump en una base **nueva** (o en la real con `--force`) y verifica las filas |
 
 ```bash
-mkdir -p ~/backups
-sudo tee /etc/cron.d/sederg-backup >/dev/null <<'EOF'
-15 3 * * * deploy cd $HOME/sederg-pay && docker compose -f docker-compose.yml -f docker-compose.production.yml exec -T postgres pg_dump -U sederg_app -Fc sederg_pay > $HOME/backups/sederg_$(date +\%F).dump
-EOF
+# Backup manual
+cd ~/sederg-pay
+bash deploy/backup-postgres.sh            # -> ~/backups/sederg_sederg_pay_<fecha>.dump
+bash deploy/backup-postgres.sh --keep 30  # otra retención
+
+# Restauración probada (no toca producción)
+bash deploy/restore-postgres.sh --file ~/backups/sederg_sederg_pay_20261111-202320.dump
+# -> crea sederg_pay_restore_test y comprueba usuarios/cotizaciones/migraciones
+
+# Restaurar sobre producción (pide --force)
+bash deploy/restore-postgres.sh --file <dump> --target sederg_pay --force
 ```
 
-Añade rotación (7 días) y copia fuera del servidor (UpCloud Object Storage desde
-5 €/mes, o descarga cifrada con `gpg`).
+**Programación automática** (ya instalada en el servidor el 2026-11-11):
 
-**Prueba la restauración** antes de considerarla válida:
-
-```bash
-docker compose ... exec -T postgres pg_restore -U sederg_app -d sederg_pay_nuevo --clean < backup.dump
+```cron
+# /etc/cron.d/sederg-backup
+15 3 * * * deploy cd /home/deploy/sederg-pay && /bin/bash deploy/backup-postgres.sh >> /home/deploy/backups/backup.log 2>&1
 ```
+
+> Estado real verificado: dump de 168 KB generado, `pg_restore --list` correcto,
+> restauración probada en `sederg_pay_restore_test` (6 usuarios · 4 cotizaciones ·
+> 17 migraciones) y base de prueba eliminada después.
+
+**Pendiente**: copia **fuera** del servidor (UpCloud Object Storage desde 5 €/mes o
+descarga cifrada con `gpg`). Un backup que solo vive en la misma VM no protege de
+la pérdida de la VM.
+
+### Opción A — Simple Backups de UpCloud (+10 %)
+
+Cubre la VM completa, incluidos los volúmenes Docker. Complementa al dump lógico.
 
 ---
 
@@ -476,7 +500,10 @@ Estado verificado el **2026-11-11** sobre el despliegue real:
 - [x] Certificado TLS válido (`CN=5-22-219-30.sslip.io`, ZeroSSL, caduca el
       2027-02-09) y redirección 80 → 443 automática
 - [x] Secretos solo en `.env` (permisos 600) y en GitHub Secrets
-- [ ] Backup ejecutado y **restauración probada**
+- [x] Backup ejecutado y **restauración probada** (dump diario 03:15 UTC con
+      `deploy/backup-postgres.sh`, rotación 7 días, restauración verificada en
+      `sederg_pay_restore_test` el 2026-11-11)
+- [ ] Copia de los backups **fuera** del servidor (Object Storage o descarga cifrada)
 - [ ] `SEDERG_AUTH_MODE=production` + OIDC configurado (hoy es sandbox)
 - [ ] Rate limiting de login en Caddy
 
