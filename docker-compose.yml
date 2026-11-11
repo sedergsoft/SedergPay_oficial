@@ -28,6 +28,12 @@ services:
       SEDERG_MAIL_USERNAME: ${SEDERG_MAIL_USERNAME:-}
       SEDERG_MAIL_PASSWORD: ${SEDERG_MAIL_PASSWORD:-}
       SEDERG_MAIL_FROM: ${SEDERG_MAIL_FROM:-}
+      # Transporte "api" (Brevo /v3/smtp/email): usado cuando el proveedor de
+      # nube bloquea el trafico SMTP saliente.
+      SEDERG_MAIL_API_URL: ${SEDERG_MAIL_API_URL:-}
+      SEDERG_MAIL_API_KEY: ${SEDERG_MAIL_API_KEY:-}
+      SEDERG_MAIL_API_KEY_HEADER: ${SEDERG_MAIL_API_KEY_HEADER:-api-key}
+      SEDERG_MAIL_FROM_NAME: ${SEDERG_MAIL_FROM_NAME:-SEDERG_PAY}
       SEDERG_APP_URL: ${SEDERG_APP_URL:-http://localhost:5173}
       SEDERG_OIDC_ISSUER: ${SEDERG_OIDC_ISSUER:-https://identity.example.invalid/realms/sederg}
       SEDERG_OIDC_AUDIENCE: ${SEDERG_OIDC_AUDIENCE:-sederg-pay-api}
