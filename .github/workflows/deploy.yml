@@ -117,24 +117,14 @@ jobs:
             "$DEPLOY_USER@$DEPLOY_HOST" \
             "cd ~/sederg-pay && bash deploy/deploy-upcloud.sh --full-rebuild=${FULL_REBUILD:-false} --skip-migrations=${SKIP_MIGRATIONS:-false}"
 
-      - name: Verificar la API pública
+      - name: Verificar la API
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL }}
         run: |
           set -uo pipefail
-          url="${PUBLIC_API_URL:-https://5-22-219-30.sslip.io}"
-          echo "Comprobando $url/health"
-          # La comprobacion se hace desde el servidor: los runners de GitHub
-          # (IP de Azure) pueden ser bloqueados por el proveedor de red al
-          # conectar con sslip.io, y el trafico nunca llega a Caddy.
-          if ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes \
-               "$DEPLOY_USER@$DEPLOY_HOST" \
-               "for i in \$(seq 1 12); do if curl -fsS --connect-timeout 5 --max-time 20 '$url/health'; then exit 0; fi; sleep 5; done; exit 1"; then
-            echo ""
-            echo "API pública operativa"
-          else
-            echo "::error::La API pública no respondió en $url/health"
-            exit 1
-          fi
+          # La verificacion se ejecuta en el servidor: los runners de GitHub
+          # (IP de Azure) pueden ser filtrados en el camino alDominio publico.
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "cd ~/sederg-pay && bash deploy/verify-upcloud.sh"
