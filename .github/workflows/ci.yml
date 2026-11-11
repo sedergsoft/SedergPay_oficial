@@ -103,6 +103,7 @@ jobs:
           done
           curl --silent --fail http://127.0.0.1:8080/health >/dev/null || { cat /tmp/sederg-yii-server.log; exit 1; }
           php tests/integration/quote_flow_smoke.php
+          php tests/integration/beneficiary_crud_smoke.php
 
   deployment-config:
     name: Docker Compose production configuration

@@ -68,7 +68,7 @@ final class BeneficiaryRepository
             'phone_e164' => $payload['phone_e164'] ?? null,
             'email' => isset($payload['email']) ? strtolower($payload['email']) : null,
             'payout_method_code' => $payload['payout_method_code'],
-            'payout_provider' => $payload['payout_provider'] ?? $current['payout_provider'],
+            'payout_provider' => $payload['payout_provider'] ?? null,
             'payout_account_token' => $payload['payout_account_token'] ?? null,
             'payout_account_last4' => $payload['payout_account_last4'] ?? null,
             'payout_card_token' => $payload['payout_card_token'] ?? null,
@@ -136,7 +136,8 @@ final class BeneficiaryRepository
     }
 
     public function findForUser(string $publicId, int $userId): ?array
-    {        $row = $this->db->createCommand(
+    {
+        $row = $this->db->createCommand(
             'SELECT b.public_id, c.iso2 AS country_code, b.first_name, b.last_name,
                     b.phone_e164, b.email, b.payout_method_code, b.payout_provider,
                     b.payout_account_last4, b.payout_card_last4, b.status, b.created_at, b.updated_at
