@@ -21,7 +21,10 @@ services:
     ports: !reset []
     restart: unless-stopped
   postgres:
-    ports: !reset []
+    # Solo en el loopback del servidor: accesible por SSH (tunel) y por
+    # VS Code Remote-SSH, pero nunca desde Internet.
+    ports:
+      - "127.0.0.1:5433:5432"
     restart: unless-stopped
   redis:
     ports: !reset []
