@@ -32,7 +32,11 @@ final class RateLimiter
         $cache->set($key, ['count' => $count, 'reset' => time() + $windowSeconds], $windowSeconds);
         if ($count > $limit) {
             Yii::warning(['throttle_exceeded' => $action, 'ip' => $ip], 'security');
-            throw new TooManyRequestsHttpException(min(300, $windowSeconds), 'Too many attempts. Please try again later.');
+            $retryAfter = min(300, $windowSeconds);
+            if (Yii::$app->has('response')) {
+                Yii::$app->response->headers->set('Retry-After', (string) $retryAfter);
+            }
+            throw new TooManyRequestsHttpException('Too many attempts. Please try again later.');
         }
     }
 
