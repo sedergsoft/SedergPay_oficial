@@ -328,7 +328,10 @@ public function sendKycStatusChange(string $email, string $firstName, string $st
 <tr><td style="padding:20px 40px;background:#f4f7fc;color:#71809d;font-size:12px;border-top:1px solid #e1e7f3;">SEDERG_PAY — Remesas Rusia &nbsp; Cuba</td></tr>
 </table></td></tr></table></body></html>
 HTML;
-    $this->deliver($email, $subject, $body, $html, $config);
+    // deliver() devuelve true cuando el envio fallo y se aplico el modo
+    // sandbox (se registra en el log de desarrollo).
+    $fallback = $this->deliver($email, $subject, $body, $html, $config);
+    $this->writeDevLog("[SEDERG_PAY][DEV][kyc-status] email={$email} status={$status} enviado=" . ($fallback ? 'no' : 'si') . " subject={$subject}");
 }
 
 /**
@@ -385,7 +388,8 @@ HTML;
             continue;
         }
         try {
-            $this->deliver($email, $subject, $body, $html, $config);
+            $fallback = $this->deliver($email, $subject, $body, $html, $config);
+            $this->writeDevLog("[SEDERG_PAY][DEV][kyc-review-requested] email={$email} enviado=" . ($fallback ? 'no' : 'si') . " subject={$subject}");
         } catch (\Throwable $exception) {
             Yii::warning('KYC review request notification failed: ' . $exception->getMessage(), __METHOD__);
         }

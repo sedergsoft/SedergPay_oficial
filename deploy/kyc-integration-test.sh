@@ -163,12 +163,12 @@ check "kyc-approved" 200 '"approved"' "$body"
 
 echo ""
 echo "=== 18. Aviso por correo del cambio de estado ==="
-docker exec sederg-pay-backend-1 sh -c 'tail -40 /app/runtime/logs/mail-dev.log 2>/dev/null | grep -iE "kyc-status|mail-fallback|mail-error" | tail -6' > /tmp/kyc-mail.log 2>&1
-if grep -qiE "kyc-status|mail-fallback|mail-error" /tmp/kyc-mail.log; then
-  ok "kyc-mail-notification ($(grep -icE 'kyc-status|mail-fallback|mail-error' /tmp/kyc-mail.log) entradas en el log)"
-  sed 's/^/      /' /tmp/kyc-mail.log | head -4
+docker exec sederg-pay-backend-1 sh -c 'tail -40 /app/runtime/logs/mail-dev.log 2>/dev/null | grep -iE "kyc-status|kyc-review-requested" | tail -8' > /tmp/kyc-mail.log 2>&1
+if grep -qE "kyc-status.*enviado=si|kyc-review-requested.*enviado=si" /tmp/kyc-mail.log; then
+  ok "kyc-mail-notification (correo enviado)"
+  sed 's/^/      /' /tmp/kyc-mail.log | tail -5
 else
-  ko "kyc-mail-notification" "sin entradas en mail-dev.log"
+  ko "kyc-mail-notification" "sin trazas de envio en mail-dev.log: $(cat /tmp/kyc-mail.log | tr '\n' ' ' | head -c 300)"
 fi
 
 echo ""
