@@ -1172,10 +1172,10 @@ function Stat({ label, value }: { label: string; value: string }) { return <div 
 
 
 function FundingMethodConfiguration({ userId, method, run, onSaved }: { userId: string; method: FundingMethod; run: (action: () => Promise<void>) => Promise<void>; onSaved: () => void }) {
-  const configuration = (method.configuration ?? {}) as Record<string, any>;
-  const [payeePhone, setPayeePhone] = useState(String(configuration.payee_phone ?? ''));
-  const [accountNumber, setAccountNumber] = useState(String(configuration.account_number ?? ''));
-  const [purpose, setPurpose] = useState(String(configuration.purpose ?? 'Fondeo SEDERG_PAY'));
+  const [editing, setEditing] = useState(false);
+  const [payeePhone, setPayeePhone] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [purpose, setPurpose] = useState('Fondeo SEDERG_PAY');
 
   useEffect(() => {
     const cfg = (method.configuration ?? {}) as Record<string, any>;
@@ -1193,14 +1193,54 @@ function FundingMethodConfiguration({ userId, method, run, onSaved }: { userId: 
       purpose: purpose.trim(),
     });
     notifySuccess('Configuración guardada correctamente.');
+    setEditing(false);
     onSaved();
   });
-  return <section className="card"><div className="section-heading"><div><h3>{method.name}</h3><p className="muted">Configuración del método de pago (SBP C2P · QR persona a persona).</p></div></div>
-  <div className="funding-account-form"><label className="funding-full">Teléfono del beneficiario (dígitos)</label><input value={payeePhone} onChange={(event) => setPayeePhone(event.target.value)} placeholder="79001234567" /><label className="funding-full">Número de cuenta del beneficiario</label><input value={accountNumber} onChange={(event) => setAccountNumber(event.target.value)} placeholder="Opcional" /><label className="funding-full">Finalidad del pago</label><input value={purpose} onChange={(event) => setPurpose(event.target.value)} /></div>
-  <button className="secondary compact-button" onClick={save}>Guardar configuración</button>
+
+  const cfg = (method.configuration ?? {}) as Record<string, any>;
+  const shownPhone = String(cfg.payee_phone ?? '').trim() || '—';
+  const shownAccount = String(cfg.account_number ?? '').trim() || '—';
+  const shownPurpose = String(cfg.purpose ?? 'Fondeo SEDERG_PAY').trim() || 'Fondeo SEDERG_PAY';
+
+  return <section className="card profile-card">
+    <div className="profile-header-card">
+      <div className="profile-identity">
+        <span className="eyebrow">Método de pago</span>
+        <h3>{method.name}</h3>
+        <p className="muted">Cuenta P2P · SBP QR persona a persona (sandbox)</p>
+      </div>
+      {!editing
+        ? <button className="edit-button" type="button" onClick={() => setEditing(true)}><Icon name="edit"/> Editar</button>
+        : <button className="edit-button secondary" type="button" onClick={() => setEditing(false)}><Icon name="arrow-left"/> Cancelar</button>}
+    </div>
+    {!editing ? (
+      <div className="profile-cards-grid">
+        <article className="profile-card-item">
+          <div className="card-title"><Icon name="user"/><span>Cuenta beneficiaria P2P</span></div>
+          <div className="card-body">
+            <div className="profile-field"><span className="profile-field-label">Teléfono del beneficiario</span><span className="profile-field-value">{shownPhone}</span></div>
+            <div className="profile-field"><span className="profile-field-label">Número de cuenta</span><span className="profile-field-value">{shownAccount}</span></div>
+            <div className="profile-field"><span className="profile-field-label">Finalidad del pago</span><span className="profile-field-value">{shownPurpose}</span></div>
+            <div className="profile-field"><span className="profile-field-label">Referencia de transferencia</span><span className="profile-field-value">Generada automáticamente por el sistema</span></div>
+          </div>
+        </article>
+      </div>
+    ) : (
+      <form className="modern-form" onSubmit={(e) => { e.preventDefault(); save(); }}>
+        <div className="form-grid">
+          <label className="funding-full">Teléfono del beneficiario (dígitos)<input value={payeePhone} onChange={(event) => setPayeePhone(event.target.value)} placeholder="79001234567" inputMode="tel" /></label>
+          <label className="funding-full">Número de cuenta del beneficiario<input value={accountNumber} onChange={(event) => setAccountNumber(event.target.value)} placeholder="Opcional" /></label>
+          <label className="funding-full">Finalidad del pago<input value={purpose} onChange={(event) => setPurpose(event.target.value)} /></label>
+          <label className="funding-full">Referencia de transferencia<input value="Generada automáticamente por el sistema" readOnly disabled /></label>
+        </div>
+        <div className="form-actions">
+          <button type="button" className="secondary" onClick={() => setEditing(false)}>Cancelar</button>
+          <button type="submit"><Icon name="check"/> Guardar configuración</button>
+        </div>
+      </form>
+    )}
   </section>;
 }
-
 function AdminFundingPanel({ userId, run }: { userId: string; run: (action: () => Promise<void>) => Promise<void> }) {
   const [methods,setMethods]=useState<FundingMethod[]>([]);
   const [accounts,setAccounts]=useState<FundingAccount[]>([]);
