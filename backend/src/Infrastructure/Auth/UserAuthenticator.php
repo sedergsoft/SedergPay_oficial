@@ -89,8 +89,9 @@ final class UserAuthenticator
         $issuer = trim((string) getenv('SEDERG_OIDC_ISSUER'));
         $audience = trim((string) getenv('SEDERG_OIDC_AUDIENCE'));
         $publicKey = trim((string) getenv('SEDERG_OIDC_PUBLIC_KEY'));
-        if ($issuer === '' || $audience === '' || $publicKey === '') {
-            throw new InvalidConfigException('OIDC issuer, audience and public key are required outside development mode');
+        $jwksUri = trim((string) getenv('SEDERG_OIDC_JWKS_URI'));
+        if ($issuer === '' || $audience === '' || ($publicKey === '' && $jwksUri === '')) {
+            throw new InvalidConfigException('OIDC issuer, audience and a public key or JWKS URI are required outside development mode');
         }
 
         $header = trim((string) Yii::$app->request->headers->get('Authorization', ''));
@@ -105,7 +106,8 @@ final class UserAuthenticator
         $tokenHeader = $this->decodeJson($encodedHeader);
         $claims = $this->decodeJson($encodedPayload);
         $signature = $this->base64UrlDecode($encodedSignature);
-        if (($tokenHeader['alg'] ?? null) !== 'RS256'
+        $alg = $tokenHeader['alg'] ?? null;
+        if ($alg !== 'RS256'
             || !isset($claims['sub'], $claims['iss'], $claims['aud'], $claims['exp'])
             || !is_string($claims['sub'])
             || !is_string($claims['iss'])
@@ -117,15 +119,162 @@ final class UserAuthenticator
             || !$this->audienceMatches($claims['aud'])) {
             throw new ForbiddenHttpException('OIDC token validation failed');
         }
-        if (openssl_verify(
-            $encodedHeader . '.' . $encodedPayload,
-            $signature,
-            $publicKey,
-            OPENSSL_ALGO_SHA256
-        ) !== 1) {
+        $keyMaterial = $publicKey;
+        if ($jwksUri !== '') {
+            $kid = isset($tokenHeader['kid']) && is_string($tokenHeader['kid']) ? $tokenHeader['kid'] : null;
+            $keyMaterial = $this->resolveJwksKey($jwksUri, $kid, false);
+        }
+        $verified = $this->verifySignature($encodedHeader . '.' . $encodedPayload, $signature, $keyMaterial);
+        if ($verified !== 1 && $jwksUri !== '') {
+            // Refresh JWKS once in case of key rotation.
+            $kid = isset($tokenHeader['kid']) && is_string($tokenHeader['kid']) ? $tokenHeader['kid'] : null;
+            $keyMaterial = $this->resolveJwksKey($jwksUri, $kid, true);
+            $verified = $this->verifySignature($encodedHeader . '.' . $encodedPayload, $signature, $keyMaterial);
+        }
+        if ($verified !== 1) {
             throw new ForbiddenHttpException('OIDC token signature validation failed');
         }
         return $claims;
+    }
+
+    private function verifySignature(string $data, string $signature, string $keyMaterial): int
+    {
+        $result = @openssl_verify($data, $signature, $keyMaterial, OPENSSL_ALGO_SHA256);
+        return $result === 1 ? 1 : 0;
+    }
+
+    private function resolveJwksKey(string $jwksUri, ?string $kid, bool $forceRefresh): string
+    {
+        $cacheKey = 'oidc:jwks:' . hash('sha256', $jwksUri);
+        $jwks = null;
+        if (!$forceRefresh && Yii::$app->has('cache')) {
+            $cached = Yii::$app->cache->get($cacheKey);
+            if (is_array($cached)) {
+                $jwks = $cached;
+            }
+        }
+        if ($jwks === null) {
+            $jwks = $this->fetchJwks($jwksUri);
+            if (Yii::$app->has('cache')) {
+                Yii::$app->cache->set($cacheKey, $jwks, 300);
+            }
+        }
+        $keys = $jwks['keys'] ?? null;
+        if (!is_array($keys)) {
+            throw new ForbiddenHttpException('OIDC JWKS is invalid');
+        }
+        $selected = null;
+        foreach ($keys as $key) {
+            if (!is_array($key)) {
+                continue;
+            }
+            if (($key['kty'] ?? null) !== 'RSA') {
+                continue;
+            }
+            if (isset($key['use']) && $key['use'] !== 'sig') {
+                continue;
+            }
+            if ($kid !== null) {
+                if (($key['kid'] ?? null) === $kid) {
+                    $selected = $key;
+                    break;
+                }
+            } elseif ($selected === null) {
+                $selected = $key;
+            }
+        }
+        if ($selected === null) {
+            throw new ForbiddenHttpException('OIDC signing key not found');
+        }
+        $n = $selected['n'] ?? null;
+        $e = $selected['e'] ?? null;
+        if (!is_string($n) || !is_string($e)) {
+            throw new ForbiddenHttpException('OIDC signing key is invalid');
+        }
+        $pem = $this->rsaJwkToPem($n, $e);
+        if ($pem === '') {
+            throw new ForbiddenHttpException('OIDC signing key could not be processed');
+        }
+        return $pem;
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private function fetchJwks(string $jwksUri): array
+    {
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'timeout' => 5,
+                'ignore_errors' => true,
+                'header' => "Accept: application/json\r\n",
+            ],
+            'https' => [
+                'method' => 'GET',
+                'timeout' => 5,
+                'ignore_errors' => true,
+            ],
+        ]);
+        $body = @file_get_contents($jwksUri, false, $context);
+        if (!is_string($body) || $body === '') {
+            throw new ForbiddenHttpException('Unable to fetch OIDC JWKS');
+        }
+        $decoded = json_decode($body, true);
+        if (!is_array($decoded)) {
+            throw new ForbiddenHttpException('OIDC JWKS is invalid');
+        }
+        return $decoded;
+    }
+
+    private function rsaJwkToPem(string $n, string $e): string
+    {
+        $modulus = $this->base64UrlDecode($n);
+        $exponent = $this->base64UrlDecode($e);
+        if ($modulus === '' || $exponent === '') {
+            return '';
+        }
+        $components = [
+            'modulus' => $this->derInteger($modulus),
+            'publicExponent' => $this->derInteger($exponent),
+        ];
+        $rsaPublicKey = $this->derSequence($components['modulus'] . $components['publicExponent']);
+        // rsaEncryption OID: 1.2.840.113549.1.1.1
+        $algorithm = $this->derSequence("\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x01\x01\x05\x00");
+        $bitString = "\x03" . $this->derLength(strlen($rsaPublicKey) + 1) . "\x00" . $rsaPublicKey;
+        $spki = $this->derSequence($algorithm . $bitString);
+        return "-----BEGIN PUBLIC KEY-----\n"
+            . chunk_split(base64_encode($spki), 64, "\n")
+            . "-----END PUBLIC KEY-----\n";
+    }
+
+    private function derInteger(string $value): string
+    {
+        if ($value === '') {
+            $value = "\x00";
+        }
+        if ((ord($value[0]) & 0x80) !== 0) {
+            $value = "\x00" . $value;
+        }
+        return "\x02" . $this->derLength(strlen($value)) . $value;
+    }
+
+    private function derSequence(string $value): string
+    {
+        return "\x30" . $this->derLength(strlen($value)) . $value;
+    }
+
+    private function derLength(int $length): string
+    {
+        if ($length <= 127) {
+            return chr($length);
+        }
+        $temp = '';
+        while ($length > 0) {
+            $temp = chr($length & 0xff) . $temp;
+            $length >>= 8;
+        }
+        return chr(0x80 | strlen($temp)) . $temp;
     }
 
     private function audienceMatches(mixed $audience): bool

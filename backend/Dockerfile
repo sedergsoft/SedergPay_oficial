@@ -14,5 +14,7 @@ RUN composer install --no-interaction --no-progress --prefer-dist
 COPY . .
 # runtime/ y web/assets son excluidos por .dockerignore; Yii los necesita en
 # tiempo de ejecucion (logs, cache, assets publicados) tambien fuera de Compose.
+# Nota de hardening: ejecutar como usuario no-root requiere alinear permisos de volúmenes
+# (runtime, web/assets, almacenamiento privado). Validar en staging antes de forzar USER.
 RUN mkdir -p runtime/logs runtime/debug runtime/cache
 CMD ["sh","-c","php yii serve 0.0.0.0:${PORT:-8080} --docroot=web"]

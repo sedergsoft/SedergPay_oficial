@@ -40,6 +40,7 @@ services:
       SEDERG_OIDC_ISSUER: ${SEDERG_OIDC_ISSUER:-https://identity.example.invalid/realms/sederg}
       SEDERG_OIDC_AUDIENCE: ${SEDERG_OIDC_AUDIENCE:-sederg-pay-api}
       SEDERG_OIDC_PUBLIC_KEY: ${SEDERG_OIDC_PUBLIC_KEY:-}
+      SEDERG_OIDC_JWKS_URI: ${SEDERG_OIDC_JWKS_URI:-}
       SEDERG_CORS_ORIGINS: ${SEDERG_CORS_ORIGINS:-http://localhost:5173}
     depends_on:
       postgres: {condition: service_healthy}
