@@ -60,7 +60,7 @@ final class FundingController extends Controller
         $this->requireAdmin();
         return ['methods' => Yii::$app->db->createCommand(
             'SELECT m.code,m.name,m.method_type,m.provider_code,m.supports_dynamic_qr,m.requires_reference,m.is_active,
-                    c.iso2 AS country_code,m.currency_code
+                    c.iso2 AS country_code,m.currency_code,m.configuration
              FROM {{%funding_payment_methods}} m
              INNER JOIN {{%countries}} c ON c.id=m.country_id ORDER BY c.iso2,m.name'
         )->queryAll()];
@@ -74,6 +74,10 @@ final class FundingController extends Controller
             throw new BadRequestHttpException('is_active must be a boolean');
         }
         $db = Yii::$app->db;
+        $configuration = null;
+        if (array_key_exists('configuration', $payload) && is_array($payload['configuration'])) {
+            $configuration = $payload['configuration'];
+        }
         $method = $db->createCommand('SELECT code,is_active FROM {{%funding_payment_methods}} WHERE code=:code', [':code' => $code])->queryOne();
         if (!$method) {
             throw new NotFoundHttpException('Funding method not found');
@@ -91,9 +95,17 @@ final class FundingController extends Controller
                 throw new UnprocessableEntityHttpException('Configure at least one active SEDERG_PAY sandbox account for this method first');
             }
         }
-        $db->createCommand()->update('{{%funding_payment_methods}}', ['is_active' => $payload['is_active']], ['code' => $code])->execute();
-        $this->audit($userId, 'funding_method.updated', 'funding_method', $code, ['is_active' => $payload['is_active']]);
-        return ['code' => $code, 'is_active' => $payload['is_active']];
+        $updateColumns = ['is_active' => $payload['is_active']];
+        if ($configuration !== null) {
+            $updateColumns['configuration'] = json_encode($configuration, JSON_THROW_ON_ERROR);
+        }
+        $db->createCommand()->update('{{%funding_payment_methods}}', $updateColumns, ['code' => $code])->execute();
+        $this->audit($userId, 'funding_method.updated', 'funding_method', $code, ['is_active' => $payload['is_active'], 'configuration' => $configuration]);
+        $response = ['code' => $code, 'is_active' => $payload['is_active']];
+        if ($configuration !== null) {
+            $response['configuration'] = $configuration;
+        }
+        return $response;
     }
 
     public function actionAdminAccounts(): array
@@ -247,7 +259,7 @@ final class FundingController extends Controller
         }
         $account = $db->createCommand(
             'SELECT a.id,a.public_id,a.bank_code,a.bank_name,a.account_holder_name,a.account_mask,a.routing_mask,a.currency_code,a.environment,
-                    m.code,m.name,m.method_type,m.supports_dynamic_qr,m.provider_code
+                    m.code,m.name,m.method_type,m.supports_dynamic_qr,m.provider_code,m.configuration
              FROM {{%funding_payment_methods}} m
              INNER JOIN {{%funding_account_methods}} fam ON fam.payment_method_code=m.code
              INNER JOIN {{%platform_funding_accounts}} a ON a.id=fam.funding_account_id
@@ -281,10 +293,14 @@ final class FundingController extends Controller
                 $providerPaymentId = $issued['provider_payment_id'];
                 $qrType = 'sbp_c2b_sandbox';
             } elseif ($account['provider_code'] === 'sbp_c2p_sandbox') {
-                $payeePhone = (string) preg_replace('/\D/', '', (string) ($p['payee_phone_e164'] ?? ''));
-                $purpose = trim((string) ($p['purpose'] ?? ''));
+                $configuration = json_decode((string) ($account['configuration'] ?? '{}'), true);
+                if (!is_array($configuration)) {
+                    $configuration = [];
+                }
+                $payeePhone = (string) preg_replace('/\D/', '', (string) ($configuration['payee_phone'] ?? ''));
+                $purpose = trim((string) ($configuration['purpose'] ?? 'Fondeo SEDERG_PAY'));
                 if ($payeePhone === '') {
-                    throw new UnprocessableEntityHttpException('payee_phone_e164 is required for SBP person-to-person instructions');
+                    throw new UnprocessableEntityHttpException('SBP C2P payee phone is not configured for this funding method');
                 }
                 $issued = (new FundingPaymentProviderFactory())->createPersonalQr('sbp_c2p_sandbox', 'sandbox')->createPersonalQr(
                     (string) $remittance['total_debit_amount'],

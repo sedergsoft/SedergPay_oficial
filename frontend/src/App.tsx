@@ -838,9 +838,6 @@ function Remittances({ userId, run }: { userId: string; run: (action: () => Prom
   const [payingFor,setPayingFor]=useState<Remittance|null>(null);
   const [fundingMethods,setFundingMethods]=useState<FundingMethod[]>([]);
   const [loadingMethods,setLoadingMethods]=useState(false);
-  const [personalMethod,setPersonalMethod]=useState<FundingMethod|null>(null);
-  const [payeePhoneInput,setPayeePhoneInput]=useState('');
-  const [purposeInput,setPurposeInput]=useState('');
   const refresh = () => run(async () => setItems(await api.remittances(userId)));
   useEffect(() => { refresh(); }, [userId]);
   useEffect(() => {
@@ -865,8 +862,6 @@ function Remittances({ userId, run }: { userId: string; run: (action: () => Prom
   };
   const chooseMethod = (method:FundingMethod) => {
     if(!payingFor)return;
-    setPersonalMethod(method);
-    if(method.code==='ru_sbp_c2p') return;
     void run(async()=>{
       await executeDeposit(method);
     });
@@ -875,7 +870,7 @@ function Remittances({ userId, run }: { userId: string; run: (action: () => Prom
   <section className="card remittances-card"><div className="filter-tabs" role="group" aria-label={t('remittances.filter')}>{[['all',t('common.all')],['active',t('common.inProgress')],['completed',t('common.completed')]].map(([value,label])=><button key={value} className={filter===value?'filter-tab active':'filter-tab'} onClick={()=>setFilter(value)}>{label}</button>)}</div>
   {visible.length===0?<div className="empty-state"><span className="empty-icon"><Icon name="history"/></span><strong>{t('remittances.empty')}</strong><p>{t('remittances.emptyDescription')}</p></div>:<div className="remittance-list">{visible.map(item=><article className="remittance-item" key={item.public_id}><span className="remittance-icon"><Icon name="transfer"/></span><div className="remittance-main"><strong>{item.reference}</strong><small>{item.created_at?new Date(item.created_at).toLocaleString(locale):'Fecha no disponible'}</small><span>{item.send_amount} {item.send_currency} <b>→</b> {item.receive_amount} {item.receive_currency}</span></div><div className="remittance-status"><StatusBadge status={item.status}/><button className="text-button" onClick={() => void run(async () => setSelected(await api.remittance(userId, item.public_id)))}>{t('common.viewDetails')} <span>→</span></button></div>
   <div className="remittance-operations">{item.status === 'awaiting_payment' && <button className="secondary compact-button" onClick={() => startPayment(item)}>{t('remittances.registerDeposit')}</button>}{item.status === 'compliance_review' && <button onClick={() => void run(async () => { await api.review(userId, item.public_id, 'approved'); refresh(); })}>{t('common.approve')} (sandbox)</button>}{item.status === 'approved' && <button onClick={() => void run(async () => { const payout = await api.payout(userId, item.public_id); await api.completePayout(userId, payout.public_id); refresh(); })}>{t('remittances.executePayout')} (sandbox)</button>}{item.status === 'reconciliation_pending' && <button className="secondary compact-button" onClick={() => void run(async () => { await api.reconcile(userId, item.public_id); refresh(); })}>{t('remittances.reconcile')}</button>}</div></article>)}</div>}</section>
-  {payingFor && <div className="details-modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setPayingFor(null);}}><section className="details-modal card" role="dialog" aria-modal="true" aria-labelledby="funding-method-title"><div className="section-heading details-modal-heading"><div><span className="eyebrow">Segundo paso · Pago</span><h2 id="funding-method-title">Selecciona cómo pagar</h2><p className="muted">{payingFor.total_debit_amount ?? payingFor.send_amount} {payingFor.send_currency}</p></div><button className="secondary compact-button" onClick={()=>{setPayingFor(null);setPersonalMethod(null);}}>Cerrar</button></div>{loadingMethods?<p className="muted">Cargando métodos disponibles…</p>:fundingMethods.length===0?<div className="alert">No hay métodos de pago habilitados para esta moneda. El administrador debe configurar una cuenta receptora SEDERG_PAY y activar el método correspondiente.</div>:<div className="payment-method-options">{fundingMethods.map(method=><button key={method.code} className="payment-method-option" type="button" onClick={()=>chooseMethod(method)}><strong>{method.name}</strong><small>{method.code==='ru_sbp_qr'?'SBP C2B · QR dinámico de sandbox':method.code==='ru_sbp_c2p'?'SBP C2P · QR persona a persona (sandbox)':method.method_type==='instant_qr'?'QR dinámico de sandbox':'Transferencia bancaria'} · {method.provider_code||'Canal manual'}</small><span>Seleccionar →</span></button>)}</div>}{personalMethod?.code==='ru_sbp_c2p' && <form className="modern-form" onSubmit={(event)=>{event.preventDefault();if(payeePhoneInput.replace(/\D/g,'').length<8)return;const method=personalMethod;if(!method||method.code!=='ru_sbp_c2p')return;void run(async()=>{await executeDeposit(method,{payeePhoneE164:payeePhoneInput.replace(/\D/g,''),purpose:purposeInput.trim()});setPersonalMethod(null);});}}><label className="funding-full">Teléfono del beneficiario (E.164, solo dígitos)</label><input value={payeePhoneInput} onChange={(event)=>setPayeePhoneInput(event.target.value)} placeholder="+79001234567" inputMode="tel" /><label className="funding-full">Finalidad del pago (opcional)</label><input value={purposeInput} onChange={(event)=>setPurposeInput(event.target.value)} placeholder="Préstamo personal a compañero" /></form>}<p className="muted">El QR de sandbox sirve para probar la experiencia; no inicia una transferencia bancaria real ni confirma el ingreso.</p></section></div>}
+  {payingFor && <div className="details-modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setPayingFor(null);}}><section className="details-modal card" role="dialog" aria-modal="true" aria-labelledby="funding-method-title"><div className="section-heading details-modal-heading"><div><span className="eyebrow">Segundo paso · Pago</span><h2 id="funding-method-title">Selecciona cómo pagar</h2><p className="muted">{payingFor.total_debit_amount ?? payingFor.send_amount} {payingFor.send_currency}</p></div><button className="secondary compact-button" onClick={()=>setPayingFor(null)}>Cerrar</button></div>{loadingMethods?<p className="muted">Cargando métodos disponibles…</p>:fundingMethods.length===0?<div className="alert">No hay métodos de pago habilitados para esta moneda. El administrador debe configurar una cuenta receptora SEDERG_PAY y activar el método correspondiente.</div>:<div className="payment-method-options">{fundingMethods.map(method=><button key={method.code} className="payment-method-option" type="button" onClick={()=>chooseMethod(method)}><strong>{method.name}</strong><small>{method.code==='ru_sbp_qr'?'SBP C2B · QR dinámico de sandbox':method.code==='ru_sbp_c2p'?'SBP C2P · QR persona a persona (sandbox)':method.method_type==='instant_qr'?'QR dinámico de sandbox':'Transferencia bancaria'} · {method.provider_code||'Canal manual'}</small><span>Seleccionar →</span></button>)}</div>}<p className="muted">El QR de sandbox sirve para probar la experiencia; no inicia una transferencia bancaria real ni confirma el ingreso.</p></section></div>}
   {selected && <RemittanceDetails detail={selected} onClose={() => setSelected(null)} />}
   </div>;
 }
@@ -1176,6 +1171,25 @@ function Field({ name, label, type = 'text', defaultValue, value, onChange, plac
 function Stat({ label, value }: { label: string; value: string }) { return <div className="stat"><span>{label}</span><strong>{value}</strong></div>; }
 
 
+function FundingMethodConfiguration({ userId, method, run, onSaved }: { userId: string; method: FundingMethod; run: (action: () => Promise<void>) => Promise<void>; onSaved: () => void }) {
+  const configuration = (method.configuration ?? {}) as Record<string, any>;
+  const [payeePhone, setPayeePhone] = useState(String(configuration.payee_phone ?? ''));
+  const [accountNumber, setAccountNumber] = useState(String(configuration.account_number ?? ''));
+  const [purpose, setPurpose] = useState(String(configuration.purpose ?? 'Fondeo SEDERG PAY'));
+  const save = () => void run(async () => {
+    await api.updateFundingMethod(userId, method.code, Boolean(method.is_active), {
+      payee_phone: payeePhone.trim(),
+      account_number: accountNumber.trim(),
+      purpose: purpose.trim(),
+    });
+    onSaved();
+  });
+  return <section className="card"><div className="section-heading"><div><h3>{method.name}</h3><p className="muted">Configuración del método de pago (SBP C2P · QR persona a persona).</p></div></div>
+  <div className="funding-account-form"><label className="funding-full">Teléfono del beneficiario (dígitos)</label><input value={payeePhone} onChange={(event) => setPayeePhone(event.target.value)} placeholder="79001234567" /><label className="funding-full">Número de cuenta del beneficiario</label><input value={accountNumber} onChange={(event) => setAccountNumber(event.target.value)} placeholder="Opcional" /><label className="funding-full">Finalidad del pago</label><input value={purpose} onChange={(event) => setPurpose(event.target.value)} /></div>
+  <button className="secondary compact-button" onClick={() => void save()}>Guardar configuración</button>
+  </section>;
+}
+
 function AdminFundingPanel({ userId, run }: { userId: string; run: (action: () => Promise<void>) => Promise<void> }) {
   const [methods,setMethods]=useState<FundingMethod[]>([]);
   const [accounts,setAccounts]=useState<FundingAccount[]>([]);
@@ -1204,7 +1218,8 @@ function AdminFundingPanel({ userId, run }: { userId: string; run: (action: () =
   });
   return <div className="feature-view"><div className="view-heading"><div><span className="eyebrow">Administración financiera</span><h2>Métodos de pago y cuentas receptoras</h2><p className="muted">Las cuentas registradas pertenecen a SEDERG_PAY. Sberbank, VTB y Alfa-Bank son candidatos documentados en Rusia, no integraciones contratadas. En esta fase solo se habilita sandbox.</p></div><span className="status-pill status-info">SANDBOX</span></div>
   <section className="card"><div className="section-heading"><div><h3>Catálogo de métodos de fondeo</h3><p className="muted">Independiente de los métodos de desembolso al beneficiario.</p></div></div>
-  {methods.map(method=><div className="funding-method-row" key={method.code}><div><strong>{method.name}</strong><small>{method.country_code} · {method.currency_code} · {method.method_type} · {method.code}</small></div><label className="switch-label"><input type="checkbox" checked={Boolean(method.is_active)} onChange={e=>void run(async()=>{await api.updateFundingMethod(userId,method.code,e.target.checked);await reload();})}/> Activo</label></div>)}</section>
+  {methods.map(method=><div className="funding-method-row" key={method.code}><div><strong>{method.name}</strong><small>{method.country_code} · {method.currency_code} · {method.method_type} · {method.code}</small></div><label className="switch-label"><input type="checkbox" checked={Boolean(method.is_active)} onChange={e=>void run(async()=>{await api.updateFundingMethod(userId,method.code,e.target.checked,method.configuration ?? undefined);await reload();})}/> Activo</label></div>)}</section>
+  {methods.filter(method=>method.code==='ru_sbp_c2p').map(method=><FundingMethodConfiguration key={method.code} userId={userId} method={method} run={run} onSaved={reload} />)}
   <section className="card"><div className="section-heading"><div><h3>Registrar cuenta receptora</h3><p className="muted">El número se cifra antes de almacenarse; solo se muestra enmascarado después del alta.</p></div></div>
   <form className="funding-account-form" onSubmit={e=>{e.preventDefault();create();}}>
     <label>País<select value={country} onChange={e=>{setCountry(e.target.value as 'RU'|'CU');setSelectedMethods([]);if(e.target.value==='RU'){setBankCode('sberbank');setBankName('Sberbank');}else{setBankCode('');setBankName('');}}}><option value="RU">Rusia</option><option value="CU">Cuba</option></select></label>

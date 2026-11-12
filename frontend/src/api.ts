@@ -211,7 +211,7 @@ export type AdminDashboard = {
   total_remittances: number;
 };
 
-export type FundingMethod = { code: string; name: string; method_type: string; provider_code: string | null; supports_dynamic_qr: boolean | number; requires_reference: boolean | number; country_code?: string; currency_code?: string; is_active?: boolean | number };
+export type FundingMethod = { code: string; name: string; method_type: string; provider_code: string | null; supports_dynamic_qr: boolean | number; requires_reference: boolean | number; country_code?: string; currency_code?: string; is_active?: boolean | number; configuration?: Record<string, unknown> | null };
 export type FundingAccount = { public_id: string; country_code: string; currency_code: string; bank_code: string; bank_name: string; account_holder_name: string; legal_entity_name: string | null; account_type: string; account_mask: string; routing_mask: string | null; environment: string; status: string; notes: string | null; methods: string | null };
 
 export type PlatformSetting = {
@@ -336,7 +336,7 @@ export const api = {
   }),
   fundingMethods: (userId: string, countryCode: string) => request<{ methods: FundingMethod[]; environment: string }>(`/api/v1/funding-methods/${countryCode}`, { headers: authHeaders(userId) }),
   adminFundingMethods: (userId: string) => request<{ methods: FundingMethod[] }>('/api/v1/admin/funding-methods', { headers: authHeaders(userId) }),
-  updateFundingMethod: (userId: string, code: string, isActive: boolean) => request<{ code: string; is_active: boolean }>(`/api/v1/admin/funding-methods/${code}`, { method: 'PUT', headers: authHeaders(userId), body: JSON.stringify({ is_active: isActive }) }),
+  updateFundingMethod: (userId: string, code: string, isActive: boolean, configuration?: Record<string, unknown>) => request<{ code: string; is_active: boolean; configuration?: Record<string, unknown> | null }>(`/api/v1/admin/funding-methods/${code}`, { method: 'PUT', headers: authHeaders(userId), body: JSON.stringify({ is_active: isActive, ...(configuration ? { configuration } : {}) }) }),
   adminFundingAccounts: (userId: string) => request<{ accounts: FundingAccount[] }>('/api/v1/admin/funding-accounts', { headers: authHeaders(userId) }),
   createFundingAccount: (userId: string, body: Record<string, unknown>) => request<{ public_id: string; account_mask: string; routing_mask?: string | null; status: string; environment: string }>('/api/v1/admin/funding-accounts', { method: 'POST', headers: authHeaders(userId), body: JSON.stringify(body) }),
   updateFundingAccount: (userId: string, publicId: string, status: 'active' | 'inactive') => request<{ public_id: string; status: string }>(`/api/v1/admin/funding-accounts/${publicId}`, { method: 'PUT', headers: authHeaders(userId), body: JSON.stringify({ status }) }),
