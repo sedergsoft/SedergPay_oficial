@@ -5,6 +5,9 @@ RUN apt-get update \
     && docker-php-ext-install bcmath pdo_pgsql zip \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+# Limites de subida y de memoria: por defecto PHP rechaza cualquier fichero
+# de mas de 2 MB y los avisos en pantalla rompen la respuesta JSON y el CORS.
+COPY docker/php/app.ini /usr/local/etc/php/conf.d/zz-sederg.ini
 WORKDIR /app
 COPY composer.json composer.lock ./
 RUN composer install --no-interaction --no-progress --prefer-dist

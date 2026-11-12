@@ -226,6 +226,110 @@ private function smtpConfig(): array
     return $this->mailConfig();
 }
 
+/**
+ * Notifica por correo el cambio de estado de un expediente KYC.
+ *
+ * Estados admitidos: pending_review (expediente recibido), approved
+ * (verificacion superada), rejected (expediente denegado) y
+ * requires_action (se necesita documentacion adicional).
+ */
+public function sendKycStatusChange(string $email, string $firstName, string $status, string $reason = ''): void
+{
+    $transport = $this->transport();
+    $config = $this->mailConfig();
+    $canSend = ($transport === 'smtp' && !$config['smtp_incomplete'])
+        || ($transport === 'api' && !$config['api_incomplete']);
+    if (!$canSend) {
+        if ($transport === 'log' || $transport === 'file' || $this->isDevelopmentMode()) {
+            $this->logGeneric($email, 'kyc-status', 'KYC ' . $status);
+            return;
+        }
+        throw new RuntimeException($transport === 'api'
+            ? 'MAIL API configuration is incomplete'
+            : 'SMTP email configuration is incomplete');
+    }
+
+    $esc = static fn(mixed $v): string => htmlspecialchars((string) $v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $safeFirstName = $esc($firstName);
+    $safeReason = trim($reason);
+    $appUrl = rtrim((string) (getenv('SEDERG_APP_URL') ?: 'http://localhost:5173'), '/');
+    $safeAppUrl = $esc($appUrl);
+
+    [$title, $headline, $intro, $note] = match ($status) {
+        'approved' => [
+            'Verificacion de identidad completada',
+            'Tu identidad ha sido verificada',
+            'Ya puedes enviar remesas sin el limite diario de 500 RUB.',
+            'Si necesitas actualizar tus documentos, subelos desde la seccion de verificacion de identidad.',
+        ],
+        'rejected' => [
+            'Verificacion de identidad denegada',
+            'No pudimos verificar tu identidad',
+            'Revisa el motivo indicado y vuelve a enviar el expediente con la documentacion correcta.',
+            '',
+        ],
+        'requires_action' => [
+            'Necesitamos documentacion adicional',
+            'Tu expediente necesita informacion adicional',
+            'Adjunta los documentos que te solicitamos para completar la verificacion.',
+            '',
+        ],
+        default => [
+            'Expediente de verificacion recibido',
+            'Recibimos tu expediente de verificacion',
+            'Nuestro equipo esta revisando tus documentos. Te avisaremos en cuanto haya novedades.',
+            '',
+        ],
+    };
+
+    $subject = 'SEDERG_PAY — ' . $title;
+    $lines = ["Hola {$firstName},", '', $intro];
+    if ($safeReason !== '') {
+        $lines[] = '';
+        $lines[] = 'Motivo del equipo de revision:';
+        $lines[] = $safeReason;
+    }
+    if ($note !== '') {
+        $lines[] = '';
+        $lines[] = $note;
+    }
+    $lines[] = '';
+    $lines[] = 'Puedes consultar el estado de tu expediente en ' . $appUrl;
+    $body = implode("\n", $lines);
+
+    $reasonBlock = '';
+    if ($safeReason !== '') {
+        $reasonBlock = '<p style="margin:0 0 20px;padding:14px 16px;background:#f4f7fc;border-radius:12px;font-size:14px;color:#42536b;">'
+            . '<strong style="display:block;margin-bottom:6px;color:#10264d;">Motivo del equipo de revision</strong>'
+            . $esc($safeReason) . '</p>';
+    }
+    $noteBlock = '';
+    if ($note !== '') {
+        $noteBlock = '<p style="margin:0 0 20px;font-size:14px;color:#71809d;">' . $esc($note) . '</p>';
+    }
+
+    $logoSrc = $this->logoSource();
+    $html = <<<HTML
+<!doctype html><html lang="es"><body style="margin:0;background:#eef3fa;color:#0f1f3d;font-family:'Inter',Arial,Helvetica,sans-serif;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:36px 12px;background:#eef3fa;"><tr><td align="center">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border-radius:24px;overflow:hidden;border:1px solid #dde6f2;box-shadow:0 24px 60px rgba(15,31,61,.12);">
+<tr><td style="padding:26px 40px;background:linear-gradient(135deg,#0a2b6b 0%,#0b4f9c 52%,#00aeef 100%);">
+  <img src="{$logoSrc}" alt="SEDERG_PAY" style="height:42px;width:auto;display:block;filter:drop-shadow(0 4px 12px rgba(0,0,0,.25));" />
+  <p style="margin:10px 0 0;color:rgba(255,255,255,.82);font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;">Verificacion de identidad</p>
+</td></tr>
+<tr><td style="padding:34px 40px;">
+<p style="margin:0 0 10px;color:#0b4f9c;font-size:12px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;">KYC</p>
+<h1 style="margin:0 0 16px;font-size:26px;color:#10264d;">{$esc($headline)}</h1>
+<p style="margin:0 0 22px;font-size:15px;color:#42536b;">Hola {$safeFirstName}, {$esc($intro)}</p>
+{$reasonBlock}{$noteBlock}
+<p style="margin:0;font-size:14px;color:#42536b;"><a href="{$safeAppUrl}" style="color:#0b4f9c;font-weight:600;">Ir a SEDERG_PAY</a></p>
+</td></tr>
+<tr><td style="padding:20px 40px;background:#f4f7fc;color:#71809d;font-size:12px;border-top:1px solid #e1e7f3;">SEDERG_PAY — Remesas Rusia &nbsp; Cuba</td></tr>
+</table></td></tr></table></body></html>
+HTML;
+    $this->deliver($email, $subject, $body, $html, $config);
+}
+
 private function transport(): string
 {
     return strtolower(trim((string) (getenv('SEDERG_MAIL_TRANSPORT') ?: 'smtp')));

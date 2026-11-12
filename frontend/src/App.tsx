@@ -22,6 +22,19 @@ function ActionButton({ icon, label, className = 'secondary', disabled = false, 
   return <button type={type} className={className} disabled={disabled} title={accessibleLabel} aria-label={accessibleLabel} onClick={onClick}>{mode === 'icons' ? <Icon name={icon} className="action-button-icon" /> : label}</button>;
 }
 
+// Traduce los errores tecnicos del backend sobre la subida de documentos KYC
+// a mensajes que el cliente entiende.
+function kycUploadErrorKey(message: string): string {
+  const lower = (message ?? '').toLowerCase();
+  if (lower.includes('exceeds the maximum allowed size') || lower.includes('exceeds 5 mb') || lower.includes('5 mb')) return 'kyc.fileTooLarge';
+  if (lower.includes('does not match its declared file type')) return 'kyc.fileTypeMismatch';
+  if (lower.includes('only pdf, jpg and png')) return 'kyc.fileTypeNotAllowed';
+  if (lower.includes('flagged as malware')) return 'kyc.fileRejected';
+  if (lower.includes('malware scanning service is unavailable') || lower.includes('malware scan could not be completed')) return 'kyc.scanUnavailable';
+  if (lower.includes('valid document upload is required') || lower.includes('invalid document signature')) return 'kyc.uploadFailed';
+  return '';
+}
+
 // Barra de filtro por columna (estilo GridView de kartik-v): una fila de
 // entradas de filtro justo debajo de los encabezados de la tabla.
 function ColumnFilterInput({ value, onChange, label }: { value: string; onChange: (value: string) => void; label: string }): JSX.Element {
@@ -634,7 +647,7 @@ function KycPanel({userId,run}:{userId:string;run:(action:()=>Promise<void>)=>Pr
  {limit?.limited&&<div className="notice-box notice-info" role="status"><Icon name="info"/><strong>{t('toast.dailyLimit')}</strong><span>{` · ${limit.used} / ${limit.limit} RUB utilizados hoy`}</span></div>}
  <section className="card kyc-card"><div className={`kyc-status-banner ${kyc?.status||'pending'}`}><span className="kyc-shield"><Icon name="shield"/></span><div><small>{t('kyc.verificationStatus')}</small><strong>{kyc?.status||t('common.loading')}</strong><p>{kyc?.review_reason||t('kyc.uploadPrompt')}</p></div><StatusBadge status={kyc?.status||'pending'}/></div>
  <div className="kyc-checklist"><div className={hasIdentity?'kyc-check complete':'kyc-check'}><Icon name={hasIdentity?'check':'receipt'}/><span><strong>{t('kyc.identityDocument')}</strong><small>{hasIdentity?t('kyc.documentReceived'):t('kyc.pendingUpload')}</small></span></div><div className={hasAddress?'kyc-check complete':'kyc-check'}><Icon name={hasAddress?'check':'location'}/><span><strong>{t('kyc.addressProof')}</strong><small>{hasAddress?t('kyc.documentReceived'):t('kyc.pendingUpload')}</small></span></div></div>
- <form className="modern-form kyc-upload" onSubmit={e=>{e.preventDefault();const form=e.currentTarget;const d=new FormData(form);const file=d.get('file') as File;void run(async()=>{if(!file||!file.size)throw new Error(t('kyc.selectFile'));await api.uploadKycDocument(userId,file,String(d.get('document_type')));setKyc(await api.kyc(userId));form.reset();});}}><div className="form-grid"><label>{t('kyc.documentType')}<select name="document_type"><option value="identity">{t('kyc.identityDocument')}</option><option value="address">{t('kyc.addressProof')}</option><option value="selfie">{t('kyc.selfieOptional')}</option></select></label><label>{t('kyc.fileTypes')}<input name="file" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" required/></label></div><button><Icon name="plus"/> {t('kyc.uploadDocument')}</button></form>
+ <form className="modern-form kyc-upload" onSubmit={e=>{e.preventDefault();const form=e.currentTarget;const d=new FormData(form);const file=d.get('file') as File;void run(async()=>{if(!file||!file.size)throw new Error(t('kyc.selectFile'));if(file.size>5*1024*1024)throw new Error(t('kyc.fileTooLarge'));const mime=(file.type||'').toLowerCase();if(mime&&!['application/pdf','image/jpeg','image/png'].includes(mime))throw new Error(t('kyc.fileTypeNotAllowed'));try{await api.uploadKycDocument(userId,file,String(d.get('document_type')));}catch(error){const key=kycUploadErrorKey((error as Error).message);throw new Error(key?t(key):(error as Error).message);}setKyc(await api.kyc(userId));form.reset();notifySuccess(t('toast.kycDocumentUploaded'));});}}><div className="form-grid"><label>{t('kyc.documentType')}<select name="document_type"><option value="identity">{t('kyc.identityDocument')}</option><option value="address">{t('kyc.addressProof')}</option><option value="selfie">{t('kyc.selfieOptional')}</option></select></label><label>{t('kyc.fileTypes')}<input name="file" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" required/></label></div><button><Icon name="plus"/> {t('kyc.uploadDocument')}</button></form>
  <h3 className="subsection-title">{t('kyc.submittedDocuments')}</h3>{!kyc?.documents?.length?<p className="muted">{t('kyc.noDocuments')}</p>:<div className="document-list">{kyc.documents.map((d:any)=><div className="document-item" key={d.public_id}><span className="document-icon"><Icon name="receipt"/></span><div><strong>{d.document_type}</strong><small>{d.original_name} · {(d.file_size/1024).toFixed(0)} KB</small></div><StatusBadge status={d.status||'received'}/></div>)}</div>}
  <div className="form-actions"><button disabled={!hasIdentity||!hasAddress||['approved','pending_review'].includes(kyc?.status)} onClick={()=>void run(async()=>{await api.submitKyc(userId);setKyc(await api.kyc(userId));notifySuccess(t('toast.kycSubmitted'));})}>{t('kyc.submitForReview')}</button></div><p className="secure-note"><Icon name="lock"/> {t('kyc.secureStorage')}</p></section></div>;
 }

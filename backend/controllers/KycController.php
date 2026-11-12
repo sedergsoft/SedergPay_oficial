@@ -6,6 +6,7 @@ namespace app\controllers;
 
 use app\Infrastructure\Auth\UserAuthenticator;
 use app\Infrastructure\Compliance\KycDailyLimit;
+use app\Infrastructure\Identity\VerificationMailer;
 use app\Infrastructure\Kyc\KycDocumentSecurity;
 use Yii;
 use yii\filters\ContentNegotiator;
@@ -19,6 +20,9 @@ use yii\web\ServerErrorHttpException;
 
 final class KycController extends Controller
 {
+    /** Tamaño máximo admitido para un documento KYC (5 MB). */
+    public const MAX_DOCUMENT_BYTES = 5 * 1024 * 1024;
+
     public $enableCsrfValidation = false;
 
     public function behaviors(): array
@@ -80,6 +84,17 @@ final class KycController extends Controller
 
         $file = UploadedFile::getInstanceByName('file');
         if ($file === null || $file->error !== UPLOAD_ERR_OK || !is_file($file->tempName)) {
+            // PHP descarta la subida cuando el fichero supera upload_max_filesize
+            // o el cuerpo entero supera post_max_size. En ese caso hay que
+            // explicarlo al cliente en lugar de devolver un error generico.
+            $declared = (int) ($_SERVER['CONTENT_LENGTH'] ?? 0);
+            $tooLarge = $declared > self::MAX_DOCUMENT_BYTES
+                || ($file !== null && in_array((int) $file->error, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true));
+            if ($tooLarge) {
+                throw new UnprocessableEntityHttpException(
+                    'The document exceeds the maximum allowed size of 5 MB'
+                );
+            }
             throw new UnprocessableEntityHttpException('A valid document upload is required');
         }
 
@@ -213,6 +228,30 @@ final class KycController extends Controller
         return ['uploaded' => true, 'document_type' => $type, 'file_name' => basename($file->name)];
     }
 
+    /**
+     * Avisa por correo al cliente de que su expediente entro en revision.
+     * Un fallo del correo no debe romper el envio del expediente.
+     */
+    private function notifyKycSubmitted(int $userId): void
+    {
+        try {
+            $user = Yii::$app->db->createCommand(
+                'SELECT email, first_name FROM {{%users}} WHERE id=:id LIMIT 1',
+                [':id' => $userId]
+            )->queryOne();
+            if ($user === false || empty($user['email'])) {
+                return;
+            }
+            (new VerificationMailer())->sendKycStatusChange(
+                (string) $user['email'],
+                (string) ($user['first_name'] ?: 'usuario'),
+                'pending_review'
+            );
+        } catch (\Throwable $exception) {
+            Yii::warning('KYC submission notification failed: ' . $exception->getMessage(), __METHOD__);
+        }
+    }
+
     public function actionSubmit(): array
     {
         $userId = $this->userId();
@@ -270,6 +309,9 @@ final class KycController extends Controller
             }
             throw $exception;
         }
+
+        // Aviso al cliente de que su expediente ya esta en revision.
+        $this->notifyKycSubmitted($userId);
 
         return ['status' => 'pending_review'];
     }

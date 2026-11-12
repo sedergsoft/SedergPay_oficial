@@ -6,6 +6,7 @@ namespace app\controllers;
 
 use app\Infrastructure\Auth\UserAuthenticator;
 use app\Infrastructure\Configuration\PlatformSettings;
+use app\Infrastructure\Identity\VerificationMailer;
 use app\Infrastructure\Pricing\ExchangeRateService;
 use DomainException;
 use Yii;
@@ -268,7 +269,35 @@ final class AdminController extends Controller
             throw $exception;
         }
 
+        // Aviso al cliente del cambio de estado (aprobado / denegado / mas datos).
+        $this->notifyKycStatusChange((int) $case['user_id'], $status, $reason);
+
         return ['public_id' => $publicId, 'status' => $status, 'review_reason' => $reason];
+    }
+
+    /**
+     * Avisa por correo al cliente del cambio de estado de su expediente KYC.
+     * Un fallo del correo no debe romper la revision ya confirmada.
+     */
+    private function notifyKycStatusChange(int $userId, string $status, string $reason): void
+    {
+        try {
+            $user = Yii::$app->db->createCommand(
+                'SELECT email, first_name FROM {{%users}} WHERE id=:id LIMIT 1',
+                [':id' => $userId]
+            )->queryOne();
+            if ($user === false || empty($user['email'])) {
+                return;
+            }
+            (new VerificationMailer())->sendKycStatusChange(
+                (string) $user['email'],
+                (string) ($user['first_name'] ?: 'usuario'),
+                $status,
+                $reason
+            );
+        } catch (\Throwable $exception) {
+            Yii::warning('KYC status notification failed: ' . $exception->getMessage(), __METHOD__);
+        }
     }
 
     public function actionKycDocuments(string $publicId): array
