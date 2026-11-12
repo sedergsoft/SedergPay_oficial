@@ -912,3 +912,14 @@ td,th { border-bottom:1px solid #E5EDF5; }
 .calculator-result small { color: var(--ink-400); font-size: .75rem; }
 @media(max-width:900px){.landing-calculator{padding:0 16px}.landing-calculator .calculator{padding:20px}}
 @media(max-width:640px){.calculator-top{grid-template-columns:1fr}.calculator-swap{justify-self:start}}
+
+/* --- Admin: buscador de usuarios --- */
+.search-users { margin: 14px 0 4px; }
+.admin-search-input { width: 100%; max-width: 420px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-1); color: var(--ink-700); font: inherit; }
+.admin-search-input:focus { outline: 2px solid var(--indigo-200, #b8c2ff); outline-offset: 1px; }
+
+/* --- Admin: modal de detalles de usuario --- */
+.detail-row { display: flex; flex-wrap: wrap; gap: 4px 16px; justify-content: space-between; padding: 10px 0; border-bottom: 1px dashed var(--line); }
+.detail-row:last-child { border-bottom: none; }
+.detail-label { color: var(--ink-400); font-size: .78rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.detail-value { color: var(--ink-700); font-size: .92rem; text-align: right; overflow-wrap: anywhere; }

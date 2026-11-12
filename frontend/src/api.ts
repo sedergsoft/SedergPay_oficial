@@ -335,6 +335,10 @@ export const api = {
   adminUsers: (userId: string) => request<AdminUser[]>('/api/v1/admin/users', {
     headers: authHeaders(userId),
   }),
+  adminUserToggle: (userId: string, publicId: string) => request<{ public_id: string; status: string }>(`/api/v1/admin/users/${publicId}/toggle`, {
+    method: 'PUT',
+    headers: { ...authHeaders(userId), 'Idempotency-Key': `user-toggle-${crypto.randomUUID()}` },
+  }),
   adminDashboard: (userId: string) => request<AdminDashboard>('/api/v1/admin/dashboard', {
     headers: authHeaders(userId),
   }),

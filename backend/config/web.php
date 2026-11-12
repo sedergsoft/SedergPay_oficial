@@ -55,6 +55,7 @@ return [
                 'POST api/v1/admin/funding-accounts' => 'funding/admin-create-account',
                 'PUT api/v1/admin/funding-accounts/<publicId:[0-9a-fA-F-]{36}>' => 'funding/admin-update-account',
                 'GET api/v1/admin/users' => 'admin/users',
+                'PUT api/v1/admin/users/<publicId:[0-9a-fA-F-]{36}>/toggle' => 'admin/user-toggle',
                 'GET api/v1/admin/rates/history' => 'admin/rate-history',
                 'GET api/v1/admin/dashboard' => 'admin/dashboard',
                 'GET api/v1/admin/settings' => 'admin/settings',
