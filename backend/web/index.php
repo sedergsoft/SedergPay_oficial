@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-if (getenv('SEDERG_DEBUG') === '1') {
+if (getenv('SEDERG_DEBUG') === '1' && getenv('SEDERG_AUTH_MODE') === 'development') {
     defined('YII_DEBUG') or define('YII_DEBUG', true);
     defined('YII_ENV') or define('YII_ENV', 'dev');
     error_reporting(E_ALL);
