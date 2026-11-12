@@ -82,7 +82,6 @@ body=$(curl -sS -m 20 -w 'HTTP:%{http_code}' "${DEMO_AUTH[@]}" "$BASE/api/v1/kyc
 check "kyc-documents" 200 '"kyc-address.png\|kyc-identity.jpg' "$body"
 DOCS=$(printf '%s' "$body" | grep -o '"original_name":"[^"]*"' | sed 's/.*:"//;s/"$//' | tr '\n' ' ')
 echo "      documentos: $DOCS"
-
 echo ""
 echo "=== 7. El cliente envia el expediente a revision ==="
 body=$(curl -sS -m 20 -w 'HTTP:%{http_code}' -X POST "${DEMO_AUTH[@]}" -H 'Content-Type: application/json' -d '{}' "$BASE/api/v1/kyc/submit")
@@ -92,14 +91,20 @@ echo ""
 echo "=== 8. El admin ve el caso en revision ==="
 body=$(curl -sS -m 20 -w 'HTTP:%{http_code}' "${ADMIN_AUTH[@]}" "$BASE/api/v1/admin/kyc")
 check "admin-kyc-list" 200 '"pending_review"' "$body"
-CASE=$(printf '%s' "$body" | python3 -c "import sys,json; d=json.load(sys.stdin); print([c['public_id'] for c in d['cases'] if c['user_public_id']=='$DEMO'][0])" 2>/dev/null)
+CASE=$(printf '%s' "$body" | tr '{' '\n' | grep "$DEMO" | grep -o '"public_id":"[^"]*"' | head -1 | cut -d'"' -f4)
 echo "      caso demo: $CASE"
+if [ -z "$CASE" ]; then
+  ko "admin-kyc-case-found" "no se encontro el caso del cliente demo en la respuesta"
+  echo ""
+  echo "=== RESULTADO: $pass PASS / $fail FAIL ==="
+  exit 1
+fi
 
 echo ""
 echo "=== 9. El admin lista los documentos del caso ==="
 body=$(curl -sS -m 20 -w 'HTTP:%{http_code}' "${ADMIN_AUTH[@]}" "$BASE/api/v1/admin/kyc/$CASE/documents")
 check "admin-kyc-documents" 200 '"documents"' "$body"
-DOC_ID=$(printf '%s' "$body" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['documents'][0]['public_id'])" 2>/dev/null)
+DOC_ID=$(printf '%s' "$body" | grep -o '"public_id":"[^"]*"' | head -1 | cut -d'"' -f4)
 echo "      documento: $DOC_ID"
 
 echo ""

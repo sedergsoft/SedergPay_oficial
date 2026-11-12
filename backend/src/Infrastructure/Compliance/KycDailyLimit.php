@@ -54,7 +54,7 @@ final class KycDailyLimit
         $used = (string) $this->db->createCommand(
             "SELECT COALESCE(SUM(send_amount), 0)
                FROM {{%remittances}}
-              WHERE user_id = :user_id
+              WHERE sender_user_id = :user_id
                 AND send_currency = :currency
                 AND created_at >= CURRENT_DATE
                 AND status <> 'cancelled'",
