@@ -34,19 +34,7 @@ final class RegistrationController extends Controller
 
     private function throttle(string $action, int $limit, int $windowSeconds): void
     {
-        $ip = (string) (Yii::$app->request->userIP ?? 'unknown');
-        $key = 'throttle:' . $action . ':' . hash('sha256', $ip);
-        $cache = Yii::$app->cache;
-        $entry = $cache->get($key);
-        $count = 1;
-        if (is_array($entry) && isset($entry['count'], $entry['reset']) && (int) $entry['reset'] > time()) {
-            $count = (int) $entry['count'] + 1;
-            $windowSeconds = max(1, (int) $entry['reset'] - time());
-        }
-        $cache->set($key, ['count' => $count, 'reset' => time() + $windowSeconds], $windowSeconds);
-        if ($count > $limit) {
-            throw new TooManyRequestsHttpException(60, 'Too many attempts. Please try again later.');
-        }
+        \app\Infrastructure\Security\RateLimiter::enforce($action, $limit, $windowSeconds);
     }
 
     public function actionCreate(): array
@@ -88,7 +76,7 @@ final class RegistrationController extends Controller
         $email = strtolower(trim($payload['email']));
         $phone = isset($payload['phone_e164']) ? trim($payload['phone_e164']) : null;
         if ($repository->contactExists($email, $phone)) {
-            throw new ConflictHttpException('Email or phone is already registered');
+            throw new ConflictHttpException('Registration could not be completed. Please verify your information or sign in.');
         }
 
         $countryCode = strtoupper($payload['residence_country_code']);
@@ -137,7 +125,7 @@ final class RegistrationController extends Controller
                 throw new HttpException(503, 'No se pudo enviar el correo de verificación. Configura el SMTP o la API de correo e inténtalo de nuevo.', 0, $exception);
             }
             if ($exception instanceof \yii\db\IntegrityException) {
-                throw new ConflictHttpException('Email or phone is already registered');
+                throw new ConflictHttpException('Registration could not be completed. Please verify your information or sign in.');
             }
             throw $exception;
         }
