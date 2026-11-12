@@ -20,6 +20,7 @@ use yii\web\ForbiddenHttpException;
 use yii\web\HttpException;
 use yii\web\NotFoundHttpException;
 use yii\web\Response;
+use yii\web\TooManyRequestsHttpException;
 use yii\web\UnprocessableEntityHttpException;
 
 final class QuoteController extends Controller
@@ -36,8 +37,26 @@ final class QuoteController extends Controller
         ];
     }
 
+    private function throttle(string $action, int $limit, int $windowSeconds): void
+    {
+        $ip = (string) (Yii::$app->request->userIP ?? 'unknown');
+        $key = 'throttle:' . $action . ':' . hash('sha256', $ip);
+        $cache = Yii::$app->cache;
+        $entry = $cache->get($key);
+        $count = 1;
+        if (is_array($entry) && isset($entry['count'], $entry['reset']) && (int) $entry['reset'] > time()) {
+            $count = (int) $entry['count'] + 1;
+            $windowSeconds = max(1, (int) $entry['reset'] - time());
+        }
+        $cache->set($key, ['count' => $count, 'reset' => time() + $windowSeconds], $windowSeconds);
+        if ($count > $limit) {
+            throw new TooManyRequestsHttpException(60, 'Too many attempts. Please try again later.');
+        }
+    }
+
     public function actionCreate(): array
     {
+        $this->throttle('quote-create', 40, 600);
         if (!PlatformSettings::getBool(Yii::$app->db, 'operations.transfers_enabled')) {
             throw new ForbiddenHttpException('Transfers are temporarily disabled by the administrator');
         }

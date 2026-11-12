@@ -14,6 +14,7 @@ use yii\web\Controller;
 use yii\web\NotFoundHttpException;
 use yii\web\Response;
 use yii\web\ServiceUnavailableHttpException;
+use yii\web\TooManyRequestsHttpException;
 use yii\web\UnprocessableEntityHttpException;
 use yii\db\JsonExpression;
 
@@ -27,6 +28,23 @@ final class FundingController extends Controller
             'class' => ContentNegotiator::class,
             'formats' => ['application/json' => Response::FORMAT_JSON],
         ]];
+    }
+
+    private function throttle(string $action, int $limit, int $windowSeconds): void
+    {
+        $ip = (string) (Yii::$app->request->userIP ?? 'unknown');
+        $key = 'throttle:' . $action . ':' . hash('sha256', $ip);
+        $cache = Yii::$app->cache;
+        $entry = $cache->get($key);
+        $count = 1;
+        if (is_array($entry) && isset($entry['count'], $entry['reset']) && (int) $entry['reset'] > time()) {
+            $count = (int) $entry['count'] + 1;
+            $windowSeconds = max(1, (int) $entry['reset'] - time());
+        }
+        $cache->set($key, ['count' => $count, 'reset' => time() + $windowSeconds], $windowSeconds);
+        if ($count > $limit) {
+            throw new TooManyRequestsHttpException(60, 'Too many attempts. Please try again later.');
+        }
     }
 
     public function actionMethods(string $countryCode): array
@@ -253,6 +271,7 @@ final class FundingController extends Controller
 
     public function actionCreateDeposit(string $publicId): array
     {
+        $this->throttle('deposit-create', 30, 600);
         $userId = $this->authenticatedUserId();
         $p = Yii::$app->request->bodyParams;
         $methodCode = (string) ($p['method_code'] ?? '');
