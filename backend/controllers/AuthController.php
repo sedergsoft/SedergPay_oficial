@@ -13,6 +13,7 @@ use yii\filters\ContentNegotiator;
 use yii\web\Controller;
 use yii\web\ForbiddenHttpException;
 use yii\web\Response;
+use yii\web\TooManyRequestsHttpException;
 use yii\web\UnprocessableEntityHttpException;
 
 final class AuthController extends Controller
@@ -27,8 +28,26 @@ final class AuthController extends Controller
         ]];
     }
 
+    private function throttle(string $action, int $limit, int $windowSeconds): void
+    {
+        $ip = (string) (Yii::$app->request->userIP ?? 'unknown');
+        $key = 'throttle:' . $action . ':' . hash('sha256', $ip);
+        $cache = Yii::$app->cache;
+        $entry = $cache->get($key);
+        $count = 1;
+        if (is_array($entry) && isset($entry['count'], $entry['reset']) && (int) $entry['reset'] > time()) {
+            $count = (int) $entry['count'] + 1;
+            $windowSeconds = max(1, (int) $entry['reset'] - time());
+        }
+        $cache->set($key, ['count' => $count, 'reset' => time() + $windowSeconds], $windowSeconds);
+        if ($count > $limit) {
+            throw new TooManyRequestsHttpException(60, 'Too many attempts. Please try again later.');
+        }
+    }
+
     public function actionLogin(): array
     {
+        $this->throttle('login', 10, 300);
         if (getenv('SEDERG_AUTH_MODE') !== 'development') {
             throw new ForbiddenHttpException('Use the configured OIDC provider to sign in');
         }
@@ -50,18 +69,21 @@ final class AuthController extends Controller
             [':email' => $email]
         )->queryOne();
 
-        if ($user === false || !Yii::$app->security->validatePassword($payload['password'], $user['password_hash'])) {
+        $valid = $user !== false && Yii::$app->security->validatePassword($payload['password'], $user['password_hash']);
+        if (!$valid) {
             throw new ForbiddenHttpException('Invalid email or password');
         }
         if ($user['status'] !== 'active' || $user['email_verified_at'] === null) {
-            // La cuenta existe y la contraseña es correcta, pero el correo no
-            // esta verificado. Se responde con una senal legible por el cliente
-            // para que abra la ventana de reenvio de verificacion.
-            Yii::$app->response->statusCode = 403;
-            return [
-                'email_verification_required' => true,
-                'message' => 'Verify your email before signing in',
-            ];
+            // Evitar oráculo en entornos expuestos; en desarrollo local se conserva
+            // la señal para guiar el reenvío de verificación sin romper la UX.
+            if (getenv('SEDERG_EXPOSE_AUTH_STATE') === '1') {
+                Yii::$app->response->statusCode = 403;
+                return [
+                    'email_verification_required' => true,
+                    'message' => 'Verify your email before signing in',
+                ];
+            }
+            throw new ForbiddenHttpException('Invalid email or password');
         }
 
         $twoFactorEnabled = !empty($user['two_factor_enabled']) && $user['two_factor_confirmed_at'] !== null;
@@ -86,6 +108,7 @@ final class AuthController extends Controller
 
     public function actionTwoFactorLoginVerify(): array
     {
+        $this->throttle('2fa', 10, 300);
         if (getenv('SEDERG_AUTH_MODE') !== 'development') {
             throw new ForbiddenHttpException('Use the configured OIDC provider to sign in');
         }
@@ -109,11 +132,8 @@ final class AuthController extends Controller
              ORDER BY c.created_at DESC LIMIT 1",
             [':hash' => hash('sha256', strtolower($payload['challenge']))]
         )->queryOne();
-        if ($row === false) {
+        if ($row === false || $row['status'] !== 'active' || $row['email_verified_at'] === null) {
             throw new ForbiddenHttpException('2FA challenge is invalid or expired');
-        }
-        if ($row['status'] !== 'active' || $row['email_verified_at'] === null) {
-            throw new ForbiddenHttpException('Invalid account state');
         }
 
         $code = (string) $payload['code'];
@@ -156,6 +176,7 @@ final class AuthController extends Controller
 
     public function actionVerifyEmail(): array
     {
+        $this->throttle('verify-email', 20, 600);
         $payload = Yii::$app->request->bodyParams;
         if (!is_array($payload)
             || !is_string($payload['email'] ?? null)
@@ -205,6 +226,7 @@ final class AuthController extends Controller
 
     public function actionResendVerification(): array
     {
+        $this->throttle('resend-verification', 5, 600);
         $payload = Yii::$app->request->bodyParams;
         if (!is_array($payload)
             || !is_string($payload['email'] ?? null)
@@ -249,6 +271,7 @@ final class AuthController extends Controller
 
     public function actionForgotPassword(): array
     {
+        $this->throttle('forgot-password', 5, 600);
         $payload = Yii::$app->request->bodyParams;
         $result = ['sent' => true];
         if (!is_array($payload) || !is_string($payload['email'] ?? null) || filter_var($payload['email'], FILTER_VALIDATE_EMAIL) === false) {
@@ -289,6 +312,7 @@ final class AuthController extends Controller
 
     public function actionResetPassword(): array
     {
+        $this->throttle('reset-password', 10, 600);
         $payload = Yii::$app->request->bodyParams;
         if (!is_array($payload)
             || !is_string($payload['email'] ?? null)

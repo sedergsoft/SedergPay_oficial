@@ -20,6 +20,10 @@ return [
             'charset' => 'utf8',
         ],
         'security' => ['class' => yii\base\Security::class],
+        'cache' => [
+            'class' => yii\caching\FileCache::class,
+            'cachePath' => '@runtime/cache',
+        ],
         'log' => [
             'class' => yii\log\Dispatcher::class,
             'targets' => [

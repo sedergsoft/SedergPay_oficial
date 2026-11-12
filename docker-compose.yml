@@ -15,7 +15,7 @@ services:
       SEDERG_AUTH_MODE: ${SEDERG_AUTH_MODE:-development}
       SEDERG_COOKIE_KEY: ${SEDERG_COOKIE_KEY:?SEDERG_COOKIE_KEY is required}
       SEDERG_DEBUG: ${SEDERG_DEBUG:-0}
-      SEDERG_PII_KEY: ${SEDERG_PII_KEY:-sederg-local-development-pii-key-change-me-2026}
+      SEDERG_PII_KEY: ${SEDERG_PII_KEY:?SEDERG_PII_KEY is required}
       SEDERG_ACCOUNT_ENCRYPTION_KEY: ${SEDERG_ACCOUNT_ENCRYPTION_KEY:?SEDERG_ACCOUNT_ENCRYPTION_KEY is required; run scripts/Initialize-LocalAccountEncryption.ps1}
       SEDERG_PRIVATE_STORAGE_PATH: ${SEDERG_PRIVATE_STORAGE_PATH:-/var/lib/sederg-private}
       SEDERG_KYC_REQUIRED: ${SEDERG_KYC_REQUIRED:-0}
