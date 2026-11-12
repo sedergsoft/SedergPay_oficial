@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace app\Infrastructure\Identity;
 
 use RuntimeException;
+use Yii;
 
 final class VerificationMailer
 {
@@ -328,6 +329,67 @@ public function sendKycStatusChange(string $email, string $firstName, string $st
 </table></td></tr></table></body></html>
 HTML;
     $this->deliver($email, $subject, $body, $html, $config);
+}
+
+/**
+ * Avisa a los administradores de que hay un expediente KYC en revision.
+ *
+ * @param array<int, array{email: string, first_name: string}> $recipients
+ */
+public function sendKycReviewRequested(array $recipients, string $customerName, int $documentCount): void
+{
+    $transport = $this->transport();
+    $config = $this->mailConfig();
+    $canSend = ($transport === 'smtp' && !$config['smtp_incomplete'])
+        || ($transport === 'api' && !$config['api_incomplete']);
+    if (!$canSend || $recipients === []) {
+        if ($transport === 'log' || $transport === 'file' || $this->isDevelopmentMode()) {
+            $this->logGeneric('admin', 'kyc-review-requested', 'KYC pendiente de revision');
+        }
+        return;
+    }
+
+    $esc = static fn(mixed $v): string => htmlspecialchars((string) $v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $safeCustomer = $esc($customerName);
+    $safeCount = (string) $documentCount;
+    $appUrl = rtrim((string) (getenv('SEDERG_APP_URL') ?: 'http://localhost:5173'), '/');
+    $safeAppUrl = $esc($appUrl);
+
+    $subject = 'SEDERG_PAY — Nuevo expediente KYC pendiente de revision';
+    $body = "Hay un expediente de verificacion de identidad pendiente de revision.\n\n"
+        . "Cliente: {$customerName}\n"
+        . "Documentos adjuntos: {$documentCount}\n\n"
+        . "Revisalo en el modulo de administracion: {$appUrl}";
+
+    $logoSrc = $this->logoSource();
+    $html = <<<HTML
+<!doctype html><html lang="es"><body style="margin:0;background:#eef3fa;color:#0f1f3d;font-family:'Inter',Arial,Helvetica,sans-serif;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:36px 12px;background:#eef3fa;"><tr><td align="center">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border-radius:24px;overflow:hidden;border:1px solid #dde6f2;box-shadow:0 24px 60px rgba(15,31,61,.12);">
+<tr><td style="padding:26px 40px;background:linear-gradient(135deg,#0a2b6b 0%,#0b4f9c 52%,#00aeef 100%);">
+  <img src="{$logoSrc}" alt="SEDERG_PAY" style="height:42px;width:auto;display:block;filter:drop-shadow(0 4px 12px rgba(0,0,0,.25));" />
+  <p style="margin:10px 0 0;color:rgba(255,255,255,.82);font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;">Administracion</p>
+</td></tr>
+<tr><td style="padding:34px 40px;">
+<p style="margin:0 0 10px;color:#0b4f9c;font-size:12px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;">KYC</p>
+<h1 style="margin:0 0 16px;font-size:26px;color:#10264d;">Nuevo expediente pendiente</h1>
+<p style="margin:0 0 22px;font-size:15px;color:#42536b;">El cliente <strong>{$safeCustomer}</strong> ha enviado su expediente de verificacion con {$safeCount} documento(s).</p>
+<p style="margin:0;font-size:14px;color:#42536b;"><a href="{$safeAppUrl}" style="color:#0b4f9c;font-weight:600;">Ir a la administracion</a></p>
+</td></tr>
+<tr><td style="padding:20px 40px;background:#f4f7fc;color:#71809d;font-size:12px;border-top:1px solid #e1e7f3;">SEDERG_PAY — Remesas Rusia &nbsp; Cuba</td></tr>
+</table></td></tr></table></body></html>
+HTML;
+    foreach ($recipients as $recipient) {
+        $email = trim((string) ($recipient['email'] ?? ''));
+        if ($email === '') {
+            continue;
+        }
+        try {
+            $this->deliver($email, $subject, $body, $html, $config);
+        } catch (\Throwable $exception) {
+            Yii::warning('KYC review request notification failed: ' . $exception->getMessage(), __METHOD__);
+        }
+    }
 }
 
 private function transport(): string

@@ -229,27 +229,67 @@ final class KycController extends Controller
     }
 
     /**
-     * Avisa por correo al cliente de que su expediente entro en revision.
+     * Avisa por correo al cliente de que su expediente entro en revision y
+     * avisa a los administradores de que hay un expediente pendiente.
      * Un fallo del correo no debe romper el envio del expediente.
      */
     private function notifyKycSubmitted(int $userId): void
     {
+        $customerName = '';
+        $documents = 0;
         try {
             $user = Yii::$app->db->createCommand(
-                'SELECT email, first_name FROM {{%users}} WHERE id=:id LIMIT 1',
+                'SELECT u.email, p.first_name, p.last_name FROM {{%users}} u
+                 LEFT JOIN {{%user_profiles}} p ON p.user_id=u.id
+                 WHERE u.id=:id LIMIT 1',
                 [':id' => $userId]
             )->queryOne();
             if ($user === false || empty($user['email'])) {
                 return;
             }
+            $name = trim((string) ($user['first_name'] ?? ''));
+            $customerName = trim((string) ($user['first_name'] ?? '') . ' ' . (string) ($user['last_name'] ?? ''));
+            if ($customerName === '') {
+                $customerName = (string) $user['email'];
+            }
+            $documents = (int) Yii::$app->db->createCommand(
+                'SELECT COUNT(*) FROM {{%kyc_documents}} WHERE kyc_case_id=(SELECT id FROM {{%kyc_cases}} WHERE user_id=:id)',
+                [':id' => $userId]
+            )->queryScalar();
+
             (new VerificationMailer())->sendKycStatusChange(
                 (string) $user['email'],
-                (string) ($user['first_name'] ?: 'usuario'),
+                $name !== '' ? $name : 'usuario',
                 'pending_review'
             );
         } catch (\Throwable $exception) {
             Yii::warning('KYC submission notification failed: ' . $exception->getMessage(), __METHOD__);
         }
+
+        try {
+            if ($customerName !== '') {
+                $this->notifyAdminsKycPending($customerName, $documents);
+            }
+        } catch (\Throwable $exception) {
+            Yii::warning('KYC admin notification failed: ' . $exception->getMessage(), __METHOD__);
+        }
+    }
+
+    /**
+     * Avisa a los administradores de que hay un expediente en revision.
+     */
+    private function notifyAdminsKycPending(string $customerName, int $documentCount): void
+    {
+        $admins = Yii::$app->db->createCommand(
+            'SELECT u.email, p.first_name FROM {{%users}} u
+             LEFT JOIN {{%user_profiles}} p ON p.user_id=u.id
+             WHERE u.role=:role ORDER BY u.id',
+            [':role' => 'admin']
+        )->queryAll();
+        if ($admins === []) {
+            return;
+        }
+        (new VerificationMailer())->sendKycReviewRequested($admins, $customerName, $documentCount);
     }
 
     public function actionSubmit(): array

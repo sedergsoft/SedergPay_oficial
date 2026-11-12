@@ -283,7 +283,9 @@ final class AdminController extends Controller
     {
         try {
             $user = Yii::$app->db->createCommand(
-                'SELECT email, first_name FROM {{%users}} WHERE id=:id LIMIT 1',
+                'SELECT u.email, p.first_name FROM {{%users}} u
+                 LEFT JOIN {{%user_profiles}} p ON p.user_id=u.id
+                 WHERE u.id=:id LIMIT 1',
                 [':id' => $userId]
             )->queryOne();
             if ($user === false || empty($user['email'])) {
