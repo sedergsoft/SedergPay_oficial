@@ -278,13 +278,47 @@ Borra `VITE_UI_PREVIEW` y relanza *Deploy frontend to GitHub Pages*.
 > `DEPLOY_ENV` es un secret multilínea: pégalo tal cual, sin comillas.
 > Cada push a `main` que toque `backend/**` redespliega automáticamente.
 
+### 7.4 Volumen privado de documentos KYC (crítico)
+
+Los adjuntos de identidad que sube el cliente se cifran con `SEDERG_PII_KEY` y se
+guardan en el volumen Docker `sederg_private_data`, montado en
+`/var/lib/sederg-private` dentro del contenedor del backend.
+
+```bash
+# El contenedor DEBE tener el volumen montado
+docker inspect sederg-pay-backend-1 \
+  --format '{{range .Mounts}}{{.Type}}: {{.Source}} -> {{.Destination}}{{"\n"}}{{end}}'
+# esperado: volume: /var/lib/docker/volumes/sederg-pay_sederg_private_data/_data -> /var/lib/sederg-private
+
+# Los archivos cifrados, agrupados por usuario
+docker exec sederg-pay-backend-1 find /var/lib/sederg-private/kyc -type f
+```
+
+> ⚠️ **Trampa de Docker Compose v2.24+**: en `docker-compose.production.yml` el
+> backend se define con `volumes: !reset` para **heredar** los volúmenes de
+> `docker-compose.yml`. `!reset` vacía el nodo completo (incluidos los volúmenes
+> heredados), por lo que el contenedor se creaba **sin** volumen y los ficheros
+> KYC quedaban en la capa desechable del contenedor: se perdían en cada
+> recreado y la descarga devolvía `400 KYC file is unavailable`.
+>
+> **Solución aplicada**: usar `!override` con la lista explícita
+> (`volumes: !override` + `- sederg_private_data:/var/lib/sederg-private`),
+> que reemplaza el nodo heredado sin vaciarlo. Commit `ded8bf4`.
+
+**Reglas operativas**:
+
+1. Nunca borres el volumen `sederg-pay_sederg_private_data` ni ejecutes
+   `docker compose down -v` en producción: se perderían todos los documentos KYC.
+2. El dump lógico de PostgreSQL **no** incluye los adjuntos: hay que copiar el
+   volumen aparte en las copias de seguridad (ver §8).
+3. Si el endpoint `GET /api/v1/admin/kyc/documents/<id>` responde
+   `400 KYC file is unavailable`, comprueba primero el montaje del volumen
+   (§7.4) y después que la fila de `kyc_documents.storage_key` apunte a un
+   archivo existente dentro del volumen.
+
 ---
 
 ## 8. Backups
-
-### Opción A — Simple Backups de UpCloud (+10 %)
-
-Cubre la VM completa, incluidos los volúmenes Docker.
 
 ### Opción B — dump lógico diario (implementado y probado)
 
@@ -323,6 +357,18 @@ bash deploy/restore-postgres.sh --file <dump> --target sederg_pay --force
 **Pendiente**: copia **fuera** del servidor (UpCloud Object Storage desde 5 €/mes o
 descarga cifrada con `gpg`). Un backup que solo vive en la misma VM no protege de
 la pérdida de la VM.
+
+**El dump de PostgreSQL NO incluye los documentos KYC**: los adjuntos cifrados
+viven en el volumen `sederg_private_data` (§7.4). Para una copia completa hay que
+añadir el volumen al backup:
+
+```bash
+# Copia de los adjuntos KYC cifrados (ajustar el destino a la copia externa)
+docker run --rm \
+  -v sederg-pay_sederg_private_data:/data:ro \
+  -v "$HOME/backups":/backup \
+  alpine tar czf /backup/sederg_kyc_private_data.tgz -C /data .
+```
 
 ### Opción A — Simple Backups de UpCloud (+10 %)
 
@@ -456,6 +502,13 @@ Docker Desktop no aplica: aquí es Docker Engine nativo.
    OIDC/MFA.
 6. **TiDB Cloud Starter está en Public Preview**: para producción, PostgreSQL
    gestionado de UpCloud (9 €/mes) o PostgreSQL propio con backups probados.
+7. **Adjuntos KYC de la demo perdidos (2026-11-11)**: por el bug de
+   `volumes: !reset` (§7.4) los dos ficheros del caso de `sederg01@gmail.com`
+   vivían en la capa del contenedor y se perdieron al recrearlo. Corregido el
+   compose (`!override`), pero los ficheros **no son recuperables**: el cliente
+   debe volver a subirlos. A partir de esa fecha quedan persistidos en el
+   volumen y la descarga funciona (verificado E2E: HTTP 200 con `image/jpeg`
+   y tamaño idéntico al original).
 
 ---
 
