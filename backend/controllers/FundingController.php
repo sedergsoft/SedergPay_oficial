@@ -310,7 +310,14 @@ final class FundingController extends Controller
                 $providerPaymentId = $issued['provider_payment_id'];
                 $qrType = 'sbp_c2b_sandbox';
             } elseif ($account['provider_code'] === 'sbp_c2p_sandbox') {
-                $configuration = json_decode((string) ($account['configuration'] ?? '{}'), true);
+                $configuration = $account['configuration'] ?? [];
+                if (is_string($configuration)) {
+                    $decoded = json_decode($configuration, true);
+                    if (is_string($decoded)) {
+                        $decoded = json_decode($decoded, true);
+                    }
+                    $configuration = is_array($decoded) ? $decoded : [];
+                }
                 if (!is_array($configuration)) {
                     $configuration = [];
                 }
