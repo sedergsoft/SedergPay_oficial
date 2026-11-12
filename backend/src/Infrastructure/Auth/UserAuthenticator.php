@@ -17,7 +17,12 @@ final class UserAuthenticator
 
     public function userId(): int
     {
-        if (getenv('SEDERG_AUTH_MODE') === 'development') {
+        $authMode = getenv('SEDERG_AUTH_MODE');
+        if ($authMode === 'development') {
+            $allowHeaderAuth = getenv('SEDERG_ALLOW_DEV_HEADER_AUTH');
+            if ($allowHeaderAuth !== '1') {
+                throw new ForbiddenHttpException('Development header authentication is disabled');
+            }
             $publicId = trim((string) Yii::$app->request->headers->get('X-User-Public-Id', ''));
             if ($publicId === '') {
                 throw new ForbiddenHttpException('Development identity is required');
@@ -27,6 +32,11 @@ final class UserAuthenticator
                 throw new ForbiddenHttpException('Authenticated user was not found');
             }
             return $id;
+        }
+
+        // Fail closed: only the OIDC bearer-token path is accepted outside development mode.
+        if ($authMode !== 'production') {
+            throw new ForbiddenHttpException('Unsupported authentication mode');
         }
 
         $claims = $this->verifyBearerToken();
