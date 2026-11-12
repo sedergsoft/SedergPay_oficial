@@ -1175,18 +1175,29 @@ function FundingMethodConfiguration({ userId, method, run, onSaved }: { userId: 
   const configuration = (method.configuration ?? {}) as Record<string, any>;
   const [payeePhone, setPayeePhone] = useState(String(configuration.payee_phone ?? ''));
   const [accountNumber, setAccountNumber] = useState(String(configuration.account_number ?? ''));
-  const [purpose, setPurpose] = useState(String(configuration.purpose ?? 'Fondeo SEDERG PAY'));
+  const [purpose, setPurpose] = useState(String(configuration.purpose ?? 'Fondeo SEDERG_PAY'));
+
+  useEffect(() => {
+    const cfg = (method.configuration ?? {}) as Record<string, any>;
+    setPayeePhone(String(cfg.payee_phone ?? ''));
+    setAccountNumber(String(cfg.account_number ?? ''));
+    setPurpose(String(cfg.purpose ?? 'Fondeo SEDERG_PAY'));
+  }, [method.code, method.configuration]);
+
   const save = () => void run(async () => {
+    const base = (method.configuration ?? {}) as Record<string, any>;
     await api.updateFundingMethod(userId, method.code, Boolean(method.is_active), {
+      ...base,
       payee_phone: payeePhone.trim(),
       account_number: accountNumber.trim(),
       purpose: purpose.trim(),
     });
+    notifySuccess('Configuración guardada correctamente.');
     onSaved();
   });
   return <section className="card"><div className="section-heading"><div><h3>{method.name}</h3><p className="muted">Configuración del método de pago (SBP C2P · QR persona a persona).</p></div></div>
   <div className="funding-account-form"><label className="funding-full">Teléfono del beneficiario (dígitos)</label><input value={payeePhone} onChange={(event) => setPayeePhone(event.target.value)} placeholder="79001234567" /><label className="funding-full">Número de cuenta del beneficiario</label><input value={accountNumber} onChange={(event) => setAccountNumber(event.target.value)} placeholder="Opcional" /><label className="funding-full">Finalidad del pago</label><input value={purpose} onChange={(event) => setPurpose(event.target.value)} /></div>
-  <button className="secondary compact-button" onClick={() => void save()}>Guardar configuración</button>
+  <button className="secondary compact-button" onClick={save}>Guardar configuración</button>
   </section>;
 }
 
@@ -1213,12 +1224,13 @@ function AdminFundingPanel({ userId, run }: { userId: string; run: (action: () =
     try{
       await api.createFundingAccount(userId,{country_code:country,currency_code:currency,bank_code:bankCode,bank_name:bankName,account_holder_name:'SEDERG_PAY',legal_entity_name:legalEntityName||null,account_identifier:accountIdentifier,routing_identifier:routingIdentifier,environment:'sandbox',status:'active',methods:selectedMethods,notes});
       setAccountIdentifier('');setRoutingIdentifier('');setLegalEntityName('');setNotes('');setSelectedMethods([]);
+      notifySuccess('Cuenta receptora guardada correctamente.');
       await reload();
     }finally{setSaving(false);}
   });
   return <div className="feature-view"><div className="view-heading"><div><span className="eyebrow">Administración financiera</span><h2>Métodos de pago y cuentas receptoras</h2><p className="muted">Las cuentas registradas pertenecen a SEDERG_PAY. Sberbank, VTB y Alfa-Bank son candidatos documentados en Rusia, no integraciones contratadas. En esta fase solo se habilita sandbox.</p></div><span className="status-pill status-info">SANDBOX</span></div>
   <section className="card"><div className="section-heading"><div><h3>Catálogo de métodos de fondeo</h3><p className="muted">Independiente de los métodos de desembolso al beneficiario.</p></div></div>
-  {methods.map(method=><div className="funding-method-row" key={method.code}><div><strong>{method.name}</strong><small>{method.country_code} · {method.currency_code} · {method.method_type} · {method.code}</small></div><label className="switch-label"><input type="checkbox" checked={Boolean(method.is_active)} onChange={e=>void run(async()=>{await api.updateFundingMethod(userId,method.code,e.target.checked,method.configuration ?? undefined);await reload();})}/> Activo</label></div>)}</section>
+  {methods.map(method=><div className="funding-method-row" key={method.code}><div><strong>{method.name}</strong><small>{method.country_code} · {method.currency_code} · {method.method_type} · {method.code}</small></div><label className="switch-label"><input type="checkbox" checked={Boolean(method.is_active)} onChange={e=>void run(async()=>{await api.updateFundingMethod(userId,method.code,e.target.checked,method.configuration ?? undefined);notifySuccess(e.target.checked ? 'Método de pago activado.' : 'Método de pago desactivado.');await reload();})}/> Activo</label></div>)}</section>
   {methods.filter(method=>method.code==='ru_sbp_c2p').map(method=><FundingMethodConfiguration key={method.code} userId={userId} method={method} run={run} onSaved={reload} />)}
   <section className="card"><div className="section-heading"><div><h3>Registrar cuenta receptora</h3><p className="muted">El número se cifra antes de almacenarse; solo se muestra enmascarado después del alta.</p></div></div>
   <form className="funding-account-form" onSubmit={e=>{e.preventDefault();create();}}>
@@ -1235,6 +1247,6 @@ function AdminFundingPanel({ userId, run }: { userId: string; run: (action: () =
     <button type="submit" disabled={saving||!accountIdentifier||!selectedMethods.length}>{saving?'Guardando…':'Guardar cuenta sandbox'}</button>
   </form></section>
   <section className="card"><div className="section-heading"><div><h3>Cuentas receptoras registradas</h3><p className="muted">Para cambiar de cuenta, registra la nueva y desactiva la anterior. Los depósitos existentes conservan su fotografía original.</p></div></div>
-  {accounts.length===0?<p className="muted">Todavía no hay cuentas configuradas.</p>:accounts.map(account=><article className="funding-account-row" key={account.public_id}><div><strong>{account.bank_name} · {account.country_code}/{account.currency_code}</strong><small>Titular: {account.account_holder_name} · Cuenta {account.account_mask}{account.routing_mask ? ` · BIC/ruta ${account.routing_mask}` : ''}</small><small>Métodos: {account.methods||'—'} · {account.environment}</small></div><div><span className={account.status==='active'?'status-pill status-success':'status-pill status-muted'}>{account.status}</span><button className="secondary compact-button" onClick={()=>void run(async()=>{await api.updateFundingAccount(userId,account.public_id,account.status==='active'?'inactive':'active');await reload();})}>{account.status==='active'?'Desactivar':'Activar'}</button></div></article>)}</section>
+  {accounts.length===0?<p className="muted">Todavía no hay cuentas configuradas.</p>:accounts.map(account=><article className="funding-account-row" key={account.public_id}><div><strong>{account.bank_name} · {account.country_code}/{account.currency_code}</strong><small>Titular: {account.account_holder_name} · Cuenta {account.account_mask}{account.routing_mask ? ` · BIC/ruta ${account.routing_mask}` : ''}</small><small>Métodos: {account.methods||'—'} · {account.environment}</small></div><div><span className={account.status==='active'?'status-pill status-success':'status-pill status-muted'}>{account.status}</span><button className="secondary compact-button" onClick={()=>void run(async()=>{const nextStatus=account.status==='active'?'inactive':'active';await api.updateFundingAccount(userId,account.public_id,nextStatus);notifySuccess(nextStatus==='active'?'Cuenta receptora activada.':'Cuenta receptora desactivada.');await reload();})}>{account.status==='active'?'Desactivar':'Activar'}</button></div></article>)}</section>
   </div>;
 }
