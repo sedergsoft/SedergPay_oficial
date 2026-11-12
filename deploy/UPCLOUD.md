@@ -452,6 +452,10 @@ https://app.brevo.com/security/authorised_ips","code":"unauthorized"}
 Solución: en <https://app.brevo.com/security/authorised_ips> añadir la IP pública del
 servidor (`5.22.219.30`) — o borrar la lista para permitir cualquier origen.
 
+> **Estado real verificado el 2026-11-12**: la IP `5.22.219.30` ya está autorizada
+> y la API de Brevo responde `HTTP 201` con `messageId`. Los correos de KYC salen
+> de verdad (verificado en `runtime/logs/mail-dev.log` con `enviado=si`).
+
 > Las **claves SMTP** (`xsmtpsib-…`) no tienen esa restricción, pero no sirven para la
 > API y el servidor no puede usarlas porque UpCloud bloquea el egress SMTP.
 >
@@ -511,12 +515,13 @@ Docker Desktop no aplica: aquí es Docker Engine nativo.
    y tamaño idéntico al original).
 8. **Aviso por correo de los cambios de estado KYC**: el cliente recibe un
    correo al enviar su expediente a revisión (`pending_review`) y en cada
-   decisión del administrador (`approved`, `rejected`, `requires_action`).
+   decisión del administrador (`approved`, `rejected`, `requires_action`);
+   los administradores reciben un aviso cuando entra un expediente nuevo.
    El envío usa el transportista configurado (Brevo por API) y **nunca** rompe
    el flujo: si el correo falla, el cambio de estado se aplica igual y el
    error queda registrado en `runtime/logs/mail-dev.log`.
-   Pendiente: autorizar la IP de salida en Brevo (§8.1) para que el correo
-   llegue de verdad.
+   Verificado el 2026-11-12: envío real con `enviado=si` (la IP ya está
+   autorizada en Brevo, §8.1).
 
 ---
 
