@@ -12,6 +12,8 @@ use Yii;
 use yii\filters\ContentNegotiator;
 use yii\web\BadRequestHttpException;
 use yii\web\Controller;
+use yii\web\ForbiddenHttpException;
+use yii\web\NotFoundHttpException;
 use yii\web\UnprocessableEntityHttpException;
 use yii\web\Response;
 use yii\db\JsonExpression;
