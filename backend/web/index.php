@@ -32,10 +32,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 $config = require dirname(__DIR__) . '/config/web.php';
 $config['components']['response']['on beforeSend'] = static function (yii\base\Event $event) use ($origin, $allowedOrigins): void {
+    $headers = $event->sender->headers;
+    $headers->set('Cache-Control', 'no-store');
+    $headers->set('Pragma', 'no-cache');
+    $headers->set('X-Content-Type-Options', 'nosniff');
+    $headers->set('X-Frame-Options', 'DENY');
+    $headers->set('Referrer-Policy', 'no-referrer');
     if ($origin !== '' && in_array($origin, $allowedOrigins, true)) {
-        $event->sender->headers->set('Access-Control-Allow-Origin', $origin);
-        $event->sender->headers->set('Vary', 'Origin');
-        $event->sender->headers->set('Access-Control-Allow-Credentials', 'false');
+        $headers->set('Access-Control-Allow-Origin', $origin);
+        $headers->set('Vary', 'Origin');
+        $headers->set('Access-Control-Allow-Credentials', 'false');
     }
 };
 try {
