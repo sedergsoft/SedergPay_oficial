@@ -58,12 +58,25 @@ final class FundingController extends Controller
     public function actionAdminMethods(): array
     {
         $this->requireAdmin();
-        return ['methods' => Yii::$app->db->createCommand(
+        $rows = Yii::$app->db->createCommand(
             'SELECT m.code,m.name,m.method_type,m.provider_code,m.supports_dynamic_qr,m.requires_reference,m.is_active,
                     c.iso2 AS country_code,m.currency_code,m.configuration
              FROM {{%funding_payment_methods}} m
              INNER JOIN {{%countries}} c ON c.id=m.country_id ORDER BY c.iso2,m.name'
-        )->queryAll()];
+        )->queryAll();
+        foreach ($rows as &$row) {
+            if (array_key_exists('configuration', $row)) {
+                $cfg = $row['configuration'];
+                if (is_string($cfg) && $cfg !== '') {
+                    $decoded = json_decode($cfg, true);
+                    $row['configuration'] = is_array($decoded) ? $decoded : $cfg;
+                } elseif ($cfg === null) {
+                    $row['configuration'] = null;
+                }
+            }
+        }
+        unset($row);
+        return ['methods' => $rows];
     }
 
     public function actionAdminUpdateMethod(string $code): array
