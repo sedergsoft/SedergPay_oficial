@@ -509,6 +509,14 @@ Docker Desktop no aplica: aquí es Docker Engine nativo.
    debe volver a subirlos. A partir de esa fecha quedan persistidos en el
    volumen y la descarga funciona (verificado E2E: HTTP 200 con `image/jpeg`
    y tamaño idéntico al original).
+8. **Aviso por correo de los cambios de estado KYC**: el cliente recibe un
+   correo al enviar su expediente a revisión (`pending_review`) y en cada
+   decisión del administrador (`approved`, `rejected`, `requires_action`).
+   El envío usa el transportista configurado (Brevo por API) y **nunca** rompe
+   el flujo: si el correo falla, el cambio de estado se aplica igual y el
+   error queda registrado en `runtime/logs/mail-dev.log`.
+   Pendiente: autorizar la IP de salida en Brevo (§8.1) para que el correo
+   llegue de verdad.
 
 ---
 
@@ -523,6 +531,8 @@ Docker Desktop no aplica: aquí es Docker Engine nativo.
 | OOM al arrancar ClamAV | RAM insuficiente | plan de 4 GB o swap de 2 GB |
 | `no space left on device` | imágenes y volúmenes | `docker system prune -af --volumes` (¡ojo con datos!) |
 | Frontend con error CORS | origen distinto al declarado | `SEDERG_CORS_ORIGINS` debe ser el origen exacto, sin `/` final |
+| "A valid document upload is required" al subir un KYC | PHP `upload_max_filesize` (2 M por defecto) más pequeño que el límite de la app (5 MB) | `backend/docker/php/app.ini` fija 6 M; comprobar `docker exec sederg-pay-backend-1 php -r 'echo ini_get("upload_max_filesize");'` |
+| La subida KYC devuelve HTML en vez de JSON | el cuerpo supera `post_max_size`: PHP avisa por pantalla y rompe las cabeceras CORS | `post_max_size = 10M` y `display_errors = Off` en `app.ini` (requiere reconstruir la imagen: `docker compose build backend`) |
 
 ---
 
