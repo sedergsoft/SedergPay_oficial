@@ -8,7 +8,7 @@ services:
       SEDERG_PRIVATE_STORAGE_PATH: /var/lib/sederg-private
       SEDERG_KYC_REQUIRED: ${SEDERG_KYC_REQUIRED:-1}
     ports: !reset []
-    volumes: !reset
+    volumes: !override
       - sederg_private_data:/var/lib/sederg-private
     healthcheck:
       test: ["CMD", "php", "-r", "exit(@file_get_contents('http://127.0.0.1:8080/health') ? 0 : 1);"]
