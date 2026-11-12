@@ -77,11 +77,9 @@ echo "=== 10. Toggle con usuario no admin debe ser 403 ==="
 b3=$(curl -sS -m 20 -w 'HTTP_CODE:%{http_code}' -X PUT -H "Content-Type: application/json" -H "X-User-Public-Id: $CUSTOMER_PUBLIC_ID" "$BASE/api/v1/admin/users/$CUSTOMER_PUBLIC_ID/toggle")
 check_status "user-toggle-forbidden" 403 'error\|Forbidden\|403' "$b3"
 
-echo "=== 11. Toggle de admin protegido (desde otro admin no disponible; auto-toggle) ==="
+echo "=== 11. Toggle sobre una cuenta ADMIN debe ser 403 (protegida) ==="
 b4=$(curl -sS -m 20 -w 'HTTP_CODE:%{http_code}' -X PUT "${AUTH[@]}" "$BASE/api/v1/admin/users/$ADMIN_PUBLIC_ID/toggle")
-check_status "user-toggle-admin-suspend" 200 '"status":"suspended"' "$b4"
-b5=$(curl -sS -m 20 -w 'HTTP_CODE:%{http_code}' -X PUT "${AUTH[@]}" "$BASE/api/v1/admin/users/$ADMIN_PUBLIC_ID/toggle")
-check_status "user-toggle-admin-reactivate" 200 '"status":"active"' "$b5"
+check_status "user-toggle-admin-protected" 403 'administrator\|Forbidden\|403' "$b4"
 
 echo ""
 echo "=== RESULTADO: $pass PASS / $fail FAIL ==="
