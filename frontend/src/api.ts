@@ -112,6 +112,7 @@ export type Remittance = {
   payment_qr_payload?: string | null;
   payment_qr_type?: string | null;
   payment_method_code?: string | null;
+  payee_phone?: string | null;
   deposit_public_id?: string | null;
   deposit_status?: string | null;
   payment_reference?: string | null;
@@ -383,10 +384,10 @@ export const api = {
     headers: { ...authHeaders(userId), 'Idempotency-Key': `remittance-${crypto.randomUUID()}` },
     body: JSON.stringify(body),
   }),
-  deposit: (userId: string, remittanceId: string, methodCode: string) => request<{ public_id: string; payment_reference: string; qr_payload: string | null; qr_type: string; provider_payment_id?: string | null; account_mask: string; bank_name: string }>('/api/v1/remittances/' + remittanceId + '/deposit', {
+  deposit: (userId: string, remittanceId: string, methodCode: string, options?: { payeePhoneE164?: string; purpose?: string }) => request<{ public_id: string; payment_reference: string; qr_payload: string | null; qr_type: string; provider_payment_id?: string | null; account_mask: string; bank_name: string }>('/api/v1/remittances/' + remittanceId + '/deposit', {
     method: 'POST',
     headers: { ...authHeaders(userId), 'Idempotency-Key': `deposit-${remittanceId}` },
-    body: JSON.stringify({ method_code: methodCode }),
+    body: JSON.stringify({ method_code: methodCode, ...(options?.payeePhoneE164 ? { payee_phone_e164: options.payeePhoneE164 } : {}), ...(options?.purpose ? { purpose: options.purpose } : {}) }),
   }),
   confirmDeposit: (userId: string, depositId: string) => request(`/api/v1/deposits/${depositId}/simulate-confirmation`, {
     method: 'POST', headers: authHeaders(userId), body: '{}',

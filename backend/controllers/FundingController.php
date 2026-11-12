@@ -267,6 +267,7 @@ final class FundingController extends Controller
         $qrPayload = null;
         $qrType = 'none';
         $providerPaymentId = null;
+        $payeePhone = '';
         if (filter_var($account['supports_dynamic_qr'], FILTER_VALIDATE_BOOLEAN) && $account['method_type'] === 'instant_qr') {
             if ($account['provider_code'] === 'sbp_c2b_sandbox') {
                 $issued = (new FundingPaymentProviderFactory())->create((string) $account['provider_code'], (string) $account['environment'])->createDynamicQr(
@@ -279,6 +280,24 @@ final class FundingController extends Controller
                 $qrPayload = $issued['payload'];
                 $providerPaymentId = $issued['provider_payment_id'];
                 $qrType = 'sbp_c2b_sandbox';
+            } elseif ($account['provider_code'] === 'sbp_c2p_sandbox') {
+                $payeePhone = (string) preg_replace('/\D/', '', (string) ($p['payee_phone_e164'] ?? ''));
+                $purpose = trim((string) ($p['purpose'] ?? ''));
+                if ($payeePhone === '') {
+                    throw new UnprocessableEntityHttpException('payee_phone_e164 is required for SBP person-to-person instructions');
+                }
+                $issued = (new FundingPaymentProviderFactory())->createPersonalQr('sbp_c2p_sandbox', 'sandbox')->createPersonalQr(
+                    (string) $remittance['total_debit_amount'],
+                    (string) $remittance['send_currency'],
+                    $reference,
+                    $expires,
+                    'SEDERG_PAY',
+                    $payeePhone,
+                    $purpose
+                );
+                $qrPayload = $issued['payload'];
+                $providerPaymentId = $issued['provider_payment_id'];
+                $qrType = 'sbp_c2p_sandbox';
             } else {
                 $qrPayload = 'sedergpay-sandbox://cuba-instant-qr?reference=' . rawurlencode($reference)
                     . '&amount=' . rawurlencode((string) $remittance['total_debit_amount'])
@@ -293,6 +312,7 @@ final class FundingController extends Controller
             'currency_code' => $remittance['send_currency'], 'amount' => $remittance['total_debit_amount'],
             'method_code' => $methodCode, 'method_name' => $account['name'], 'reference' => $reference,
             'environment' => 'sandbox', 'qr_type' => $qrType, 'provider_payment_id' => $providerPaymentId,
+            'payee_phone' => $account['provider_code'] === 'sbp_c2p_sandbox' ? $payeePhone : null,
         ];
         $response = [
             'public_id' => $depositId, 'provider' => 'simulator', 'status' => 'pending',
@@ -301,6 +321,7 @@ final class FundingController extends Controller
             'method_code' => $methodCode, 'method_name' => $account['name'], 'bank_name' => $account['bank_name'],
             'account_holder_name' => 'SEDERG_PAY', 'account_mask' => $account['account_mask'], 'routing_mask' => $account['routing_mask'],
             'qr_payload' => $qrPayload, 'qr_type' => $qrType, 'provider_payment_id' => $providerPaymentId,
+            'payee_phone' => $account['provider_code'] === 'sbp_c2p_sandbox' ? $payeePhone : null,
         ];
         $tx = $db->beginTransaction();
         try {

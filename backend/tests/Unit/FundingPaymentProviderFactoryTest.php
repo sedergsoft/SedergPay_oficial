@@ -6,6 +6,7 @@ namespace tests\Unit;
 
 use app\Infrastructure\Payment\FundingPaymentProviderFactory;
 use app\Infrastructure\Payment\GenericSandboxQrProvider;
+use app\Infrastructure\Payment\SbpPersonalQrProvider;
 use app\Infrastructure\Payment\SbpSandboxQrProvider;
 use DomainException;
 use PHPUnit\Framework\TestCase;
@@ -17,6 +18,24 @@ final class FundingPaymentProviderFactoryTest extends TestCase
         $factory = new FundingPaymentProviderFactory();
         self::assertInstanceOf(SbpSandboxQrProvider::class, $factory->create('sbp_c2b_sandbox', 'sandbox'));
         self::assertInstanceOf(GenericSandboxQrProvider::class, $factory->create('sedergpay_sandbox', 'sandbox'));
+    }
+
+    public function testResolvesSbpPersonToPersonSandboxProvider(): void
+    {
+        $factory = new FundingPaymentProviderFactory();
+        self::assertInstanceOf(SbpPersonalQrProvider::class, $factory->createPersonalQr('sbp_c2p_sandbox', 'sandbox'));
+    }
+
+    public function testRejectsProductionForPersonalProvider(): void
+    {
+        $this->expectException(DomainException::class);
+        (new FundingPaymentProviderFactory())->createPersonalQr('sbp_c2p_sandbox', 'production');
+    }
+
+    public function testRejectsUnknownPersonalProvider(): void
+    {
+        $this->expectException(DomainException::class);
+        (new FundingPaymentProviderFactory())->createPersonalQr('unknown', 'sandbox');
     }
 
     public function testRejectsProductionUntilContractAdapterExists(): void

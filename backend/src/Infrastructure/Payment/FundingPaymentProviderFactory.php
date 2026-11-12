@@ -21,4 +21,16 @@ final class FundingPaymentProviderFactory
             default => throw new DomainException('Unsupported or unconfigured funding provider'),
         };
     }
+
+    public function createPersonalQr(string $providerCode, string $environment): PersonalQrProvider
+    {
+        if ($environment !== 'sandbox') {
+            throw new DomainException('Production payment providers are not configured until the bank contract is validated');
+        }
+
+        return match ($providerCode) {
+            'sbp_c2p_sandbox' => new SbpPersonalQrProvider(),
+            default => throw new DomainException('Unsupported or unconfigured funding provider'),
+        };
+    }
 }
