@@ -26,4 +26,6 @@
 <symbol id="delete" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 14h10l1-14M9 7V4h6v3"/></symbol>
 <symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
 <symbol id="close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+<symbol id="download" viewBox="0 0 24 24"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 21h16"/></symbol>
+<symbol id="power" viewBox="0 0 24 24"><path d="M12 3v9M6.3 6.6a8 8 0 1 0 11.4 0"/></symbol>
 </svg>

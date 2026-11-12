@@ -923,3 +923,16 @@ td,th { border-bottom:1px solid #E5EDF5; }
 .detail-row:last-child { border-bottom: none; }
 .detail-label { color: var(--ink-400); font-size: .78rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
 .detail-value { color: var(--ink-700); font-size: .92rem; text-align: right; overflow-wrap: anywhere; }
+
+/* --- Admin: filtros por columna (estilo GridView de kartik-v) --- */
+.filter-row th { padding: 2px 6px 10px; }
+.table-filter-input { width: 100%; min-width: 70px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-1); color: var(--ink-700); font: inherit; font-size: .8rem; }
+.table-filter-input:focus { outline: 2px solid var(--indigo-200, #b8c2ff); outline-offset: 1px; border-color: var(--indigo-300, #93a3ff); }
+.table-filter-input::placeholder { color: var(--ink-400); }
+
+/* --- Admin: modo de botones (texto / iconos) --- */
+.button-mode-toggle { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 14px 0; margin-bottom: 6px; border-top: 1px dashed var(--line); }
+.button-mode-toggle label { color: var(--ink-400); font-size: .78rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.button-mode-toggle select { max-width: 260px; }
+.button-mode-toggle .muted { flex-basis: 100%; margin: 0; font-size: .8rem; }
+.action-button-icon { width: 16px; height: 16px; display: block; }
