@@ -14,6 +14,7 @@ use yii\web\Controller;
 use yii\web\ForbiddenHttpException;
 use yii\web\NotFoundHttpException;
 use yii\web\Response;
+use yii\web\TooManyRequestsHttpException;
 use yii\web\UnprocessableEntityHttpException;
 
 final class PaymentController extends Controller
@@ -28,8 +29,26 @@ final class PaymentController extends Controller
         ]];
     }
 
+    private function throttle(string $action, int $limit, int $windowSeconds): void
+    {
+        $ip = (string) (Yii::$app->request->userIP ?? 'unknown');
+        $key = 'throttle:' . $action . ':' . hash('sha256', $ip);
+        $cache = Yii::$app->cache;
+        $entry = $cache->get($key);
+        $count = 1;
+        if (is_array($entry) && isset($entry['count'], $entry['reset']) && (int) $entry['reset'] > time()) {
+            $count = (int) $entry['count'] + 1;
+            $windowSeconds = max(1, (int) $entry['reset'] - time());
+        }
+        $cache->set($key, ['count' => $count, 'reset' => time() + $windowSeconds], $windowSeconds);
+        if ($count > $limit) {
+            throw new TooManyRequestsHttpException(60, 'Too many attempts. Please try again later.');
+        }
+    }
+
     public function actionCreateDeposit(string $publicId): array
     {
+        $this->throttle('sim-deposit-create', 30, 600);
         $userId = $this->authenticatedUserId();
         $request = Yii::$app->request;
         $key = trim((string) $request->headers->get('Idempotency-Key', ''));
@@ -87,6 +106,7 @@ final class PaymentController extends Controller
 
     public function actionSimulateConfirm(string $publicId): array
     {
+        $this->throttle('sim-deposit-confirm', 30, 600);
         if (getenv('SEDERG_AUTH_MODE') !== 'development') {
             throw new ForbiddenHttpException('Simulated payment confirmation is available only in development/sandbox.');
         }

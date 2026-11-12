@@ -12,7 +12,7 @@ services:
       SEDERG_DB_DSN: ${SEDERG_DB_DSN:-pgsql:host=postgres;port=5432;dbname=sederg_pay}
       SEDERG_DB_USER: ${SEDERG_DB_USER:-sederg_app}
       SEDERG_DB_PASSWORD: ${SEDERG_DB_PASSWORD:?SEDERG_DB_PASSWORD is required}
-      SEDERG_AUTH_MODE: ${SEDERG_AUTH_MODE:-development}
+      SEDERG_AUTH_MODE: ${SEDERG_AUTH_MODE:-production}
       SEDERG_EXPOSE_AUTH_STATE: ${SEDERG_EXPOSE_AUTH_STATE:-0}
       SEDERG_COOKIE_KEY: ${SEDERG_COOKIE_KEY:?SEDERG_COOKIE_KEY is required}
       SEDERG_DEBUG: ${SEDERG_DEBUG:-0}

@@ -11,6 +11,7 @@ use yii\web\BadRequestHttpException;
 use yii\web\Controller;
 use yii\web\NotFoundHttpException;
 use yii\web\Response;
+use yii\web\TooManyRequestsHttpException;
 use yii\web\UnprocessableEntityHttpException;
 
 final class ProfileController extends Controller
@@ -19,6 +20,23 @@ final class ProfileController extends Controller
     public function behaviors(): array
     {
         return ['contentNegotiator' => ['class' => ContentNegotiator::class, 'formats' => ['application/json' => Response::FORMAT_JSON]]];
+    }
+
+    private function throttle(string $action, int $limit, int $windowSeconds): void
+    {
+        $ip = (string) (Yii::$app->request->userIP ?? 'unknown');
+        $key = 'throttle:' . $action . ':' . hash('sha256', $ip);
+        $cache = Yii::$app->cache;
+        $entry = $cache->get($key);
+        $count = 1;
+        if (is_array($entry) && isset($entry['count'], $entry['reset']) && (int) $entry['reset'] > time()) {
+            $count = (int) $entry['count'] + 1;
+            $windowSeconds = max(1, (int) $entry['reset'] - time());
+        }
+        $cache->set($key, ['count' => $count, 'reset' => time() + $windowSeconds], $windowSeconds);
+        if ($count > $limit) {
+            throw new TooManyRequestsHttpException(60, 'Too many attempts. Please try again later.');
+        }
     }
 
     public function actionView(): array
@@ -42,6 +60,7 @@ final class ProfileController extends Controller
 
     public function actionUpdate(): array
     {
+        $this->throttle('profile-update', 20, 600);
         $userId = (new UserAuthenticator(Yii::$app->db))->userId();
         $p = Yii::$app->request->bodyParams;
         if (!is_array($p)) {
