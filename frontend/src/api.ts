@@ -299,7 +299,17 @@ export const api = {
   submitKyc: (userId: string) => request<KycCase>('/api/v1/kyc/submit', { method: 'POST', headers: authHeaders(userId), body: '{}' }),
   uploadKycDocument: async (userId: string, file: File, documentType: string) => { const form = new FormData(); form.append('file', file); form.append('document_type', documentType); const headers = authHeaders(userId); const response = await fetch(`${apiBase}/api/v1/kyc/documents`, { method: 'POST', headers, body: form }); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.message ?? `HTTP ${response.status}`); return body; },
   adminKycDocuments: (userId: string, publicId: string) => request<{ documents: Array<{ public_id: string; document_type: string; original_name: string; mime_type: string; file_size: number }> }>('/api/v1/admin/kyc/' + publicId + '/documents', { headers: authHeaders(userId) }),
-  downloadKycDocument: async (userId: string, publicId: string) => { const response = await fetch(apiBase + '/api/v1/admin/kyc/documents/' + publicId, { headers: authHeaders(userId) }); if (!response.ok) throw new Error('No se pudo descargar el documento KYC'); return await response.blob(); },
+  downloadKycDocument: async (userId: string, publicId: string) => {
+    const response = await fetch(apiBase + '/api/v1/admin/kyc/documents/' + publicId, { headers: authHeaders(userId) });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({} as { message?: string }));
+      const reason = body.message ?? `HTTP ${response.status}`;
+      throw new Error(reason === 'KYC file is unavailable'
+        ? 'El archivo ya no está disponible en el servidor (documento antiguo no almacenado). El cliente debe volver a subirlo.'
+        : `No se pudo descargar el documento KYC: ${reason}`);
+    }
+    return await response.blob();
+  },
   adminKyc: (userId: string) => request<{ cases: AdminKycCase[] }>('/api/v1/admin/kyc', { headers: authHeaders(userId) }),
   reviewKyc: (userId: string, publicId: string, decision: 'approved' | 'rejected' | 'more_information', reason: string) => request<KycCase>(`/api/v1/admin/kyc/${publicId}/review`, { method: 'POST', headers: authHeaders(userId), body: JSON.stringify({ decision, reason }) }),
   beneficiaries: (userId: string) => request<Beneficiary[]>('/api/v1/beneficiaries', {
