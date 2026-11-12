@@ -360,6 +360,9 @@ final class AdminController extends Controller
         if ($user === false) {
             throw new NotFoundHttpException('User not found');
         }
+        if (($user['role'] ?? '') === 'admin') {
+            throw new ForbiddenHttpException('Cannot change the status of an administrator account');
+        }
 
         $newStatus = ($user['status'] === 'active') ? 'suspended' : 'active';
         Yii::$app->db->createCommand()
