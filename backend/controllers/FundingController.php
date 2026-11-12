@@ -69,6 +69,10 @@ final class FundingController extends Controller
                 $cfg = $row['configuration'];
                 if (is_string($cfg) && $cfg !== '') {
                     $decoded = json_decode($cfg, true);
+                    if (is_string($decoded)) {
+                        $decoded2 = json_decode($decoded, true);
+                        $decoded = is_array($decoded2) ? $decoded2 : $decoded;
+                    }
                     $row['configuration'] = is_array($decoded) ? $decoded : $cfg;
                 } elseif ($cfg === null) {
                     $row['configuration'] = null;
