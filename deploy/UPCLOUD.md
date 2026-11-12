@@ -371,6 +371,18 @@ SEDERG_MAIL_FROM_NAME=SEDERG_PAY
 > `401 {"message":"Key not found"}`. Hay que crear una *API key* en
 > *Brevo → SMTP & API → API Keys*.
 
+> **Estado real (2026-11-12):** el servidor ya envía con
+> `SEDERG_MAIL_TRANSPORT=api` (HTTPS por el puerto 443, puertos SMTP bloqueados
+> por UpCloud *trial*). Falta únicamente autorizar la IP `5.22.219.30` en
+> <https://app.brevo.com/security/authorised_ips>; mientras tanto Brevo rechaza
+> el envío con `unauthorized` y el backend registra el error sin romperse.
+>
+> **Logo en los correos:** los PNG de marca viven en
+> `backend/resources/brand/` (versionados en Git) y `VerificationMailer`
+> los incrusta como *data URI* (`data:image/png;base64,…`, 46 998 bytes),
+> de modo que el logo se ve en todos los clientes de correo sin alojamiento
+> externo ni ficheros CID.
+
 ### Comprobación
 
 ```bash
@@ -557,8 +569,9 @@ Secrets → DEPLOY_ENV*.
    otro con permisos mínimos.
 2. **El servidor está en modo sandbox**: `SEDERG_AUTH_MODE=development` permite
    actuar como cualquier usuario conocidas su `public_id`; `SEDERG_KYC_REQUIRED=0`
-   desactiva el escaneo obligatorio; los correos no se envían (van al log).
-   Es válido para una demo, **no** para operar dinero real.
+   desactiva el escaneo obligatorio. Los correos sí se configuran vía API de
+   Brevo (§8.1) pero requieren autorizar la IP del servidor. Es válido para una
+   demo, **no** para operar dinero real.
 3. **SSH abierto a Internet** (puerto 22) con autenticación por clave. Restringe
    el origen en el firewall de UpCloud o en `ufw` cuando tengas la IP fija.
 4. **El plan STARTER-1xCPU-4GB no tiene backups incluidos**: activa *Simple
