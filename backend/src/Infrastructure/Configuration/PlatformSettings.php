@@ -55,6 +55,11 @@ final class PlatformSettings
                 'type' => 'integer', 'default' => '30', 'min' => '5', 'max' => '1440',
                 'label' => 'Expiración del enlace de verificación (minutos)', 'category' => 'security',
             ],
+            'appearance.theme' => [
+                'type' => 'enum', 'default' => 'light',
+                'options' => ['light', 'dark', 'aurora', 'aurora-dark'],
+                'label' => 'Tema visual de la plataforma', 'category' => 'appearance',
+            ],
         ];
     }
 

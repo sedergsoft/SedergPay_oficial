@@ -220,7 +220,7 @@ export type PlatformSetting = {
   type: 'decimal' | 'integer' | 'boolean' | 'enum';
   options?: string[] | null;
   label: string;
-  category: 'pricing' | 'operations' | 'security';
+  category: 'pricing' | 'operations' | 'security' | 'appearance';
   updated_at: string | null;
 };
 
@@ -362,6 +362,7 @@ export const api = {
     body: JSON.stringify({ settings }),
   }),
   currentExchangeRate: (base = 'RUB', quote = 'CUP') => request<ExchangeRate>(`/api/v1/exchange-rates/current?base=${base}&quote=${quote}`),
+  platformAppearance: () => request<{ theme: string }>('/api/v1/platform/appearance'),
   bothExchangeRates: () => Promise.all([
     request<ExchangeRate>('/api/v1/exchange-rates/current?base=RUB&quote=CUP'),
     request<ExchangeRate>('/api/v1/exchange-rates/current?base=CUP&quote=RUB'),

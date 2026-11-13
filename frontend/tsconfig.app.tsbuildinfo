@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/toasthost.tsx","./src/api.ts","./src/buttonmode.ts","./src/i18n.ts","./src/icons.tsx","./src/main.tsx","./src/toast.ts","./src/vite-env.d.ts"],"version":"5.9.3"}
+{"root":["./src/app.tsx","./src/toasthost.tsx","./src/api.ts","./src/buttonmode.ts","./src/i18n.ts","./src/icons.tsx","./src/main.tsx","./src/theme.ts","./src/toast.ts","./src/vite-env.d.ts"],"version":"5.9.3"}

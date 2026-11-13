@@ -9,4 +9,5 @@
 !.env.example
 *.log
 SEDERG_PAY_SVG_Assets.zip
+/9drive/
 .vscode/

@@ -10,6 +10,17 @@
     <meta property="og:description" content="Gestiona tus remesas entre Rusia y Cuba con claridad, seguridad y trazabilidad." />
     <meta property="og:type" content="website" />
     <title>SEDERG_PAY | Remesas sin complicaciones</title>
+    <script>
+      // Aplica el tema antes del primer pintado para evitar el destello de tema.
+      (function () {
+        try {
+          var saved = localStorage.getItem('sederg_theme');
+          if (saved) document.documentElement.setAttribute('data-theme', saved);
+        } catch (error) {
+          /* almacenamiento no disponible */
+        }
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />

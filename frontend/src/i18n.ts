@@ -536,6 +536,24 @@ const extendedMessages: Record<Language, Record<string, string>> = {
     'kyc.noDocuments': 'Todavía no has cargado documentos.',
     'kyc.submitForReview': 'Enviar expediente a revisión',
     'kyc.secureStorage': 'Los archivos se almacenan fuera del directorio público y solo son accesibles para personal autorizado.',
+
+    // Temas de la plataforma
+    'admin.appearance': 'Apariencia',
+    'admin.themes': 'Temas de la plataforma',
+    'admin.themeHint': 'Elige el aspecto visual que verán todas las personas que usen SEDERG_PAY. Se aplica a la página pública, al panel del cliente y a la administración.',
+    'admin.themeSave': 'Aplicar a toda la plataforma',
+    'admin.themeSaved': 'Tema de la plataforma actualizado.',
+    'admin.themeReset': 'Descartar cambios',
+    'admin.themeNote': 'La vista previa se muestra solo en este navegador hasta que pulses «Aplicar a toda la plataforma». Cada persona puede ajustar el modo claro u oscuro con el botón de la cabecera.',
+    'common.saving': 'Guardando…',
+    'theme.option.light': 'Dos orillas',
+    'theme.option.dark': 'Dos orillas oscuro',
+    'theme.option.aurora': 'Aurora',
+    'theme.option.auroraDark': 'Aurora nocturna',
+    'theme.tagline.light': 'Identidad institucional, clara y sobria.',
+    'theme.tagline.dark': 'La misma identidad, con contraste nocturno.',
+    'theme.tagline.aurora': 'Cristal suave, degradados luminosos y aire moderno.',
+    'theme.tagline.auroraDark': 'Cristal nocturno con acentos aurora.',
   },
   ru: {
     'rate.unavailable': 'Курсы валют временно недоступны.',
@@ -886,6 +904,24 @@ const extendedMessages: Record<Language, Record<string, string>> = {
     'security.recoveryCodesHint': 'Сохраните эти коды в надёжном месте. Каждый код можно использовать только один раз.',
     'security.disableHint': 'Чтобы выключить 2FA, подтвердите пароль и код проверки.',
     'security.oidcPasswordNote': 'Пароль управляется настроенным поставщиком удостоверений.',
+
+    // Темы платформы
+    'admin.appearance': 'Оформление',
+    'admin.themes': 'Темы платформы',
+    'admin.themeHint': 'Выберите оформление, которое увидят все пользователи SEDERG_PAY. Оно применяется к публичной странице, кабинету клиента и админ-панели.',
+    'admin.themeSave': 'Применить ко всей платформе',
+    'admin.themeSaved': 'Тема платформы обновлена.',
+    'admin.themeReset': 'Отменить изменения',
+    'admin.themeNote': 'Предпросмотр виден только в этом браузере, пока вы не нажмёте «Применить ко всей платформе». Каждый пользователь может переключить светлый или тёмный режим кнопкой в шапке.',
+    'common.saving': 'Сохранение…',
+    'theme.option.light': 'Два берега',
+    'theme.option.dark': 'Два берега · тёмная',
+    'theme.option.aurora': 'Аврора',
+    'theme.option.auroraDark': 'Ночная аврора',
+    'theme.tagline.light': 'Институциональный стиль: ясный и сдержанный.',
+    'theme.tagline.dark': 'Тот же стиль с ночным контрастом.',
+    'theme.tagline.aurora': 'Мягкое стекло, светящиеся градиенты, современный вид.',
+    'theme.tagline.auroraDark': 'Ночное стекло с акцентами северного сияния.',
   }
 };
 export function translate(language: Language, key: string): string {
