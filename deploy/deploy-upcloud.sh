@@ -69,7 +69,7 @@ rollback() {
   echo "=== DESPLIEGUE FALLIDO: revirtiendo a la imagen anterior ===" >&2
   if docker image inspect "${BACKEND_IMAGE}:rollback" >/dev/null 2>&1; then
     docker tag "${BACKEND_IMAGE}:rollback" "${BACKEND_IMAGE}:latest"
-    "${COMPOSE[@]}" up -d --no-build --force-recreate backend caddy >&2 || true
+    "${COMPOSE[@]}" up -d --no-build --force-recreate backend caddy rate-updater >&2 || true
     sleep 10
     curl -fsS "https://${domain}/health" >&2 || true
     echo "" >&2
@@ -98,8 +98,8 @@ else
   warn "Migraciones omitidas por parámetros del workflow."
 fi
 
-log "Arrancando API + Caddy (con espera de salud)"
-"${COMPOSE[@]}" up -d --build --wait --wait-timeout 300 backend caddy
+log "Arrancando API + Caddy + scheduler de tasas (con espera de salud)"
+"${COMPOSE[@]}" up -d --build --wait --wait-timeout 300 backend caddy rate-updater
 
 log "Esperando /health en https://${domain}/health"
 for i in $(seq 1 "${HEALTH_RETRIES}"); do

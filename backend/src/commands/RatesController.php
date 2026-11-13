@@ -11,7 +11,7 @@ use yii\console\ExitCode;
 
 final class RatesController extends Controller
 {
-    /** Intended to be invoked by system cron every 12 hours. */
+    /** Refresca tasas oficiales (BCC/CBR). Ejecutar cada 6 horas vía scheduler/cron. */
     public function actionUpdate(): int
     {
         try {

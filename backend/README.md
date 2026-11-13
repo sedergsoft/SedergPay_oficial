@@ -104,7 +104,7 @@ El esquema no fuerza un límite fijo de importe por fila porque los límites dep
 - La selección activa se almacena en `platform_settings` como `pricing.exchange_rate_source`: `official` o `admin_override`.
 - La API administrativa `PUT /api/v1/admin/exchange-rate/source` recibe JSON `{"source":"official"}` o `{"source":"admin_override"}`. Requiere rol administrador.
 - Al guardar una tasa manual con `POST /api/v1/admin/exchange-rate`, se activa automáticamente la fuente manual. La tasa oficial queda conservada y puede reactivarse en cualquier momento.
-- El refresco de fuentes oficiales se ejecuta con `php yii rates/update`. Instale en el servidor la tarea cron para ejecutarlo cada 12 horas: `0 */12 * * * cd /ruta/backend && php yii rates/update >> runtime/logs/rates-cron.log 2>&1`. El repositorio incluye el ejemplo en `backend/deploy/sederg-rates.cron`; la tarea debe instalarse en el host que ejecuta el backend.
+- El refresco de fuentes oficiales (BCC, con respaldo CBR) se ejecuta con `php yii rates/update`. En Docker (`docker-compose.yml` / producción) corre automáticamente el servicio `rate-updater` cada 6 horas. Si se opera sin ese servicio, instale en el host la tarea cron cada 6 horas: `0 */6 * * * cd /ruta/backend && php yii rates/update >> runtime/logs/rates-cron.log 2>&1`. El repositorio incluye el ejemplo en `backend/deploy/sederg-rates.cron`.
 - El refresco oficial no cambia la fuente activa. Si está seleccionada la tasa manual, la cotización continúa usando esa tasa aunque se actualicen los datos oficiales.
 - Las tasas aplicadas a cotizaciones/remesas ya creadas no se reescriben; el cambio afecta a nuevas cotizaciones.
 

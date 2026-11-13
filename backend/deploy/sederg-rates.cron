@@ -1,3 +1,3 @@
 # Install with: crontab backend/deploy/sederg-rates.cron
-# Runs official RUB/CUP rate refresh every 12 hours (server timezone).
-0 */12 * * * cd /srv/sederg-pay/backend && /usr/bin/php yii rates/update >> /srv/sederg-pay/backend/runtime/logs/rates-cron.log 2>&1
+# Refresca tasas oficiales RUB/CUP (BCC/CBR) cada 6 horas (zona horaria del servidor).
+0 */6 * * * cd /srv/sederg-pay/backend && /usr/bin/php yii rates/update >> /srv/sederg-pay/backend/runtime/logs/rates-cron.log 2>&1
