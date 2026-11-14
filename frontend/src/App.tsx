@@ -117,6 +117,9 @@ function AppContent({ language, onLanguageChange, theme, onThemeChange }: { lang
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const navigate = (next: View) => { setView(next); setMenuOpen(false); };
 
   useEffect(() => {
     if (!storedUserId) return;
@@ -143,7 +146,17 @@ function AppContent({ language, onLanguageChange, theme, onThemeChange }: { lang
     localStorage.removeItem('sederg_access_token');
     setUser(null);
     setView('summary');
+    setMenuOpen(false);
   };
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setMenuOpen(false); };
+    document.addEventListener('keydown', onKey);
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = previous; };
+  }, [menuOpen]);
 
   if (!authReady) return <main className="shell narrow"><Header language={language} onLanguageChange={onLanguageChange} theme={theme} onThemeChange={onThemeChange} /><section className="card"><p className="muted">{t('app.restoringSession')}</p></section></main>;
   if (!user && publicView === 'landing') return <Landing language={language} onLanguageChange={onLanguageChange} theme={theme} onThemeChange={onThemeChange} onLogin={() => { setAuthView('login'); setPublicView('auth'); }} onRegister={() => { setAuthView('register'); setPublicView('auth'); }} />;
@@ -161,18 +174,19 @@ function AppContent({ language, onLanguageChange, theme, onThemeChange }: { lang
       <div className="hero-mark" aria-hidden="true">↗</div>
     </section>
     <div className="workspace">
-      <nav className="menu" aria-label={t("nav.platform")}>
-        <strong>{t('nav.platform')}</strong>
-        <NavButton icon="home" active={view === 'summary'} onClick={() => setView('summary')}>{translate(language, 'nav.summary')}</NavButton>
-        <NavButton icon="users" active={view === 'beneficiaries'} onClick={() => setView('beneficiaries')}>{translate(language, 'nav.beneficiaries')}</NavButton>
-        <NavButton icon="send" active={view === 'quote'} onClick={() => setView('quote')}>{translate(language, 'nav.quote')}</NavButton>
-        {user.role !== 'admin' && <NavButton icon="history" active={view === 'remittances'} onClick={() => setView('remittances')}>{translate(language, 'nav.remittances')}</NavButton>}<NavButton icon="user" active={view === 'profile'} onClick={() => setView('profile')}>{t('nav.profile')}</NavButton><NavButton icon="lock" active={view === 'security'} onClick={() => setView('security')}>{t('nav.security')}</NavButton>{user.role !== 'admin' && <NavButton icon="shield" active={view === 'kyc'} onClick={() => setView('kyc')}>{t('nav.kyc')}</NavButton>}
-        <NavButton icon="bell" active={view === 'notifications'} onClick={() => setView('notifications')}>{translate(language, 'nav.notifications')}{unreadNotifications > 0 ? <span className="nav-badge">{unreadNotifications > 99 ? '99+' : unreadNotifications}</span> : null}</NavButton>
-        {user.role === 'admin' && <><NavButton icon="settings" active={view === 'admin'} onClick={() => setView('admin')}>{translate(language, 'nav.admin')}</NavButton><NavButton icon="settings" active={view === 'funding'} onClick={() => setView('funding')}>Métodos de pago</NavButton></>}
+      <div className={`menu-overlay ${menuOpen ? 'is-open' : ''}`} onClick={() => setMenuOpen(false)} aria-hidden="true" />
+      <nav id="app-menu" className={`menu ${menuOpen ? 'is-open' : ''}`} aria-label={t("nav.platform")}>
+        <div className="menu-head"><strong>{t('nav.platform')}</strong><button type="button" className="menu-close" aria-label={t('nav.closeMenu')} onClick={() => setMenuOpen(false)}>×</button></div>
+        <NavButton icon="home" active={view === 'summary'} onClick={() => navigate('summary')}>{translate(language, 'nav.summary')}</NavButton>
+        <NavButton icon="users" active={view === 'beneficiaries'} onClick={() => navigate('beneficiaries')}>{translate(language, 'nav.beneficiaries')}</NavButton>
+        <NavButton icon="send" active={view === 'quote'} onClick={() => navigate('quote')}>{translate(language, 'nav.quote')}</NavButton>
+        {user.role !== 'admin' && <NavButton icon="history" active={view === 'remittances'} onClick={() => navigate('remittances')}>{translate(language, 'nav.remittances')}</NavButton>}<NavButton icon="user" active={view === 'profile'} onClick={() => navigate('profile')}>{t('nav.profile')}</NavButton><NavButton icon="lock" active={view === 'security'} onClick={() => navigate('security')}>{t('nav.security')}</NavButton>{user.role !== 'admin' && <NavButton icon="shield" active={view === 'kyc'} onClick={() => navigate('kyc')}>{t('nav.kyc')}</NavButton>}
+        <NavButton icon="bell" active={view === 'notifications'} onClick={() => navigate('notifications')}>{translate(language, 'nav.notifications')}{unreadNotifications > 0 ? <span className="nav-badge">{unreadNotifications > 99 ? '99+' : unreadNotifications}</span> : null}</NavButton>
+        {user.role === 'admin' && <><NavButton icon="settings" active={view === 'admin'} onClick={() => navigate('admin')}>{translate(language, 'nav.admin')}</NavButton><NavButton icon="settings" active={view === 'funding'} onClick={() => navigate('funding')}>Métodos de pago</NavButton></>}
         <button className="secondary menu-exit" onClick={signOut}>{translate(language, 'nav.logout')}</button>
       </nav>
       <section className="content">
-        <div className="toolbar"><span>{user.email} · <span className="role">{user.role === 'admin' ? t('role.admin') : t('role.customer')}</span></span><span className="sandbox"><i /> {t('common.sandbox')}</span></div>
+        <div className="toolbar"><button type="button" className="menu-toggle" aria-label={menuOpen ? t('nav.closeMenu') : t('nav.openMenu')} aria-expanded={menuOpen} aria-controls="app-menu" onClick={() => setMenuOpen((v) => !v)}><span /><span /><span /></button><span className="toolbar-user">{user.email} · <span className="role">{user.role === 'admin' ? t('role.admin') : t('role.customer')}</span></span><span className="sandbox"><i /> {t('common.sandbox')}</span></div>
         {view === 'summary' && <Summary userId={user.public_id} setView={setView} run={run} />}
         {view === 'beneficiaries' && <Beneficiaries userId={user.public_id} run={run} />}
         {view === 'quote' && <QuotePanel userId={user.public_id} run={run} />}

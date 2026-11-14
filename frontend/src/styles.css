@@ -2035,3 +2035,27 @@ td,th { border-bottom:1px solid #E5EDF5; }
 .notification-dropdown-foot { padding: 10px 14px; border-top: 1px solid var(--border, rgba(148,163,184,.2)); text-align: center; }
 .text-button { background: none; border: none; color: var(--accent, #2563eb); cursor: pointer; padding: 4px 8px; font: inherit; }
 .text-button:disabled { opacity: .5; cursor: default; }
+
+/* Hamburger / lateral menu (mobile & tablet) */
+.menu-toggle { display: none; align-items: center; justify-content: center; flex-direction: column; gap: 4px; width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--border, rgba(148,163,184,.25)); background: var(--surface, transparent); cursor: pointer; padding: 0; }
+.menu-toggle span { display: block; width: 18px; height: 2px; border-radius: 2px; background: currentColor; }
+.menu-head { display: none; }
+.menu-close { display: none; }
+.menu-overlay { display: none; }
+.toolbar-user { flex: 1; min-width: 0; }
+@media (max-width: 900px) {
+  .menu-toggle { display: inline-flex; }
+  .menu-overlay { display: block; position: fixed; inset: 0; background: rgba(15,23,42,.45); opacity: 0; pointer-events: none; transition: opacity .2s ease; z-index: 900; }
+  .menu-overlay.is-open { opacity: 1; pointer-events: auto; }
+  .menu { position: fixed !important; top: 0; left: 0; bottom: 0; width: min(86vw, 320px); max-width: 320px; height: 100dvh; overflow-y: auto; transform: translateX(-105%); transition: transform .25s ease; z-index: 950; border-radius: 0 16px 16px 0 !important; margin: 0; display: flex !important; flex-direction: column; padding: 14px 12px !important; }
+  .menu.is-open { transform: translateX(0); }
+  .menu-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 8px 10px; }
+  .menu-head strong { display: block !important; padding: 0; }
+  .menu-close { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 1px solid var(--border, rgba(148,163,184,.25)); border-radius: 8px; background: transparent; color: inherit; font-size: 20px; line-height: 1; cursor: pointer; }
+  .workspace { grid-template-columns: 1fr !important; }
+  .toolbar { gap: 10px; }
+}
+@media (min-width: 901px) {
+  .menu-toggle, .menu-overlay, .menu-close { display: none !important; }
+  .menu-head strong { display: block; }
+}
