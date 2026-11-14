@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">SEDERG_PAY - Remesas entre Rusia y Cuba</title>
+  <desc id="desc">Plataforma para gestionar remesas entre Rusia y Cuba con claridad, seguridad y trazabilidad.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#06142B"/>
+      <stop offset="55%" stop-color="#0D1B33"/>
+      <stop offset="100%" stop-color="#0A3D62"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#00C853"/>
+      <stop offset="100%" stop-color="#2DD4BF"/>
+    </linearGradient>
+    <radialGradient id="glow1" cx="85%" cy="20%" r="35%">
+      <stop offset="0%" stop-color="#00C853" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#00C853" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="15%" cy="85%" r="40%">
+      <stop offset="0%" stop-color="#2DD4BF" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#2DD4BF" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#glow1)"/>
+  <rect width="1200" height="630" fill="url(#glow2)"/>
+  <g opacity="0.12" stroke="#FFFFFF">
+    <path d="M760 40c120 40 180 120 170 220s-110 170-230 190" fill="none" stroke-width="2"/>
+    <path d="M820 10c140 50 210 150 190 270S880 470 740 500" fill="none" stroke-width="2"/>
+    <circle cx="980" cy="315" r="210" fill="none" stroke-width="1.5"/>
+  </g>
+
+  <g transform="translate(90,110)">
+    <rect x="0" y="0" rx="18" ry="18" width="74" height="74" fill="url(#accent)"/>
+    <path d="M22 50 L38 24 L54 50 Z" fill="#06142B" opacity="0.95"/>
+    <path d="M18 50 H56" stroke="#06142B" stroke-width="6" stroke-linecap="round"/>
+    <text x="98" y="52" font-family="Inter, Manrope, Arial, sans-serif" font-size="54" font-weight="800" fill="#FFFFFF" letter-spacing="1">SEDERG_PAY</text>
+  </g>
+
+  <g transform="translate(90,250)">
+    <text font-family="Manrope, Inter, Arial, sans-serif" font-size="64" font-weight="800" fill="#FFFFFF">
+      <tspan x="0" y="0">Remesas entre</tspan>
+      <tspan x="0" y="78">Rusia y Cuba</tspan>
+    </text>
+    <rect x="0" y="108" width="320" height="8" rx="4" fill="url(#accent)"/>
+    <text x="0" y="168" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="500" fill="#D7E3F4">Claridad, seguridad y trazabilidad en cada envío.</text>
+  </g>
+
+  <g transform="translate(90,470)" font-family="Inter, Arial, sans-serif" font-size="26" font-weight="600">
+    <g>
+      <rect x="0" y="0" rx="22" ry="22" width="250" height="54" fill="#FFFFFF" fill-opacity="0.08" stroke="#FFFFFF" stroke-opacity="0.18"/>
+      <circle cx="28" cy="27" r="7" fill="#00C853"/>
+      <text x="48" y="35" fill="#EAF2FF">Tasas transparentes</text>
+    </g>
+    <g transform="translate(270,0)">
+      <rect x="0" y="0" rx="22" ry="22" width="210" height="54" fill="#FFFFFF" fill-opacity="0.08" stroke="#FFFFFF" stroke-opacity="0.18"/>
+      <circle cx="28" cy="27" r="7" fill="#00C853"/>
+      <text x="48" y="35" fill="#EAF2FF">Pago seguro</text>
+    </g>
+    <g transform="translate(500,0)">
+      <rect x="0" y="0" rx="22" ry="22" width="280" height="54" fill="#FFFFFF" fill-opacity="0.08" stroke="#FFFFFF" stroke-opacity="0.18"/>
+      <circle cx="28" cy="27" r="7" fill="#00C853"/>
+      <text x="48" y="35" fill="#EAF2FF">Seguimiento en tiempo real</text>
+    </g>
+  </g>
+
+  <g transform="translate(760,170)" filter="url(#shadow)">
+    <rect x="0" y="0" rx="28" ry="28" width="350" height="300" fill="#0F2442" stroke="#FFFFFF" stroke-opacity="0.12"/>
+    <rect x="28" y="28" rx="14" ry="14" width="294" height="54" fill="#FFFFFF" fill-opacity="0.06"/>
+    <text x="48" y="63" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700" fill="#BFD3EA">Cotización</text>
+    <circle cx="286" cy="55" r="6" fill="#00C853"/>
+    <text x="240" y="62" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="600" fill="#00C853">En vivo</text>
+
+    <text x="28" y="132" font-family="Inter, Arial, sans-serif" font-size="20" fill="#9FB7D6">Envías</text>
+    <text x="28" y="170" font-family="Manrope, Inter, Arial, sans-serif" font-size="40" font-weight="800" fill="#FFFFFF">10 000 RUB</text>
+    <text x="28" y="214" font-family="Inter, Arial, sans-serif" font-size="20" fill="#9FB7D6">Recibe</text>
+    <text x="28" y="252" font-family="Manrope, Inter, Arial, sans-serif" font-size="40" font-weight="800" fill="#00C853">— CUP</text>
+    <rect x="28" y="270" rx="10" ry="10" width="294" height="10" fill="url(#accent)" opacity="0.9"/>
+  </g>
+</svg>
