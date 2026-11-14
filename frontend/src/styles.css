@@ -364,7 +364,8 @@ footer { padding-top: 18px; text-align: center; }
 .transfer-card { position: relative; z-index: 1; width: min(100%, 340px); padding: 23px; border: 1px solid var(--line); border-radius: 22px; background: var(--surface-0); box-shadow: var(--shadow-lg); }
 .transfer-head, .transfer-detail { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .transfer-head { color: var(--ink-400); font-size: .75rem; font-weight: 700; }
-.live-dot { color: var(--jade-600); font-size: .66rem; }
+.live-dot { display: inline-flex; align-items: center; gap: 4px; color: var(--jade-600); font-size: .66rem; animation: live-dot-pulse 1.4s ease-in-out infinite; }
+@keyframes live-dot-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 .transfer-route { display: flex; align-items: center; gap: 14px; margin: 28px 0 15px; color: var(--ink-400); font-size: 1.1rem; }
 .transfer-route strong { display: grid; place-items: center; width: 47px; height: 47px; border-radius: 14px; color: #fff; background: var(--indigo-600); font-size: .83rem; }
 .transfer-route .route-cup { background: var(--coral-500); }
