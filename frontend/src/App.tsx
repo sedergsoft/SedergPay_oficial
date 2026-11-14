@@ -632,7 +632,7 @@ function AuthScreen({ language, onLanguageChange, theme, onThemeChange, mode, se
         setVerificationEmail(email);
         setNotification(`${text('auth.accountCreated')} ${result.email}.`);
       });
-    }}><Field name="first_name" label={text('field.firstName')} /><Field name="last_name" label={text('field.lastName')} /><Field name="email" label={text('field.email')} type="email" /><Field name="password" label={text('field.passwordMin')} type="password" /><label>{text('field.residenceCountry')}<select name="country" defaultValue="RU"><option value="RU">{text('country.russia')}</option><option value="CU">{text('country.cuba')}</option></select></label><button disabled={effectiveBusy}>{effectiveBusy ? text('common.creating') : text('common.register')}</button></form>}
+    }}><Field name="first_name" label={text('field.firstName')} /><Field name="last_name" label={text('field.lastName')} /><Field name="email" label={text('field.email')} type="email" /><Field name="password" label={text('field.passwordMin')} type="password" /><label>{text('field.residenceCountry')}<CountrySelect name="country" defaultValue="RU" /></label><button disabled={effectiveBusy}>{effectiveBusy ? text('common.creating') : text('common.register')}</button></form>}
 
     {isDevelopmentAuth && authMode === 'forgot' && <form onSubmit={(e) => {
       e.preventDefault(); const email = String(new FormData(e.currentTarget).get('email') || '');
@@ -747,7 +747,7 @@ function ProfilePanel({userId,run}:{userId:string;run:(action:()=>Promise<void>)
   ):(
     <section className="card profile-card"><div className="profile-header-card"><div className="profile-avatar-wrap"><span className="profile-avatar">{profile.first_name?.[0]||'U'}{profile.last_name?.[0]||''}</span></div><div className="profile-identity"><h3>{profile.first_name} {profile.last_name}</h3><p className="profile-email">{profile.email}</p><small className="profile-id">{t('common.userId')||'ID'}: {profile.public_id}</small></div><button className="edit-button secondary" onClick={()=>setEditing(false)} disabled={saving}><Icon name="arrow-left"/>{t('profile.cancel')}</button></div>
     <div className="profile-section-title"><Icon name="user"/><div><strong>{t('profile.personalInformation')}</strong><small>{t('profile.emailImmutable')}</small></div></div>
-    <form className="modern-form" onSubmit={handleSave}><div className="form-grid"><Field name="first_name" label={t('field.firstName')} defaultValue={profile.first_name} error={fieldErrors.first_name}/><Field name="last_name" label={t('field.lastName')} defaultValue={profile.last_name} error={fieldErrors.last_name}/><Field name="middle_name" label={t('field.middleName')} required={false} defaultValue={profile.middle_name||''} error={fieldErrors.middle_name}/><label>Correo electrónico<input type="email" value={profile.email} disabled/></label><Field name="phone_e164" label={t('field.phone')} type="tel" required={false} defaultValue={profile.phone_e164||''} error={fieldErrors.phone_e164}/><Field name="date_of_birth" label={t('field.birthDate')} type="date" required={false} defaultValue={profile.date_of_birth||''} error={fieldErrors.date_of_birth}/><label className={fieldErrors.residence_country_code ? 'field-error' : undefined}>{t('field.residenceCountry')}<select name="residence_country_code" defaultValue={profile.residence_country_code||'RU'}><option value="RU">🇷🇺 Rusia</option><option value="CU">🇨🇺 Cuba</option></select>{fieldErrors.residence_country_code && <small className="field-error-message" id="residence_country_code-error" role="alert">{fieldErrors.residence_country_code}</small>}</label><label className={fieldErrors.nationality_country_code ? 'field-error' : undefined}>{t('field.nationality')}<select name="nationality_country_code" defaultValue={profile.nationality_country_code||'CU'}><option value="CU">🇨🇺 {t('country.cuba')}</option><option value="RU">🇷🇺 {t('country.russia')}</option></select>{fieldErrors.nationality_country_code && <small className="field-error-message" id="nationality_country_code-error" role="alert">{fieldErrors.nationality_country_code}</small>}</label><Field name="address_line" label={t('field.address')} required={false} defaultValue={profile.address_line||''} error={fieldErrors.address_line}/><Field name="city" label={t('field.city')} required={false} defaultValue={profile.city||''} error={fieldErrors.city}/><Field name="postal_code" label={t('field.postalCode')} required={false} defaultValue={profile.postal_code||''} error={fieldErrors.postal_code}/></div><div className="form-actions"><button type="button" className="secondary" onClick={()=>setEditing(false)} disabled={saving}>{t('profile.cancel')}</button><button type="submit" disabled={saving}>{saving?'Guardando…':<><Icon name="check"/>{t('common.saveChanges')}</>}</button></div></form></section>
+    <form className="modern-form" onSubmit={handleSave}><div className="form-grid"><Field name="first_name" label={t('field.firstName')} defaultValue={profile.first_name} error={fieldErrors.first_name}/><Field name="last_name" label={t('field.lastName')} defaultValue={profile.last_name} error={fieldErrors.last_name}/><Field name="middle_name" label={t('field.middleName')} required={false} defaultValue={profile.middle_name||''} error={fieldErrors.middle_name}/><label>Correo electrónico<input type="email" value={profile.email} disabled/></label><Field name="phone_e164" label={t('field.phone')} type="tel" required={false} defaultValue={profile.phone_e164||''} error={fieldErrors.phone_e164}/><Field name="date_of_birth" label={t('field.birthDate')} type="date" required={false} defaultValue={profile.date_of_birth||''} error={fieldErrors.date_of_birth}/><label className={fieldErrors.residence_country_code ? 'field-error' : undefined}>{t('field.residenceCountry')}<CountrySelect name="residence_country_code" defaultValue={(profile.residence_country_code as any)||'RU'} error={fieldErrors.residence_country_code} />{fieldErrors.residence_country_code && <small className="field-error-message" id="residence_country_code-error" role="alert">{fieldErrors.residence_country_code}</small>}</label><label className={fieldErrors.nationality_country_code ? 'field-error' : undefined}>{t('field.nationality')}<CountrySelect name="nationality_country_code" defaultValue={(profile.nationality_country_code as any)||'CU'} error={fieldErrors.nationality_country_code} />{fieldErrors.nationality_country_code && <small className="field-error-message" id="nationality_country_code-error" role="alert">{fieldErrors.nationality_country_code}</small>}</label><Field name="address_line" label={t('field.address')} required={false} defaultValue={profile.address_line||''} error={fieldErrors.address_line}/><Field name="city" label={t('field.city')} required={false} defaultValue={profile.city||''} error={fieldErrors.city}/><Field name="postal_code" label={t('field.postalCode')} required={false} defaultValue={profile.postal_code||''} error={fieldErrors.postal_code}/></div><div className="form-actions"><button type="button" className="secondary" onClick={()=>setEditing(false)} disabled={saving}>{t('profile.cancel')}</button><button type="submit" disabled={saving}>{saving?'Guardando…':<><Icon name="check"/>{t('common.saveChanges')}</>}</button></div></form></section>
   )}</div>;
 }
 
@@ -855,7 +855,7 @@ function Beneficiaries({ userId, run }: { userId: string; run: (action: () => Pr
  const remove=(item:Beneficiary)=>setPendingDelete(item);
  const confirmDelete=()=>{if(!pendingDelete)return;const target=pendingDelete;setPendingDelete(null);void run(async()=>{await api.deleteBeneficiary(userId,target.public_id);notifySuccess(t('toast.beneficiaryDeleted'));await refresh();});};
  return <div className="feature-view"><div className="view-heading"><div><span className="eyebrow">{t('beneficiaries.eyebrow')}</span><h2>{t('nav.beneficiaries')}</h2><p className="muted">{t('beneficiaries.description')}</p></div><span className="count-chip">{items.length} {t('common.registered')}</span></div>
- <div className="beneficiary-layout"><section className="card form-card"><div className="section-heading"><div><span className="eyebrow">{editing?t('common.updateData'):t('beneficiaries.newRecipient')}</span><h3>{editing?t('beneficiaries.edit'):t('beneficiaries.add')}</h3></div><span className="section-icon"><Icon name="user"/></span></div><p className="muted">{t('beneficiaries.editSecurity')}</p><form className="modern-form" key={editing?.public_id ?? 'new-beneficiary'} onSubmit={submit}><div className="form-grid"><Field name="first_name" label={t('field.firstName')} defaultValue={editing?.first_name}/><Field name="last_name" label={t('field.lastName')} defaultValue={editing?.last_name}/><Field name="phone_e164" label={t('field.phone')} type="tel" mask="phone" error={fieldErrors.phone_e164} placeholder="+7 999 123-45-67 / +53 5 123 4567" defaultValue={editing?.phone_e164??''}/><Field name="email" label={t('field.email')} type="email" defaultValue={editing?.email??''}/><label>{t('field.country')}<select name="country" value={benefCountry} onChange={e=>{const c=e.target.value as 'CU'|'RU';setBenefCountry(c);setBenefProvider('');}}><option value="CU">🇨🇺 {t('country.cuba')}</option><option value="RU">🇷🇺 {t('country.russia')}</option></select></label><label>Método de entrega preferido<select value={method} onChange={e=>setMethod(e.target.value)}>{paymentMethods.map(m=><option key={m.code} value={m.code}>{t('payout.'+m.code)}</option>)}</select></label></div>
+ <div className="beneficiary-layout"><section className="card form-card"><div className="section-heading"><div><span className="eyebrow">{editing?t('common.updateData'):t('beneficiaries.newRecipient')}</span><h3>{editing?t('beneficiaries.edit'):t('beneficiaries.add')}</h3></div><span className="section-icon"><Icon name="user"/></span></div><p className="muted">{t('beneficiaries.editSecurity')}</p><form className="modern-form" key={editing?.public_id ?? 'new-beneficiary'} onSubmit={submit}><div className="form-grid"><Field name="first_name" label={t('field.firstName')} defaultValue={editing?.first_name}/><Field name="last_name" label={t('field.lastName')} defaultValue={editing?.last_name}/><Field name="phone_e164" label={t('field.phone')} type="tel" mask="phone" error={fieldErrors.phone_e164} placeholder="+7 999 123-45-67 / +53 5 123 4567" defaultValue={editing?.phone_e164??''}/><Field name="email" label={t('field.email')} type="email" defaultValue={editing?.email??''}/><label>{t('field.country')}<CountrySelect name="country" value={benefCountry} onChange={(c: 'CU' | 'RU')=>{setBenefCountry(c);setBenefProvider('');}} /></label><label>Método de entrega preferido<select value={method} onChange={e=>setMethod(e.target.value)}>{paymentMethods.map(m=><option key={m.code} value={m.code}>{t('payout.'+m.code)}</option>)}</select></label></div>
  <div className="conditional-fields"><label>{t('field.bankProvider')}{method==='bank_account' ? <BankSelect banks={BANKS_BY_COUNTRY[benefCountry]} value={benefProvider} valueKey="name" name="payout_provider" onChange={(val)=>setBenefProvider(val)} placeholder="Selecciona un banco" allowEmptyOption emptyLabel="Selecciona un banco" error={fieldErrors.payout_provider} /> : <input name="payout_provider" value={benefProvider} onChange={e=>setBenefProvider(e.target.value)} placeholder={t('field.bankProvider')} />}{fieldErrors.payout_provider && method!=='bank_account' && <span className="field-error-message" role="alert">{fieldErrors.payout_provider}</span>}{fieldErrors.payout_provider && method==='bank_account' && <span className="field-error-message" role="alert">{fieldErrors.payout_provider}</span>}</label><Field name="payout_account_number" label={t('field.accountNumberKeep')} error={fieldErrors.payout_account_number} mask="account" placeholder="0000 0000 0000 0000" inputMode="numeric" pattern="[0-9 ]{6,42}" required={method==='bank_account'&&!editing}/><Field name="payout_card_number" label={t('field.cardNumberKeep')} error={fieldErrors.payout_card_number} mask="card" placeholder="0000 0000 0000 0000" inputMode="numeric" pattern="[0-9 ]{12,23}" required={method==='card_transfer'&&!editing}/></div><p className="muted">Puedes registrar los datos bancarios y de tarjeta ahora. Los campos que dejes vacíos podrán completarse al seleccionar ese método en una cotización.</p><p className="secure-note"><Icon name="lock"/> {t('beneficiaries.encryptedData')}</p><div className="form-actions"><button>{editing?t('common.saveChanges'):t('beneficiaries.save')}</button>{editing&&<button type="button" className="secondary" onClick={()=>{setEditing(null);setMethod('cash_pickup');setBenefCountry('CU');setBenefProvider('');setFieldErrors({});}}>{t('common.cancel')}</button>}</div></form></section>
  <section className="card beneficiary-list-card"><div className="section-heading"><div><span className="eyebrow">{t('beneficiaries.addressBook')}</span><h3>{t('beneficiaries.registeredPeople')}</h3></div><span className="section-icon"><Icon name="users"/></span></div>{items.length===0?<div className="empty-state"><span className="empty-icon"><Icon name="users"/></span><strong>{t('beneficiaries.empty')}</strong><p>{t('beneficiaries.emptyDescription')}</p></div>:<div className="beneficiary-list">{items.map(item=><article className="beneficiary-item" key={item.public_id}><div className="beneficiary-avatar">{(item.first_name?.[0]||'B').toUpperCase()}{(item.last_name?.[0]||'')[0]?.toUpperCase()}</div><div className="beneficiary-info"><strong>{item.first_name} {item.last_name}</strong><span><Icon name="globe"/> {item.country_code==='CU'?t('country.cuba'):t('country.russia')} · {item.phone_e164||item.email||t('common.noContact')}</span><small>{t('payout.'+item.payout_method_code)} {item.payout_provider??''} {item.payout_account_last4?'· cuenta ****'+item.payout_account_last4:''} {item.payout_card_last4?'· tarjeta ****'+item.payout_card_last4:''}</small></div><div className="beneficiary-actions"><StatusBadge status={item.status}/><button className="secondary compact-button" type="button" onClick={()=>{setEditing(item);setMethod(item.payout_method_code);setBenefCountry((item.country_code as 'CU'|'RU')||'CU');setBenefProvider(item.payout_provider||'');setFieldErrors({});}}><Icon name="edit"/> {t('common.edit')}</button><button className="secondary compact-button danger" type="button" onClick={()=>remove(item)}><Icon name="delete"/> {t('common.delete')}</button></div></article>)}</div>}</section></div>
  {pendingDelete&&<div className="details-modal-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)setPendingDelete(null);}}><section className="details-modal card" role="dialog" aria-modal="true" aria-labelledby="delete-beneficiary-title"><div className="section-heading details-modal-heading"><div><span className="eyebrow">{t('common.confirm')}</span><h2 id="delete-beneficiary-title">{t('toast.deleteBeneficiaryTitle')}</h2></div><button type="button" className="secondary compact-button" onClick={()=>setPendingDelete(null)}>{t('common.close')}</button></div><p className="muted">{t('toast.deleteBeneficiaryHint')} <strong>{pendingDelete.first_name} {pendingDelete.last_name}</strong>.</p><div className="form-actions"><button type="button" className="danger" onClick={confirmDelete}>{t('common.delete')}</button><button type="button" className="secondary" onClick={()=>setPendingDelete(null)}>{t('common.cancel')}</button></div></section></div>}
@@ -875,6 +875,61 @@ function CountryFlag({ country, className = '' }: { country: 'CU' | 'RU'; classN
     <path d="M0 0 15 10 0 20z" fill="#CF142B" />
     <path d="m5.1 6.8 1.1 2.3 2.5.3-1.8 1.7.5 2.5-2.3-1.2-2.2 1.2.4-2.5-1.8-1.7 2.5-.3z" fill="#fff" />
   </svg>;
+}
+
+const COUNTRIES: { code: 'CU' | 'RU'; name: string; flag: string }[] = [
+  { code: 'CU', name: 'Cuba', flag: `${import.meta.env.BASE_URL}assets/sederg-pay/flags/cuba.svg` },
+  { code: 'RU', name: 'Rusia', flag: `${import.meta.env.BASE_URL}assets/sederg-pay/flags/russia.svg` },
+];
+
+function CountrySelect({
+  value,
+  defaultValue,
+  onChange,
+  name,
+  error,
+  placeholder,
+}: {
+  value?: 'CU' | 'RU' | string;
+  defaultValue?: 'CU' | 'RU' | string;
+  onChange?: (value: 'CU' | 'RU') => void;
+  name?: string;
+  error?: string;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [internal, setInternal] = useState<'CU' | 'RU' | string>((defaultValue ?? 'CU') as 'CU' | 'RU');
+  const current = (value !== undefined ? value : internal) as 'CU' | 'RU';
+  const ref = useRef<HTMLDivElement | null>(null);
+  const selected = COUNTRIES.find((c) => c.code === current);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey); };
+  }, [open]);
+  const select = (code: 'CU' | 'RU') => {
+    if (value === undefined) setInternal(code);
+    onChange?.(code);
+    setOpen(false);
+  };
+  return <div className={`bank-select country-select${open ? ' open' : ''}${error ? ' has-error' : ''}`} ref={ref}>
+    {name && <input type="hidden" name={name} value={current} />}
+    <button type="button" className="bank-select-trigger" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+      {selected ? <><img className="country-flag-icon" src={selected.flag} alt="" /><span className="bank-select-label">{selected.name}</span></> : <span className="bank-select-placeholder">{placeholder || 'Selecciona un país'}</span>}
+      <span className="bank-select-caret" aria-hidden="true">▾</span>
+    </button>
+    {open && <div className="bank-select-list" role="listbox">
+      {COUNTRIES.map((c) => {
+        const isSel = c.code === current;
+        return <button key={c.code} type="button" role="option" aria-selected={isSel} className={`bank-select-option${isSel ? ' selected' : ''}`} onClick={() => select(c.code)}>
+          <img className="country-flag-icon" src={c.flag} alt="" /><span className="bank-select-label">{c.name}</span>
+        </button>;
+      })}
+    </div>}
+  </div>;
 }
 
 function QuotePanel({ userId, run }: { userId: string; run: (action: () => Promise<void>) => Promise<void> }) {
@@ -1600,7 +1655,7 @@ function FundingMethodConfiguration({ userId, method, run, onSaved }: { userId: 
   </section>;
 }
 
-type BankInfo = { code: string; name: string; routing?: string; legalName?: string; source?: string; short?: string; color?: string };
+type BankInfo = { code: string; name: string; routing?: string; legalName?: string; source?: string; short?: string; color?: string; logoUrl?: string };
 const BANKS_BY_COUNTRY: Record<'RU'|'CU', BankInfo[]> = {
   RU: [
     { code: 'sberbank', name: 'Sberbank (Сбербанк)', routing: '044525225 / SABRRUMM', legalName: 'Публичное акционерное общество «Сбербанк России» (ПАО Сбербанк)', source: 'CBR/SWIFT', short: 'Sber', color: '#21A038' },
@@ -1630,7 +1685,10 @@ const BANKS_BY_COUNTRY: Record<'RU'|'CU', BankInfo[]> = {
 
 
 
-function BankLogo({ bank, size = 24 }: { bank: { short?: string; color?: string; name: string; code?: string }; size?: number }) {
+function BankLogo({ bank, size = 24 }: { bank: { short?: string; color?: string; name: string; code?: string; logoUrl?: string }; size?: number }) {
+  if (bank.logoUrl) {
+    return <span className="bank-logo bank-logo-image" style={{ width: size, height: size, minWidth: size }} aria-hidden="true"><img src={bank.logoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /></span>;
+  }
   const bg = bank.color || '#64748b';
   const text = (bank.short || bank.name || '?').slice(0, 4);
   const dark = ['#FFDD2D', '#FFED00'].includes(bg) ? '#1f2937' : '#ffffff';
@@ -1723,7 +1781,7 @@ function AdminFundingPanel({ userId, run }: { userId: string; run: (action: () =
   {methods.filter(method=>method.code==='ru_sbp_c2p').map(method=><FundingMethodConfiguration key={method.code} userId={userId} method={method} run={run} onSaved={reload} />)}
   <section className="card"><div className="section-heading"><div><h3>Registrar cuenta receptora</h3><p className="muted">El número se cifra antes de almacenarse; solo se muestra enmascarado después del alta.</p></div></div>
   <form className="funding-account-form" onSubmit={e=>{e.preventDefault();create();}}>
-    <label>País<select value={country} onChange={e=>{const c=e.target.value as 'RU'|'CU';setCountry(c);setSelectedMethods([]);const first=BANKS_BY_COUNTRY[c][0];if(first){setBankCode(first.code);setBankName(first.name);setRoutingIdentifier(first.routing||'');setLegalEntityName(first.legalName||'');}else{setBankCode('');setBankName('');setRoutingIdentifier('');setLegalEntityName('');}}}><option value="RU">Rusia</option><option value="CU">Cuba</option></select></label>
+    <label>País<CountrySelect name="country" value={country} onChange={(c: 'CU' | 'RU')=>{setCountry(c);setSelectedMethods([]);const first=BANKS_BY_COUNTRY[c][0];if(first){setBankCode(first.code);setBankName(first.name);setRoutingIdentifier(first.routing||'');setLegalEntityName(first.legalName||'');}else{setBankCode('');setBankName('');setRoutingIdentifier('');setLegalEntityName('');}}} /></label>
     <label>Moneda<input value={currency} readOnly/></label>
     <label>Banco<BankSelect banks={BANKS_BY_COUNTRY[country]} value={bankCode} valueKey="code" onChange={(code,b)=>{setBankCode(code);if(b){setBankName(b.name);setRoutingIdentifier(b.routing||'');setLegalEntityName(b.legalName||'');}}} placeholder="Selecciona un banco" /></label>
     <label>Código del banco<input value={bankCode} readOnly/></label>

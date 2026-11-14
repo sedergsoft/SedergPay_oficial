@@ -2184,3 +2184,6 @@ td,th { border-bottom:1px solid #E5EDF5; }
 :root[data-theme='aurora-dark'] .bank-select-option { color: var(--ink-900, #e5e7eb); }
 :root[data-theme='aurora-dark'] .bank-select-option:hover, :root[data-theme='aurora-dark'] .bank-select-option.selected { background: var(--surface-2, #1e293b); color: var(--ink-900, #f8fafc); }
 :root[data-theme='aurora-dark'] .bank-select-placeholder, :root[data-theme='aurora-dark'] .bank-select-caret { color: var(--ink-400, #94a3b8); }
+.country-flag-icon { width: 22px; height: 16px; border-radius: 3px; object-fit: cover; flex-shrink: 0; box-shadow: 0 0 0 1px rgba(0,0,0,.08); }
+.bank-logo-image { background: #fff; padding: 2px; border-radius: 6px; box-shadow: 0 0 0 1px rgba(0,0,0,.06); }
+:root[data-theme='dark'] .bank-logo-image, :root[data-theme='mulen-dark'] .bank-logo-image, :root[data-theme='aurora-dark'] .bank-logo-image { background: #ffffff; }
