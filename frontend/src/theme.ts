@@ -1,18 +1,20 @@
 /**
  * SEDERG_PAY — Registro de temas visuales de la plataforma.
  *
- * Dos familias:
+ * Familias:
  *  - `sederge`  · identidad "Dos orillas" (azul institucional)
  *  - `aurora`   · estilo "glass" inspirado en la estética de 9Drive
  *                 (fondo con degradados suaves + tarjetas translúcidas)
+ *  - `mulen`    · estilo limpio inspirado en MulenPay (azules de marca,
+ *                 tipografía Manrope/Inter, botones y menús con transiciones)
  *
  * Cada familia tiene variante clara y oscura. El tema global lo define el
  * módulo de administración (`appearance.theme`) y se aplica a toda la
  * plataforma; el conmutador de la cabecera guarda una preferencia personal.
  */
 
-export type ThemeId = 'light' | 'dark' | 'aurora' | 'aurora-dark';
-export type ThemeFamily = 'sederge' | 'aurora';
+export type ThemeId = 'light' | 'dark' | 'aurora' | 'aurora-dark' | 'mulen' | 'mulen-dark';
+export type ThemeFamily = 'sederge' | 'aurora' | 'mulen';
 export type ThemeMode = 'light' | 'dark';
 
 export type ThemeDefinition = {
@@ -63,6 +65,22 @@ export const THEMES: ThemeDefinition[] = [
     labelKey: 'theme.option.auroraDark',
     taglineKey: 'theme.tagline.auroraDark',
     swatches: ['#818CF8', '#1E293B', '#090D16'],
+  },
+  {
+    id: 'mulen',
+    family: 'mulen',
+    mode: 'light',
+    labelKey: 'theme.option.mulen',
+    taglineKey: 'theme.tagline.mulen',
+    swatches: ['#2E94E2', '#1A78C5', '#F5F9FC'],
+  },
+  {
+    id: 'mulen-dark',
+    family: 'mulen',
+    mode: 'dark',
+    labelKey: 'theme.option.mulenDark',
+    taglineKey: 'theme.tagline.mulenDark',
+    swatches: ['#38B8F4', '#1561A0', '#03131B'],
   },
 ];
 
@@ -122,7 +140,9 @@ export function applyTheme(id: ThemeId, options: { persist?: PersistMode } = {})
 
   if (typeof document !== 'undefined') {
     document.documentElement.dataset.theme = theme;
-    const themeColor = themeById(theme).mode === 'dark' ? '#090D16' : '#0B4F9C';
+    const themeColor = themeById(theme).mode === 'dark'
+      ? (themeById(theme).family === 'mulen' ? '#03131B' : '#090D16')
+      : (themeById(theme).family === 'mulen' ? '#1A78C5' : '#0B4F9C');
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', themeColor);
   }
 
@@ -146,9 +166,14 @@ export function applyTheme(id: ThemeId, options: { persist?: PersistMode } = {})
 /** Alterna claro/oscuro dentro de la misma familia visual. */
 export function toggleMode(current: ThemeId): ThemeId {
   const definition = themeById(current);
-  return definition.mode === 'dark'
-    ? (definition.family === 'aurora' ? 'aurora' : 'light')
-    : (definition.family === 'aurora' ? 'aurora-dark' : 'dark');
+  if (definition.mode === 'dark') {
+    if (definition.family === 'aurora') return 'aurora';
+    if (definition.family === 'mulen') return 'mulen';
+    return 'light';
+  }
+  if (definition.family === 'aurora') return 'aurora-dark';
+  if (definition.family === 'mulen') return 'mulen-dark';
+  return 'dark';
 }
 
 /** Tema global publicado por el módulo de administración. */

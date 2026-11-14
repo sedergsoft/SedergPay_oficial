@@ -1557,3 +1557,445 @@ td,th { border-bottom:1px solid #E5EDF5; }
   }
 }
 
+/* ============================================================
+   TEMA MULEN — estilo limpio inspirado en MulenPay
+   Paleta de marca (azules/cian e "ink" oscuro), tipografía
+   Manrope/Inter, menús y botones con transiciones suaves.
+   ============================================================ */
+:root[data-theme='mulen'] {
+  color-scheme: light;
+
+  /* Identidad inspirada en MulenPay (brand/ink) */
+  --ink-900: #081e30;
+  --ink-600: #2e5f7c;
+  --ink-400: #4a7d9e;
+  --indigo-700: #1561a0;
+  --indigo-600: #1a78c5;
+  --indigo-500: #2e94e2;
+  --indigo-100: #dff2ff;
+  --coral-600: #c2410c;
+  --coral-500: #f97316;
+  --coral-100: #fff1e8;
+  --jade-600: #047857;
+  --jade-500: #10b981;
+  --jade-100: #e6fbf4;
+  --amber-500: #f59e0b;
+  --amber-100: #fff7e6;
+
+  --surface-0: #ffffff;
+  --surface-1: #f5f9fc;
+  --surface-2: #ebf3f9;
+  --line: #d8e9f3;
+
+  --font-display: "Manrope", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-ui: "Inter", "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --radius-s: 10px;
+  --radius-m: 16px;
+  --radius-l: 22px;
+  --shadow-1: 0 1px 2px rgba(8,30,48,.05), 0 10px 28px -16px rgba(26,120,197,.25);
+  --shadow-lg: 0 24px 56px -24px rgba(8,30,48,.28);
+
+  --mulen-btn: linear-gradient(135deg, #2e94e2 0%, #1a78c5 100%);
+  --mulen-btn-hover: linear-gradient(135deg, #38b8f4 0%, #1561a0 100%);
+  --mulen-btn-shadow: 0 10px 22px -10px rgba(26,120,197,.55);
+  --mulen-btn-shadow-hover: 0 16px 30px -10px rgba(26,120,197,.65);
+  --mulen-focus: 0 0 0 4px rgba(46,148,226,.22);
+}
+
+:root[data-theme='mulen-dark'] {
+  color-scheme: dark;
+
+  --ink-900: #ebf3f9;
+  --ink-600: #b8e5fd;
+  --ink-400: #7ca8c4;
+  --indigo-700: #7ad0fa;
+  --indigo-600: #38b8f4;
+  --indigo-500: #2e94e2;
+  --indigo-100: #102e48;
+  --coral-600: #fdba74;
+  --coral-500: #fb923c;
+  --coral-100: #3a2414;
+  --jade-600: #6ee7b7;
+  --jade-500: #34d399;
+  --jade-100: #0f2f27;
+  --amber-500: #fbbf24;
+  --amber-100: #3a2c12;
+
+  --surface-0: #081e30;
+  --surface-1: #03131b;
+  --surface-2: #102e48;
+  --line: #174e7f;
+
+  --font-display: "Manrope", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-ui: "Inter", "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --radius-s: 10px;
+  --radius-m: 16px;
+  --radius-l: 22px;
+  --shadow-1: 0 1px 2px rgba(0,0,0,.35), 0 14px 34px -18px rgba(0,0,0,.7);
+  --shadow-lg: 0 28px 60px -26px rgba(0,0,0,.8);
+
+  --mulen-btn: linear-gradient(135deg, #2e94e2 0%, #1561a0 100%);
+  --mulen-btn-hover: linear-gradient(135deg, #38b8f4 0%, #1a78c5 100%);
+  --mulen-btn-shadow: 0 10px 22px -10px rgba(56,184,244,.35);
+  --mulen-btn-shadow-hover: 0 16px 30px -10px rgba(56,184,244,.45);
+  --mulen-focus: 0 0 0 4px rgba(56,184,244,.22);
+}
+
+/* Base y tipografía */
+:root[data-theme='mulen'] body,
+:root[data-theme='mulen-dark'] body {
+  color: var(--ink-900);
+  background:
+    radial-gradient(1200px 420px at 100% -10%, rgba(46,148,226,.10), transparent 60%),
+    radial-gradient(900px 360px at -10% 0%, rgba(56,184,244,.10), transparent 55%),
+    var(--surface-1);
+  font-family: var(--font-ui);
+}
+
+:root[data-theme='mulen-dark'] body {
+  background:
+    radial-gradient(1000px 420px at 100% -10%, rgba(46,148,226,.18), transparent 60%),
+    radial-gradient(900px 360px at -10% 0%, rgba(21,97,160,.22), transparent 55%),
+    var(--surface-1);
+}
+
+:root[data-theme='mulen'] h1, :root[data-theme='mulen'] h2, :root[data-theme='mulen'] h3,
+:root[data-theme='mulen-dark'] h1, :root[data-theme='mulen-dark'] h2, :root[data-theme='mulen-dark'] h3 {
+  font-family: var(--font-display);
+  letter-spacing: -.02em;
+}
+
+/* Superficies y layout */
+:root[data-theme='mulen'] .menu,
+:root[data-theme='mulen'] .card,
+:root[data-theme='mulen'] .stat,
+:root[data-theme='mulen'] .metric-card,
+:root[data-theme='mulen'] .action-tile,
+:root[data-theme='mulen'] .feature,
+:root[data-theme='mulen'] .landing-rate,
+:root[data-theme='mulen'] .transfer-card,
+:root[data-theme='mulen'] .settings-group,
+:root[data-theme='mulen'] .profile-card-item,
+:root[data-theme='mulen'] .payment-panel,
+:root[data-theme='mulen'] .detail-panel,
+:root[data-theme='mulen'] .details-modal,
+:root[data-theme='mulen-dark'] .menu,
+:root[data-theme='mulen-dark'] .card,
+:root[data-theme='mulen-dark'] .stat,
+:root[data-theme='mulen-dark'] .metric-card,
+:root[data-theme='mulen-dark'] .action-tile,
+:root[data-theme='mulen-dark'] .feature,
+:root[data-theme='mulen-dark'] .landing-rate,
+:root[data-theme='mulen-dark'] .transfer-card,
+:root[data-theme='mulen-dark'] .settings-group,
+:root[data-theme='mulen-dark'] .profile-card-item,
+:root[data-theme='mulen-dark'] .payment-panel,
+:root[data-theme='mulen-dark'] .detail-panel,
+:root[data-theme='mulen-dark'] .details-modal {
+  border-color: var(--line);
+  background: var(--surface-0);
+  box-shadow: var(--shadow-1);
+}
+
+:root[data-theme='mulen'] .landing,
+:root[data-theme='mulen-dark'] .landing {
+  background: transparent;
+}
+
+:root[data-theme='mulen'] .hero,
+:root[data-theme='mulen-dark'] .hero,
+:root[data-theme='mulen'] .quote-side,
+:root[data-theme='mulen-dark'] .quote-side {
+  border: 1px solid rgba(255,255,255,.08);
+  background:
+    radial-gradient(900px 360px at 95% -20%, rgba(56,184,244,.35), transparent 60%),
+    linear-gradient(135deg, #113c60 0%, #1561a0 45%, #1a78c5 100%);
+  box-shadow: 0 28px 60px -28px rgba(17,60,96,.55);
+}
+
+:root[data-theme='mulen'] .details-modal-backdrop,
+:root[data-theme='mulen-dark'] .details-modal-backdrop {
+  background: rgba(3,19,27,.58);
+}
+
+/* Botones: gradiente de marca, elevación y transición suave */
+:root[data-theme='mulen'] button,
+:root[data-theme='mulen-dark'] button {
+  border-radius: 12px;
+  background: var(--mulen-btn);
+  color: #fff;
+  box-shadow: var(--mulen-btn-shadow);
+  transition: transform .18s ease, box-shadow .22s ease, background .22s ease, color .18s ease, border-color .18s ease;
+}
+
+:root[data-theme='mulen'] button:not(:disabled):hover,
+:root[data-theme='mulen-dark'] button:not(:disabled):hover {
+  background: var(--mulen-btn-hover);
+  box-shadow: var(--mulen-btn-shadow-hover);
+  transform: translateY(-1px);
+}
+
+:root[data-theme='mulen'] button:not(:disabled):active,
+:root[data-theme='mulen-dark'] button:not(:disabled):active {
+  transform: translateY(0);
+  box-shadow: var(--mulen-btn-shadow);
+}
+
+:root[data-theme='mulen'] button:focus-visible,
+:root[data-theme='mulen-dark'] button:focus-visible {
+  outline: none;
+  box-shadow: var(--mulen-btn-shadow), var(--mulen-focus);
+}
+
+:root[data-theme='mulen'] button.secondary,
+:root[data-theme='mulen'] .secondary,
+:root[data-theme='mulen-dark'] button.secondary,
+:root[data-theme='mulen-dark'] .secondary {
+  color: var(--indigo-700);
+  border: 1px solid var(--line);
+  background: var(--surface-0);
+  box-shadow: none;
+}
+
+:root[data-theme='mulen'] button.secondary:not(:disabled):hover,
+:root[data-theme='mulen-dark'] button.secondary:not(:disabled):hover {
+  color: var(--indigo-600);
+  border-color: var(--indigo-500);
+  background: var(--surface-2);
+  box-shadow: 0 8px 18px -12px rgba(26,120,197,.35);
+}
+
+/* Menú lateral y navegación: resaltado con acento y barra */
+:root[data-theme='mulen'] .nav-button,
+:root[data-theme='mulen-dark'] .nav-button {
+  color: var(--ink-600) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 10px;
+  transition: background .18s ease, color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+:root[data-theme='mulen'] .nav-button:hover,
+:root[data-theme='mulen-dark'] .nav-button:hover {
+  color: var(--indigo-700) !important;
+  background: var(--indigo-100) !important;
+  transform: translateX(2px);
+}
+
+:root[data-theme='mulen'] .nav-button.active,
+:root[data-theme='mulen-dark'] .nav-button.active {
+  color: var(--indigo-700) !important;
+  background: linear-gradient(90deg, rgba(46,148,226,.18), rgba(46,148,226,.06)) !important;
+  box-shadow: inset 3px 0 0 var(--indigo-500) !important;
+}
+
+:root[data-theme='mulen'] .menu-exit,
+:root[data-theme='mulen-dark'] .menu-exit {
+  color: var(--ink-600);
+}
+
+/* Campos, selects y controles */
+:root[data-theme='mulen'] input,
+:root[data-theme='mulen'] select,
+:root[data-theme='mulen'] .toggle-row,
+:root[data-theme='mulen'] .table-filter-input,
+:root[data-theme='mulen'] .admin-search-input,
+:root[data-theme='mulen'] .calculator-field input,
+:root[data-theme='mulen'] .calculator-field select,
+:root[data-theme='mulen-dark'] input,
+:root[data-theme='mulen-dark'] select,
+:root[data-theme='mulen-dark'] .toggle-row,
+:root[data-theme='mulen-dark'] .table-filter-input,
+:root[data-theme='mulen-dark'] .admin-search-input,
+:root[data-theme='mulen-dark'] .calculator-field input,
+:root[data-theme='mulen-dark'] .calculator-field select {
+  border-color: var(--line);
+  background: var(--surface-0);
+  color: var(--ink-900);
+  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+:root[data-theme='mulen-dark'] input,
+:root[data-theme='mulen-dark'] select,
+:root[data-theme='mulen-dark'] .toggle-row,
+:root[data-theme='mulen-dark'] .table-filter-input,
+:root[data-theme='mulen-dark'] .admin-search-input {
+  background: var(--surface-2);
+}
+
+:root[data-theme='mulen'] input:focus,
+:root[data-theme='mulen'] select:focus,
+:root[data-theme='mulen-dark'] input:focus,
+:root[data-theme='mulen-dark'] select:focus {
+  border-color: var(--indigo-500);
+  box-shadow: var(--mulen-focus);
+  outline: none;
+}
+
+:root[data-theme='mulen'] th,
+:root[data-theme='mulen-dark'] th {
+  color: var(--ink-400);
+  background: transparent;
+}
+
+:root[data-theme='mulen'] td, :root[data-theme='mulen'] th,
+:root[data-theme='mulen-dark'] td, :root[data-theme='mulen-dark'] th {
+  border-bottom-color: var(--line);
+}
+
+/* Tarjetas interactivas y acentos */
+:root[data-theme='mulen'] .action-tile:hover,
+:root[data-theme='mulen-dark'] .action-tile:hover {
+  border-color: var(--indigo-500) !important;
+  box-shadow: 0 18px 36px -22px rgba(26,120,197,.45) !important;
+  transform: translateY(-2px);
+}
+
+:root[data-theme='mulen'] .action-tile,
+:root[data-theme='mulen-dark'] .action-tile {
+  transition: transform .18s ease, box-shadow .22s ease, border-color .18s ease, background .18s ease;
+}
+
+:root[data-theme='mulen'] .feature-icon,
+:root[data-theme='mulen'] .action-icon,
+:root[data-theme='mulen'] .section-icon,
+:root[data-theme='mulen'] .empty-icon,
+:root[data-theme='mulen'] .activity-symbol,
+:root[data-theme='mulen'] .remittance-icon,
+:root[data-theme='mulen'] .document-icon,
+:root[data-theme='mulen'] .profile-avatar,
+:root[data-theme='mulen'] .beneficiary-avatar,
+:root[data-theme='mulen'] .kyc-shield,
+:root[data-theme='mulen-dark'] .feature-icon,
+:root[data-theme='mulen-dark'] .action-icon,
+:root[data-theme='mulen-dark'] .section-icon,
+:root[data-theme='mulen-dark'] .empty-icon,
+:root[data-theme='mulen-dark'] .activity-symbol,
+:root[data-theme='mulen-dark'] .remittance-icon,
+:root[data-theme='mulen-dark'] .document-icon,
+:root[data-theme='mulen-dark'] .profile-avatar,
+:root[data-theme='mulen-dark'] .beneficiary-avatar,
+:root[data-theme='mulen-dark'] .kyc-shield {
+  background: rgba(46,148,226,.14);
+  color: var(--indigo-600);
+}
+
+:root[data-theme='mulen'] .metric-primary,
+:root[data-theme='mulen-dark'] .metric-primary {
+  background: linear-gradient(140deg, #1561a0, #2e94e2) !important;
+  border-color: transparent !important;
+}
+:root[data-theme='mulen'] .metric-primary > span,
+:root[data-theme='mulen'] .metric-primary > strong,
+:root[data-theme='mulen'] .metric-primary > small,
+:root[data-theme='mulen-dark'] .metric-primary > span,
+:root[data-theme='mulen-dark'] .metric-primary > strong,
+:root[data-theme='mulen-dark'] .metric-primary > small { color: #fff; }
+
+:root[data-theme='mulen'] .exchange-rate-card,
+:root[data-theme='mulen-dark'] .exchange-rate-card {
+  border-color: var(--line);
+  background: var(--surface-0);
+}
+:root[data-theme='mulen'] .exchange-rate-capsule,
+:root[data-theme='mulen-dark'] .exchange-rate-capsule { background: var(--indigo-600); }
+:root[data-theme='mulen'] .exchange-rate-leg strong,
+:root[data-theme='mulen'] .exchange-rate-value,
+:root[data-theme='mulen-dark'] .exchange-rate-leg strong,
+:root[data-theme='mulen-dark'] .exchange-rate-value { color: var(--indigo-600); }
+
+:root[data-theme='mulen'] .language-switch,
+:root[data-theme='mulen-dark'] .language-switch,
+:root[data-theme='mulen'] .theme-toggle,
+:root[data-theme='mulen-dark'] .theme-toggle {
+  border-color: var(--line);
+  background: var(--surface-0);
+}
+:root[data-theme='mulen'] .language-option.active,
+:root[data-theme='mulen-dark'] .language-option.active { background: var(--indigo-600); color: #fff; }
+
+:root[data-theme='mulen'] .text-button,
+:root[data-theme='mulen-dark'] .text-button {
+  color: var(--indigo-600) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+:root[data-theme='mulen'] .filter-tabs,
+:root[data-theme='mulen-dark'] .filter-tabs { background: var(--surface-2); }
+:root[data-theme='mulen'] .filter-tab.active,
+:root[data-theme='mulen-dark'] .filter-tab.active {
+  background: var(--surface-0) !important;
+  color: var(--indigo-700) !important;
+  box-shadow: 0 4px 12px -6px rgba(26,120,197,.35);
+}
+
+:root[data-theme='mulen'] .stat,
+:root[data-theme='mulen-dark'] .stat { background: var(--surface-2); }
+:root[data-theme='mulen'] .stat strong,
+:root[data-theme='mulen-dark'] .stat strong { color: var(--indigo-600); }
+
+:root[data-theme='mulen'] .row:hover,
+:root[data-theme='mulen-dark'] .row:hover { background: var(--surface-2); }
+
+:root[data-theme='mulen'] .rate-ticker,
+:root[data-theme='mulen-dark'] .rate-ticker {
+  border-color: var(--line);
+  background: linear-gradient(110deg, rgba(223,242,255,.95), rgba(235,243,249,.95));
+  color: var(--indigo-700);
+}
+:root[data-theme='mulen-dark'] .rate-ticker {
+  background: linear-gradient(110deg, rgba(16,46,72,.95), rgba(17,60,96,.95));
+}
+
+:root[data-theme='mulen'] .status-pill,
+:root[data-theme='mulen-dark'] .status-pill { background: var(--indigo-100); color: var(--indigo-700); }
+:root[data-theme='mulen'] .details-modal-heading,
+:root[data-theme='mulen-dark'] .details-modal-heading { background: var(--surface-0); border-bottom-color: var(--line); }
+
+/* Animaciones suaves inspiradas en Mulen (hover/foco) */
+@keyframes mulen-soft-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+@keyframes mulen-soft-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(46,148,226,0); }
+  50% { box-shadow: 0 0 0 6px rgba(46,148,226,.12); }
+}
+:root[data-theme='mulen'] .landing-cta button:first-child:not(:disabled),
+:root[data-theme='mulen-dark'] .landing-cta button:first-child:not(:disabled) {
+  animation: mulen-soft-pulse 2.6s ease-in-out infinite;
+}
+:root[data-theme='mulen'] .landing-cta button:first-child:not(:disabled):hover,
+:root[data-theme='mulen-dark'] .landing-cta button:first-child:not(:disabled):hover {
+  animation: none;
+}
+
+/* Vistas previas del selector de temas (admin) */
+.theme-preview.mulen {
+  background:
+    radial-gradient(at 0% 0%, rgba(223,242,255,.95) 0px, transparent 55%),
+    radial-gradient(at 100% 100%, rgba(184,229,253,.7) 0px, transparent 50%),
+    #f5f9fc;
+}
+.theme-preview.mulen-dark {
+  background:
+    radial-gradient(at 0% 0%, rgba(46,148,226,.45) 0px, transparent 60%),
+    radial-gradient(at 100% 100%, rgba(21,97,160,.4) 0px, transparent 55%),
+    #03131b;
+}
+.theme-preview.mulen .theme-preview-card {
+  background: rgba(255,255,255,.82);
+  border-color: rgba(216,233,243,.9);
+}
+.theme-preview.mulen-dark .theme-preview-bar {
+  background: rgba(255,255,255,.07);
+  border-color: rgba(122,208,250,.18);
+}
+.theme-preview.mulen-dark .theme-preview-card {
+  background: rgba(16,46,72,.85);
+  border-color: rgba(122,208,250,.2);
+}
+

@@ -550,10 +550,14 @@ const extendedMessages: Record<Language, Record<string, string>> = {
     'theme.option.dark': 'Dos orillas oscuro',
     'theme.option.aurora': 'Aurora',
     'theme.option.auroraDark': 'Aurora nocturna',
+    'theme.option.mulen': 'Mulen',
+    'theme.option.mulenDark': 'Mulen nocturno',
     'theme.tagline.light': 'Identidad institucional, clara y sobria.',
     'theme.tagline.dark': 'La misma identidad, con contraste nocturno.',
     'theme.tagline.aurora': 'Cristal suave, degradados luminosos y aire moderno.',
     'theme.tagline.auroraDark': 'Cristal nocturno con acentos aurora.',
+    'theme.tagline.mulen': 'Limpio y moderno, con azules de marca y botones dinámicos.',
+    'theme.tagline.mulenDark': 'Estilo Mulen en modo oscuro, nítido y de alto contraste.',
   },
   ru: {
     'rate.unavailable': 'Курсы валют временно недоступны.',
@@ -918,10 +922,14 @@ const extendedMessages: Record<Language, Record<string, string>> = {
     'theme.option.dark': 'Два берега · тёмная',
     'theme.option.aurora': 'Аврора',
     'theme.option.auroraDark': 'Ночная аврора',
+    'theme.option.mulen': 'Mulen',
+    'theme.option.mulenDark': 'Mulen · тёмная',
     'theme.tagline.light': 'Институциональный стиль: ясный и сдержанный.',
     'theme.tagline.dark': 'Тот же стиль с ночным контрастом.',
     'theme.tagline.aurora': 'Мягкое стекло, светящиеся градиенты, современный вид.',
     'theme.tagline.auroraDark': 'Ночное стекло с акцентами северного сияния.',
+    'theme.tagline.mulen': 'Чистый современный стиль с фирменными синими и динамичными кнопками.',
+    'theme.tagline.mulenDark': 'Стиль Mulen в тёмном режиме: чёткий и контрастный.',
   }
 };
 export function translate(language: Language, key: string): string {
