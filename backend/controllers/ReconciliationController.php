@@ -67,6 +67,17 @@ final class ReconciliationController extends Controller
             if ($transaction->getIsActive()) $transaction->rollBack();
             throw new UnprocessableEntityHttpException($exception->getMessage(), $exception);
         }
+        try {
+            (new \app\Infrastructure\Notification\NotificationService(Yii::$app->db))->notifyUser(
+                $userId,
+                'remittance.completed',
+                'Remesa completada',
+                'Tu remesa fue conciliada y completada exitosamente.',
+                ['remittance_public_id' => $publicId, 'status' => 'completed']
+            );
+        } catch (\Throwable $exception) {
+            Yii::warning('Reconciliation notification failed: ' . $exception->getMessage(), __METHOD__);
+        }
         return $response;
     }
 

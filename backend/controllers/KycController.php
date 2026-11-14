@@ -360,7 +360,19 @@ final class KycController extends Controller
 
         // Aviso al cliente de que su expediente ya esta en revision.
         $this->notifyKycSubmitted($userId);
+        $this->notifyUserKycSubmitted($userId);
 
         return ['status' => 'pending_review'];
+    }
+
+    private function notifyUserKycSubmitted(int $userId): void
+    {
+        (new \app\Infrastructure\Notification\NotificationService(Yii::$app->db))->notifyUser(
+            $userId,
+            'kyc.submitted',
+            'Verificación KYC enviada',
+            'Tu expediente de verificación fue enviado y está pendiente de revisión.',
+            ['status' => 'pending_review']
+        );
     }
 }

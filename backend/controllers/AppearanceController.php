@@ -31,7 +31,7 @@ final class AppearanceController extends Controller
     public function actionIndex(): array
     {
         $theme = PlatformSettings::get(Yii::$app->db, 'appearance.theme');
-        $allowed = ['light', 'dark', 'aurora', 'aurora-dark'];
+        $allowed = ['light', 'dark', 'aurora', 'aurora-dark', 'mulen', 'mulen-dark'];
 
         Yii::$app->response->headers->set('Cache-Control', 'public, max-age=60');
 

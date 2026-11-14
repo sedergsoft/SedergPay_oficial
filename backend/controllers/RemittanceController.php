@@ -164,6 +164,18 @@ final class RemittanceController extends Controller
             throw $exception;
         }
 
+        try {
+            (new \app\Infrastructure\Notification\NotificationService(Yii::$app->db))->notifyUser(
+                $userId,
+                'remittance.created',
+                'Remesa creada',
+                'Tu remesa ' . $reference . ' fue creada y está pendiente de pago.',
+                ['remittance_public_id' => $publicId, 'reference' => $reference, 'status' => 'awaiting_payment']
+            );
+        } catch (\Throwable $exception) {
+            Yii::warning('Remittance created notification failed: ' . $exception->getMessage(), __METHOD__);
+        }
+
         Yii::$app->response->statusCode = 201;
         $detail = $repository->findForUser($publicId, $userId);
         if ($detail !== null) {

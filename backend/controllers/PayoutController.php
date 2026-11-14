@@ -71,6 +71,17 @@ final class PayoutController extends Controller
             if ($transaction->getIsActive()) $transaction->rollBack();
             throw $exception;
         }
+        try {
+            (new \app\Infrastructure\Notification\NotificationService(Yii::$app->db))->notifyUser(
+                $userId,
+                'payout.created',
+                'Entrega iniciada',
+                'Se inició la entrega de tu remesa.',
+                ['remittance_public_id' => $publicId, 'payout_public_id' => $payoutId, 'status' => 'pending']
+            );
+        } catch (\Throwable $exception) {
+            Yii::warning('Payout created notification failed: ' . $exception->getMessage(), __METHOD__);
+        }
         Yii::$app->response->statusCode = 201;
         return $response;
     }
@@ -89,6 +100,17 @@ final class PayoutController extends Controller
         } catch (\Throwable $exception) {
             if ($transaction->getIsActive()) $transaction->rollBack();
             throw new UnprocessableEntityHttpException($exception->getMessage(), $exception);
+        }
+        try {
+            (new \app\Infrastructure\Notification\NotificationService(Yii::$app->db))->notifyUser(
+                $userId,
+                'payout.completed',
+                'Entrega completada (pendiente de conciliación)',
+                'La entrega de tu remesa se completó y quedó pendiente de conciliación.',
+                ['payout_public_id' => $publicId, 'remittance_public_id' => $remittance['public_id'] ?? null, 'status' => 'reconciliation_pending']
+            );
+        } catch (\Throwable $exception) {
+            Yii::warning('Payout completed notification failed: ' . $exception->getMessage(), __METHOD__);
         }
         return ['public_id' => $publicId, 'status' => 'reconciliation_pending'];
     }

@@ -1999,3 +1999,14 @@ td,th { border-bottom:1px solid #E5EDF5; }
   border-color: rgba(122,208,250,.2);
 }
 
+
+/* Notifications */
+.nav-button-label { display: inline-flex; align-items: center; gap: 8px; }
+.nav-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--accent, #2563eb); color: #fff; font-size: 12px; font-weight: 700; line-height: 1; }
+.notifications-list { display: grid; gap: 12px; }
+.notification-item { border: 1px solid var(--border, rgba(148,163,184,.25)); border-radius: 12px; padding: 14px 16px; background: var(--surface, rgba(255,255,255,.03)); }
+.notification-item.is-unread { border-color: var(--accent, #2563eb); background: color-mix(in srgb, var(--accent, #2563eb) 8%, transparent); }
+.notification-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.notification-head small { color: var(--muted, #94a3b8); white-space: nowrap; }
+.notification-item p { margin: 0 0 10px; }
+.header-actions { display: flex; gap: 8px; flex-wrap: wrap; }

@@ -1,6 +1,6 @@
-import { ChangeEvent, FormEvent, createContext, useContext, useEffect, useState } from 'react';
+import { ChangeEvent, FormEvent, ReactNode, createContext, useContext, useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import { api, AdminDashboard, AdminOperation, AdminRate, AdminUser, Beneficiary, ExchangeRate, FundingAccount, FundingMethod, PlatformSetting, Quote, Remittance, RemittanceDetail, User, isDevelopmentAuth, paymentMethods, isLoginChallenge, isEmailVerificationRequired, SecurityStatus, TwoFactorSetup } from './api';
+import { api, AdminDashboard, AdminOperation, AdminRate, AdminUser, AppNotification, Beneficiary, ExchangeRate, FundingAccount, FundingMethod, PlatformSetting, Quote, Remittance, RemittanceDetail, User, isDevelopmentAuth, paymentMethods, isLoginChallenge, isEmailVerificationRequired, SecurityStatus, TwoFactorSetup } from './api';
 import { getInitialLanguage, Language, languageLabels, translate } from './i18n';
 import { Icon } from './icons';
 import { ToastHost } from './ToastHost';
@@ -62,7 +62,7 @@ const useLanguage = () => useContext(LanguageContext);
 const useT = () => { const language = useLanguage(); return (key: string) => translate(language, key); };
 const localeFor = (language: Language) => language === 'ru' ? 'ru-RU' : 'es-ES';
 
-type View = 'summary' | 'beneficiaries' | 'quote' | 'remittances' | 'profile' | 'security' | 'kyc' | 'admin' | 'funding';
+type View = 'summary' | 'beneficiaries' | 'quote' | 'remittances' | 'profile' | 'security' | 'kyc' | 'admin' | 'funding' | 'notifications';
 const storedUserId = isDevelopmentAuth ? localStorage.getItem('sederg_user') ?? '' : '';
 
 export function App() {
@@ -116,11 +116,21 @@ function AppContent({ language, onLanguageChange, theme, onThemeChange }: { lang
   const [view, setView] = useState<View>('summary');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   useEffect(() => {
     if (!storedUserId) return;
     api.me(storedUserId).then(setUser).catch(() => localStorage.removeItem('sederg_user')).finally(() => setAuthReady(true));
   }, []);
+
+  useEffect(() => {
+    if (!user) { setUnreadNotifications(0); return; }
+    let cancelled = false;
+    const load = () => api.notificationsUnreadCount(user.public_id).then((r) => { if (!cancelled) setUnreadNotifications(r.unread_count || 0); }).catch(() => undefined);
+    void load();
+    const id = window.setInterval(load, 30000);
+    return () => { cancelled = true; window.clearInterval(id); };
+  }, [user?.public_id]);
 
   const run = async (action: () => Promise<void>) => {
     setBusy(true);
@@ -157,6 +167,7 @@ function AppContent({ language, onLanguageChange, theme, onThemeChange }: { lang
         <NavButton icon="users" active={view === 'beneficiaries'} onClick={() => setView('beneficiaries')}>{translate(language, 'nav.beneficiaries')}</NavButton>
         <NavButton icon="send" active={view === 'quote'} onClick={() => setView('quote')}>{translate(language, 'nav.quote')}</NavButton>
         {user.role !== 'admin' && <NavButton icon="history" active={view === 'remittances'} onClick={() => setView('remittances')}>{translate(language, 'nav.remittances')}</NavButton>}<NavButton icon="user" active={view === 'profile'} onClick={() => setView('profile')}>{t('nav.profile')}</NavButton><NavButton icon="lock" active={view === 'security'} onClick={() => setView('security')}>{t('nav.security')}</NavButton>{user.role !== 'admin' && <NavButton icon="shield" active={view === 'kyc'} onClick={() => setView('kyc')}>{t('nav.kyc')}</NavButton>}
+        <NavButton icon="bell" active={view === 'notifications'} onClick={() => setView('notifications')}>{translate(language, 'nav.notifications')}{unreadNotifications > 0 ? <span className="nav-badge">{unreadNotifications > 99 ? '99+' : unreadNotifications}</span> : null}</NavButton>
         {user.role === 'admin' && <><NavButton icon="settings" active={view === 'admin'} onClick={() => setView('admin')}>{translate(language, 'nav.admin')}</NavButton><NavButton icon="settings" active={view === 'funding'} onClick={() => setView('funding')}>Métodos de pago</NavButton></>}
         <button className="secondary menu-exit" onClick={signOut}>{translate(language, 'nav.logout')}</button>
       </nav>
@@ -166,6 +177,7 @@ function AppContent({ language, onLanguageChange, theme, onThemeChange }: { lang
         {view === 'beneficiaries' && <Beneficiaries userId={user.public_id} run={run} />}
         {view === 'quote' && <QuotePanel userId={user.public_id} run={run} />}
         {view === 'remittances' && <Remittances userId={user.public_id} run={run} />}{view === 'profile' && <ProfilePanel userId={user.public_id} run={run} />}{view === 'security' && <SecurityPanel userId={user.public_id} run={run} />}{view === 'kyc' && <KycPanel userId={user.public_id} run={run} />}
+        {view === 'notifications' && <NotificationsPanel userId={user.public_id} run={run} onUnreadChange={setUnreadNotifications} />}
         {view === 'admin' && user.role === 'admin' && <AdminOperations userId={user.public_id} run={run} />}{view === 'funding' && user.role === 'admin' && <AdminFundingPanel userId={user.public_id} run={run} />}
         {message && <Alert text={message} />}
       </section>
@@ -1186,7 +1198,7 @@ function StatusBadge({status}:{status:string}) {
   return <span className={`status-pill status-${tone}`}>{t(`status.${normalized}`) === `status.${normalized}` ? status.replace(/_/g,' ') : t(`status.${normalized}`)}</span>;
 }
 
-function NavButton({ active, onClick, children, icon }: { active: boolean; onClick: () => void; children: string; icon?: string }) { return <button className={active ? 'nav-button active' : 'nav-button'} onClick={onClick}>{icon && <Icon name={icon} />}<span>{children}</span></button>; }
+function NavButton({ active, onClick, children, icon }: { active: boolean; onClick: () => void; children: React.ReactNode; icon?: string }) { return <button className={active ? 'nav-button active' : 'nav-button'} onClick={onClick}>{icon && <Icon name={icon} />}<span className="nav-button-label">{children}</span></button>; }
 function Logo({ language, monochrome = false }: { language: Language; monochrome?: boolean }) {
   const slogan = translate(language, 'brand.slogan');
   // El repositorio solo publica los logotipos en SVG (no hay PNG), por eso se
@@ -1397,5 +1409,61 @@ function AdminFundingPanel({ userId, run }: { userId: string; run: (action: () =
   </form></section>
   <section className="card"><div className="section-heading"><div><h3>Cuentas receptoras registradas</h3><p className="muted">Para cambiar de cuenta, registra la nueva y desactiva la anterior. Los depósitos existentes conservan su fotografía original.</p></div></div>
   {accounts.length===0?<p className="muted">Todavía no hay cuentas configuradas.</p>:accounts.map(account=><article className="funding-account-row" key={account.public_id}><div><strong>{account.bank_name} · {account.country_code}/{account.currency_code}</strong><small>Titular: {account.account_holder_name} · Cuenta {account.account_mask}{account.routing_mask ? ` · BIC/ruta ${account.routing_mask}` : ''}</small><small>Métodos: {account.methods||'—'} · {account.environment}</small></div><div><span className={account.status==='active'?'status-pill status-success':'status-pill status-muted'}>{account.status}</span><button className="secondary compact-button" onClick={()=>void run(async()=>{const nextStatus=account.status==='active'?'inactive':'active';await api.updateFundingAccount(userId,account.public_id,nextStatus);notifySuccess(nextStatus==='active'?'Cuenta receptora activada.':'Cuenta receptora desactivada.');await reload();})}>{account.status==='active'?'Desactivar':'Activar'}</button></div></article>)}</section>
+  </div>;
+}
+
+function NotificationsPanel({ userId, run, onUnreadChange }: { userId: string; run: (action: () => Promise<void>) => Promise<void>; onUnreadChange: (count: number) => void }) {
+  const t = useT();
+  const [items, setItems] = useState<AppNotification[]>([]);
+  const [unread, setUnread] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const data = await api.notifications(userId, 50);
+      setItems(data.items || []);
+      setUnread(data.unread_count || 0);
+      onUnreadChange(data.unread_count || 0);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { void load(); }, [userId]);
+
+  const markRead = (id: string) => void run(async () => {
+    await api.markNotificationRead(userId, id);
+    await load();
+  });
+  const markAll = () => void run(async () => {
+    await api.markAllNotificationsRead(userId);
+    await load();
+  });
+
+  return <div className="feature-view">
+    <div className="view-heading">
+      <div><span className="eyebrow">{t('notifications.eyebrow')}</span><h2>{t('notifications.title')}</h2><p className="muted">{t('notifications.description')}</p></div>
+      <div className="header-actions">
+        <ActionButton icon="refresh" label={t('notifications.refresh')} onClick={() => void load()} disabled={loading} />
+        <ActionButton icon="check" label={t('notifications.markAllRead')} onClick={markAll} disabled={loading || unread === 0} />
+      </div>
+    </div>
+    <section className="card">
+      {loading ? <p className="muted">{t('common.loading')}</p>
+        : items.length === 0 ? <p className="muted">{t('notifications.empty')}</p>
+        : <div className="notifications-list">
+            {items.map((item) => (
+              <article key={item.public_id} className={`notification-item ${item.is_read ? 'is-read' : 'is-unread'}`}>
+                <div className="notification-head">
+                  <strong>{item.title}</strong>
+                  <small>{new Date(item.created_at).toLocaleString()}</small>
+                </div>
+                <p>{item.body}</p>
+                {!item.is_read && <button type="button" className="secondary compact-button" onClick={() => markRead(item.public_id)}>{t('notifications.markRead')}</button>}
+              </article>
+            ))}
+          </div>}
+    </section>
   </div>;
 }

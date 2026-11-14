@@ -271,6 +271,7 @@ final class AdminController extends Controller
 
         // Aviso al cliente del cambio de estado (aprobado / denegado / mas datos).
         $this->notifyKycStatusChange((int) $case['user_id'], $status, $reason);
+        $this->notifyUserKycReviewed((int) $case['user_id'], $status, $reason, $publicId);
 
         return ['public_id' => $publicId, 'status' => $status, 'review_reason' => $reason];
     }
@@ -300,6 +301,33 @@ final class AdminController extends Controller
         } catch (\Throwable $exception) {
             Yii::warning('KYC status notification failed: ' . $exception->getMessage(), __METHOD__);
         }
+    }
+
+    private function notifyUserKycReviewed(int $userId, string $status, string $reason, string $casePublicId): void
+    {
+        $titles = [
+            'approved' => 'Verificación KYC aprobada',
+            'rejected' => 'Verificación KYC rechazada',
+            'requires_action' => 'Acción requerida en tu verificación KYC',
+        ];
+        $bodies = [
+            'approved' => 'Tu verificación de identidad fue aprobada. Ya puedes operar sin las restricciones del límite diario para usuarios no verificados.',
+            'rejected' => 'Tu verificación de identidad fue rechazada.',
+            'requires_action' => 'Tu verificación de identidad requiere información o documentos adicionales.',
+        ];
+        $title = $titles[$status] ?? 'Actualización de verificación KYC';
+        $body = $bodies[$status] ?? 'El estado de tu verificación de identidad ha cambiado.';
+        $reason = trim($reason);
+        if ($reason !== '' && $status !== 'approved') {
+            $body .= ' Motivo: ' . $reason;
+        }
+        (new \app\Infrastructure\Notification\NotificationService(Yii::$app->db))->notifyUser(
+            $userId,
+            'kyc.status_changed',
+            $title,
+            $body,
+            ['status' => $status, 'reason' => $reason !== '' ? $reason : null, 'kyc_case_public_id' => $casePublicId]
+        );
     }
 
     public function actionKycDocuments(string $publicId): array
