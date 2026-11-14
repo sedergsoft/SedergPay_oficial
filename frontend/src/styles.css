@@ -2086,3 +2086,35 @@ td,th { border-bottom:1px solid #E5EDF5; }
   .notification-dropdown-title { font-size: 14px; }
   .notification-dropdown-text { font-size: 12px; }
 }
+
+/* Sticky mobile header: app icon, menu icon, notifications always visible */
+.header-start { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.header-menu-toggle { flex-shrink: 0; }
+@media (max-width: 900px) {
+  .shell > header.app-header.has-menu-toggle,
+  .landing-header header,
+  .narrow > header.app-header {
+    position: sticky;
+    top: 0;
+    z-index: 850;
+    background: color-mix(in srgb, var(--surface-0, #ffffff) 92%, transparent);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding-top: 10px;
+    padding-bottom: 10px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--border, rgba(148,163,184,.18));
+  }
+  .app-header .header-start { gap: 8px; }
+  .app-header .brand, .app-header .logo, .app-header [class*="brand"] { max-width: 140px; }
+  .app-header .brand img, .app-header .logo img { max-height: 32px; width: auto; }
+}
+@media (max-width: 720px) {
+  .shell > header.app-header.has-menu-toggle { padding-top: 8px; padding-bottom: 8px; }
+  .app-header .brand img, .app-header .logo img { max-height: 28px; }
+}
+@media (max-width: 420px) {
+  .app-header .header-start { gap: 6px; }
+  .app-header .brand img, .app-header .logo img { max-height: 26px; }
+  .header-tools { gap: 4px; }
+}

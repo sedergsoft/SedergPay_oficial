@@ -167,7 +167,7 @@ function AppContent({ language, onLanguageChange, theme, onThemeChange }: { lang
 
   return <main className="shell">
     <ToastHost />
-    <Header language={language} onLanguageChange={onLanguageChange} theme={theme} onThemeChange={onThemeChange} notification={{ userId: user.public_id, unreadCount: unreadNotifications, onUnreadChange: setUnreadNotifications, onViewAll: () => setView('notifications') }} />
+    <Header language={language} onLanguageChange={onLanguageChange} theme={theme} onThemeChange={onThemeChange} notification={{ userId: user.public_id, unreadCount: unreadNotifications, onUnreadChange: setUnreadNotifications, onViewAll: () => setView('notifications') }} menuControl={{ open: menuOpen, toggle: () => setMenuOpen((v) => !v) }} />
     <RateTicker />
     <section className="hero">
       <div><div className="eyebrow">{t('app.operationsPanel')}</div><h1>{t('app.hello')}, {user.first_name}.</h1><p>{t('app.welcomeDescription')}</p></div>
@@ -186,7 +186,7 @@ function AppContent({ language, onLanguageChange, theme, onThemeChange }: { lang
         <button className="secondary menu-exit" onClick={signOut}>{translate(language, 'nav.logout')}</button>
       </nav>
       <section className="content">
-        <div className="toolbar"><button type="button" className="menu-toggle" aria-label={menuOpen ? t('nav.closeMenu') : t('nav.openMenu')} aria-expanded={menuOpen} aria-controls="app-menu" onClick={() => setMenuOpen((v) => !v)}><span /><span /><span /></button><span className="toolbar-user">{user.email} · <span className="role">{user.role === 'admin' ? t('role.admin') : t('role.customer')}</span></span><span className="sandbox"><i /> {t('common.sandbox')}</span></div>
+        <div className="toolbar"><span className="toolbar-user">{user.email} · <span className="role">{user.role === 'admin' ? t('role.admin') : t('role.customer')}</span></span><span className="sandbox"><i /> {t('common.sandbox')}</span></div>
         {view === 'summary' && <Summary userId={user.public_id} setView={setView} run={run} />}
         {view === 'beneficiaries' && <Beneficiaries userId={user.public_id} run={run} />}
         {view === 'quote' && <QuotePanel userId={user.public_id} run={run} />}
@@ -1333,8 +1333,15 @@ function NotificationBell({ userId, unreadCount, onUnreadChange, onViewAll }: { 
   </div>;
 }
 
-function Header({ language, onLanguageChange, theme, onThemeChange, notification }: { language: Language; onLanguageChange: (language: Language) => void; theme: ThemeId; onThemeChange: (theme: ThemeId) => void; notification?: { userId: string; unreadCount: number; onUnreadChange: (n: number) => void; onViewAll: () => void } }) {
-  return <header><Brand language={language} /><div className="header-tools">{notification && <NotificationBell userId={notification.userId} unreadCount={notification.unreadCount} onUnreadChange={notification.onUnreadChange} onViewAll={notification.onViewAll} />}<ThemeToggle theme={theme} onChange={onThemeChange} /><LanguageSwitch language={language} onChange={onLanguageChange} /><span className="sandbox"><i /> {translate(language, 'common.sandbox')}</span></div></header>;
+function Header({ language, onLanguageChange, theme, onThemeChange, notification, menuControl }: { language: Language; onLanguageChange: (language: Language) => void; theme: ThemeId; onThemeChange: (theme: ThemeId) => void; notification?: { userId: string; unreadCount: number; onUnreadChange: (n: number) => void; onViewAll: () => void }; menuControl?: { open: boolean; toggle: () => void } }) {
+  const t = useT();
+  return <header className={menuControl ? 'app-header has-menu-toggle' : 'app-header'}>
+    <div className="header-start">
+      {menuControl && <button type="button" className="menu-toggle header-menu-toggle" aria-label={menuControl.open ? t('nav.closeMenu') : t('nav.openMenu')} aria-expanded={menuControl.open} aria-controls="app-menu" onClick={menuControl.toggle}><span /><span /><span /></button>}
+      <Brand language={language} />
+    </div>
+    <div className="header-tools">{notification && <NotificationBell userId={notification.userId} unreadCount={notification.unreadCount} onUnreadChange={notification.onUnreadChange} onViewAll={notification.onViewAll} />}<ThemeToggle theme={theme} onChange={onThemeChange} /><LanguageSwitch language={language} onChange={onLanguageChange} /><span className="sandbox"><i /> {translate(language, 'common.sandbox')}</span></div>
+  </header>;
 }
 function RateTicker() {
   const t = useT();
