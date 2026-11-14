@@ -406,7 +406,12 @@ footer { padding-top: 18px; text-align: center; }
 .exchange-rate-meta strong { color: var(--ink-900); }
 .exchange-rate-status { display: inline-flex; align-items: center; gap: 7px; }
 .exchange-rate-status i { width: 8px; height: 8px; border-radius: 50%; background: var(--jade-500); box-shadow: 0 0 0 3px rgba(0,197,83,.18); }
-.exchange-rate-status.cached i { background: var(--amber-500); box-shadow: 0 0 0 3px rgba(230,154,25,.18); }
+.exchange-rate-status.live i { animation: live-pulse 1.4s ease-in-out infinite; }
+.exchange-rate-status.cached i { background: var(--amber-500); box-shadow: 0 0 0 3px rgba(230,154,25,.18); animation: none; }
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 3px rgba(0,197,83,.18); }
+  50% { opacity: .35; transform: scale(.85); box-shadow: 0 0 0 6px rgba(0,197,83,.08); }
+}
 @media (max-width: 720px) { .landing-rate-card-wrap { margin: 0 15px 75px; padding: 0; } .exchange-rate-card { padding: 18px 16px; } .exchange-rate-main { gap: 12px; } .exchange-rate-meta { flex-direction: column; align-items: flex-start; } }
 @media (max-width: 420px) { .exchange-rate-main { flex-direction: column; gap: 8px; } .exchange-rate-symbol { transform: rotate(90deg); } }
 
