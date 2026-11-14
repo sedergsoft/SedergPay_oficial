@@ -177,7 +177,7 @@ function AppContent({ language, onLanguageChange, theme, onThemeChange }: { lang
       <div className={`menu-overlay ${menuOpen ? 'is-open' : ''}`} onClick={() => setMenuOpen(false)} aria-hidden="true" />
       <nav id="app-menu" className={`menu ${menuOpen ? 'is-open' : ''}`} aria-label={t("nav.platform")}>
         <div className="menu-head"><strong>{t('nav.platform')}</strong><button type="button" className="menu-close" aria-label={t('nav.closeMenu')} onClick={() => setMenuOpen(false)}>×</button></div>
-        <div className="menu-preferences" aria-label={t('nav.preferences')}>
+        <div className="menu-preferences menu-preferences-mobile-only" aria-label={t('nav.preferences')}>
           <ThemeToggle theme={theme} onChange={onThemeChange} />
           <LanguageSwitch language={language} onChange={onLanguageChange} />
         </div>
@@ -1344,7 +1344,11 @@ function Header({ language, onLanguageChange, theme, onThemeChange, notification
       {menuControl && <button type="button" className="menu-toggle header-menu-toggle" aria-label={menuControl.open ? t('nav.closeMenu') : t('nav.openMenu')} aria-expanded={menuControl.open} aria-controls="app-menu" onClick={menuControl.toggle}><span /><span /><span /></button>}
       <Brand language={language} />
     </div>
-    <div className="header-tools">{notification && <NotificationBell userId={notification.userId} unreadCount={notification.unreadCount} onUnreadChange={notification.onUnreadChange} onViewAll={notification.onViewAll} />}{!menuControl && <ThemeToggle theme={theme} onChange={onThemeChange} />}{!menuControl && <LanguageSwitch language={language} onChange={onLanguageChange} />}<span className="sandbox"><i /> {translate(language, 'common.sandbox')}</span></div>
+    <div className="header-tools">
+      {notification && <NotificationBell userId={notification.userId} unreadCount={notification.unreadCount} onUnreadChange={notification.onUnreadChange} onViewAll={notification.onViewAll} />}
+      <span className={menuControl ? 'header-appearance' : undefined}><ThemeToggle theme={theme} onChange={onThemeChange} /><LanguageSwitch language={language} onChange={onLanguageChange} /></span>
+      <span className="sandbox"><i /> {translate(language, 'common.sandbox')}</span>
+    </div>
   </header>;
 }
 function RateTicker() {

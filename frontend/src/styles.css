@@ -2126,3 +2126,11 @@ td,th { border-bottom:1px solid #E5EDF5; }
 @media (max-width: 900px) {
   .menu-preferences { padding: 10px 8px 12px; }
 }
+
+/* Theme/language: in header on tablet/desktop, in menu only on mobile */
+.header-appearance { display: inline-flex; align-items: center; gap: 10px; }
+.menu-preferences-mobile-only { display: none; }
+@media (max-width: 640px) {
+  .app-header.has-menu-toggle .header-appearance { display: none; }
+  .menu-preferences-mobile-only { display: flex; }
+}
