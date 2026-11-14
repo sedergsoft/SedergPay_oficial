@@ -1600,31 +1600,31 @@ function FundingMethodConfiguration({ userId, method, run, onSaved }: { userId: 
   </section>;
 }
 
-const BANKS_BY_COUNTRY: Record<'RU'|'CU', { code: string; name: string }[]> = {
+type BankInfo = { code: string; name: string; routing?: string; legalName?: string; source?: string };
+const BANKS_BY_COUNTRY: Record<'RU'|'CU', BankInfo[]> = {
   RU: [
-    { code: 'sberbank', name: 'Sberbank (Сбербанк)' },
-    { code: 'vtb', name: 'VTB (ВТБ)' },
-    { code: 'gazprombank', name: 'Gazprombank (Газпромбанк)' },
-    { code: 'alfa', name: 'Alfa-Bank (Альфа-Банк)' },
-    { code: 'tbank', name: 'T-Bank / Tinkoff (Т-Банк)' },
-    { code: 'rosselkhozbank', name: 'Rosselkhozbank (Россельхозбанк)' },
-    { code: 'sovcombank', name: 'Sovcombank (Совкомбанк)' },
-    { code: 'promsvyazbank', name: 'Promsvyazbank (Промсвязьбанк)' },
-    { code: 'otkritie', name: 'Otkritie Bank (Банк «Открытие»)' },
-    { code: 'raiffeisen', name: 'Raiffeisen Bank (Райффайзен Банк)' },
-    { code: 'rosbank', name: 'Rosbank (Росбанк)' },
-    { code: 'unicredit', name: 'UniCredit Bank (ЮниКредит Банк)' },
-    { code: 'mkb', name: 'Credit Bank of Moscow (МКБ)' },
-    { code: 'domrf', name: 'DOM.RF Bank (Банк ДОМ.РФ)' },
+    { code: 'sberbank', name: 'Sberbank (Сбербанк)', routing: '044525225 / SABRRUMM', legalName: 'Публичное акционерное общество «Сбербанк России» (ПАО Сбербанк)', source: 'CBR/SWIFT' },
+    { code: 'vtb', name: 'VTB (ВТБ)', routing: '044525187 / VTBRRUMM', legalName: 'Банк ВТБ (публичное акционерное общество)', source: 'CBR/SWIFT' },
+    { code: 'gazprombank', name: 'Gazprombank (Газпромбанк)', routing: '044525823 / GAZPRUMM', legalName: 'Банк ГПБ (АО)', source: 'CBR/SWIFT' },
+    { code: 'alfa', name: 'Alfa-Bank (Альфа-Банк)', routing: '044525593 / ALFARUMM', legalName: 'АО «Альфа-Банк»', source: 'CBR/SWIFT' },
+    { code: 'tbank', name: 'T-Bank (Т-Банк, ex Tinkoff)', routing: '044525974 / TICSRUMM', legalName: 'АО «ТБанк»', source: 'CBR/SWIFT' },
+    { code: 'rosselkhozbank', name: 'Rosselkhozbank (Россельхозбанк)', routing: '044525219 / RUAGRUMM', legalName: 'АО «Россельхозбанк»', source: 'CBR/SWIFT' },
+    { code: 'sovcombank', name: 'Sovcombank (Совкомбанк)', routing: '044525297 / SOMRRUMM', legalName: 'ПАО «Совкомбанк»', source: 'CBR/SWIFT' },
+    { code: 'promsvyazbank', name: 'Promsvyazbank (Промсвязьбанк)', routing: '044525555 / PRMSRUMM', legalName: 'ПАО «Промсвязьбанк»', source: 'CBR/SWIFT' },
+    { code: 'raiffeisen', name: 'Raiffeisen Bank (Райффайзен Банк)', routing: '044525700 / RZBMRUMM', legalName: 'АО «Райффайзенбанк»', source: 'CBR/SWIFT' },
+    { code: 'rosbank', name: 'Rosbank (Росбанк)', routing: '044525256 / RSBNRUMM', legalName: 'ПАО РОСБАНК', source: 'CBR/SWIFT' },
+    { code: 'unicredit', name: 'UniCredit Bank (ЮниКредит Банк)', routing: '044525545 / IMBKRUMM', legalName: 'АО ЮниКредит Банк', source: 'CBR/SWIFT' },
+    { code: 'mkb', name: 'Credit Bank of Moscow (МКБ)', routing: '044525659 / MCRBRUMM', legalName: 'ПАО «Московский кредитный банк»', source: 'CBR/SWIFT' },
+    { code: 'domrf', name: 'DOM.RF Bank (Банк ДОМ.РФ)', routing: '044525154 / JMBRRUMM', legalName: 'АО «Банк ДОМ.РФ»', source: 'CBR/SWIFT' },
   ],
   CU: [
-    { code: 'bpa', name: 'Banco Popular de Ahorro (BPA)' },
-    { code: 'bandec', name: 'Banco de Crédito y Comercio (BANDEC)' },
-    { code: 'banmet', name: 'Banco Metropolitano (BANMET)' },
-    { code: 'bfi', name: 'Banco Financiero Internacional (BFI)' },
-    { code: 'bnc', name: 'Banco Nacional de Cuba (BNC)' },
-    { code: 'bec', name: 'Banco Exterior de Cuba (BEC)' },
-    { code: 'bi', name: 'Banco de Inversiones (BI)' },
+    { code: 'bpa', name: 'Banco Popular de Ahorro (BPA)', routing: 'BPAHCUHH', legalName: 'Banco Popular de Ahorro', source: 'BCC/SWIFT' },
+    { code: 'bandec', name: 'Banco de Crédito y Comercio (BANDEC)', routing: 'BDCRCUHH', legalName: 'Banco de Crédito y Comercio', source: 'BCC/SWIFT' },
+    { code: 'banmet', name: 'Banco Metropolitano (BANMET)', routing: 'BMNBCUHH', legalName: 'Banco Metropolitano S.A.', source: 'BCC/SWIFT' },
+    { code: 'bfi', name: 'Banco Financiero Internacional (BFI)', routing: 'BFICCUHH', legalName: 'Banco Financiero Internacional S.A.', source: 'BCC/SWIFT' },
+    { code: 'bnc', name: 'Banco Nacional de Cuba (BNC)', routing: 'BNACCUHH', legalName: 'Banco Nacional de Cuba', source: 'BCC/SWIFT' },
+    { code: 'bec', name: 'Banco Exterior de Cuba (BEC)', routing: 'BEACCUHH', legalName: 'Banco Exterior de Cuba', source: 'BCC/SWIFT' },
+    { code: 'bi', name: 'Banco de Inversiones (BI)', routing: 'BICVCUHH', legalName: 'Banco de Inversiones S.A.', source: 'BCC/SWIFT' },
   ],
 };
 
@@ -1635,8 +1635,8 @@ function AdminFundingPanel({ userId, run }: { userId: string; run: (action: () =
   const [bankCode,setBankCode]=useState(BANKS_BY_COUNTRY.RU[0].code);
   const [bankName,setBankName]=useState(BANKS_BY_COUNTRY.RU[0].name);
   const [accountIdentifier,setAccountIdentifier]=useState('');
-  const [routingIdentifier,setRoutingIdentifier]=useState('');
-  const [legalEntityName,setLegalEntityName]=useState('');
+  const [routingIdentifier,setRoutingIdentifier]=useState(BANKS_BY_COUNTRY.RU[0].routing || '');
+  const [legalEntityName,setLegalEntityName]=useState(BANKS_BY_COUNTRY.RU[0].legalName || '');
   const [notes,setNotes]=useState('');
   const [selectedMethods,setSelectedMethods]=useState<string[]>([]);
   const [saving,setSaving]=useState(false);
@@ -1661,14 +1661,15 @@ function AdminFundingPanel({ userId, run }: { userId: string; run: (action: () =
   {methods.filter(method=>method.code==='ru_sbp_c2p').map(method=><FundingMethodConfiguration key={method.code} userId={userId} method={method} run={run} onSaved={reload} />)}
   <section className="card"><div className="section-heading"><div><h3>Registrar cuenta receptora</h3><p className="muted">El número se cifra antes de almacenarse; solo se muestra enmascarado después del alta.</p></div></div>
   <form className="funding-account-form" onSubmit={e=>{e.preventDefault();create();}}>
-    <label>País<select value={country} onChange={e=>{const c=e.target.value as 'RU'|'CU';setCountry(c);setSelectedMethods([]);const first=BANKS_BY_COUNTRY[c][0];if(first){setBankCode(first.code);setBankName(first.name);}else{setBankCode('');setBankName('');}}}><option value="RU">Rusia</option><option value="CU">Cuba</option></select></label>
+    <label>País<select value={country} onChange={e=>{const c=e.target.value as 'RU'|'CU';setCountry(c);setSelectedMethods([]);const first=BANKS_BY_COUNTRY[c][0];if(first){setBankCode(first.code);setBankName(first.name);setRoutingIdentifier(first.routing||'');setLegalEntityName(first.legalName||'');}else{setBankCode('');setBankName('');setRoutingIdentifier('');setLegalEntityName('');}}}><option value="RU">Rusia</option><option value="CU">Cuba</option></select></label>
     <label>Moneda<input value={currency} readOnly/></label>
-    <label>Banco<select value={bankCode} onChange={e=>{const code=e.target.value;setBankCode(code);const b=BANKS_BY_COUNTRY[country].find(x=>x.code===code);if(b)setBankName(b.name);}} required>{BANKS_BY_COUNTRY[country].map(b=><option key={b.code} value={b.code}>{b.name}</option>)}</select></label>
+    <label>Banco<select value={bankCode} onChange={e=>{const code=e.target.value;setBankCode(code);const b=BANKS_BY_COUNTRY[country].find(x=>x.code===code);if(b){setBankName(b.name);setRoutingIdentifier(b.routing||'');setLegalEntityName(b.legalName||'');}}} required>{BANKS_BY_COUNTRY[country].map(b=><option key={b.code} value={b.code}>{b.name}</option>)}</select></label>
     <label>Código del banco<input value={bankCode} readOnly/></label>
+    <p className="muted funding-full">Datos de referencia (BIC/SWIFT, БИК y razón social) obtenidos de directorios/registros públicos (Banco Central de Rusia y SWIFT para RU; Banco Central de Cuba y SWIFT para CU). Verificar contra la fuente oficial vigente antes de uso en producción.</p>
     <label>Titular<input value="SEDERG_PAY" readOnly/></label>
-    <label>Denominación jurídica (si aplica)<input value={legalEntityName} onChange={e=>setLegalEntityName(e.target.value)} placeholder="Nombre legal validado por el banco"/></label>
+    <label className="funding-full">Denominación jurídica / razón social<input value={legalEntityName} onChange={e=>setLegalEntityName(e.target.value)} placeholder="Nombre legal registrado"/></label>
     <label className="funding-full">Número de cuenta / identificador bancario<input value={accountIdentifier} onChange={e=>setAccountIdentifier(e.target.value)} required autoComplete="off" /></label>
-    <label className="funding-full">BIC / БИК / código de ruta (si aplica)<input value={routingIdentifier} onChange={e=>setRoutingIdentifier(e.target.value)} autoComplete="off" /></label>
+    <label className="funding-full">BIC / БИК / SWIFT / código de ruta<input value={routingIdentifier} onChange={e=>setRoutingIdentifier(e.target.value)} autoComplete="off" placeholder="SWIFT/BIC o БИК" /></label>
     <div className="funding-full"><strong>Métodos compatibles</strong>{compatible.length===0?<p className="muted">No hay métodos definidos para este país.</p>:compatible.map(method=><label className="funding-checkbox" key={method.code}><input type="checkbox" checked={selectedMethods.includes(method.code)} onChange={()=>toggle(method.code)}/>{method.name} <small>{method.method_type==='instant_qr'?'QR sandbox':'Transferencia'}</small></label>)}</div>
     <label className="funding-full">Notas<input value={notes} onChange={e=>setNotes(e.target.value)}/></label>
     <button type="submit" disabled={saving||!accountIdentifier||!selectedMethods.length}>{saving?'Guardando…':'Guardar cuenta sandbox'}</button>
