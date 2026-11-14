@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, ReactNode, createContext, useContext, useEffect, useState } from 'react';
+import { ChangeEvent, FormEvent, ReactNode, createContext, useContext, useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { api, AdminDashboard, AdminOperation, AdminRate, AdminUser, AppNotification, Beneficiary, ExchangeRate, FundingAccount, FundingMethod, PlatformSetting, Quote, Remittance, RemittanceDetail, User, isDevelopmentAuth, paymentMethods, isLoginChallenge, isEmailVerificationRequired, SecurityStatus, TwoFactorSetup } from './api';
 import { getInitialLanguage, Language, languageLabels, translate } from './i18n';
@@ -154,7 +154,7 @@ function AppContent({ language, onLanguageChange, theme, onThemeChange }: { lang
 
   return <main className="shell">
     <ToastHost />
-    <Header language={language} onLanguageChange={onLanguageChange} theme={theme} onThemeChange={onThemeChange} />
+    <Header language={language} onLanguageChange={onLanguageChange} theme={theme} onThemeChange={onThemeChange} notification={{ userId: user.public_id, unreadCount: unreadNotifications, onUnreadChange: setUnreadNotifications, onViewAll: () => setView('notifications') }} />
     <RateTicker />
     <section className="hero">
       <div><div className="eyebrow">{t('app.operationsPanel')}</div><h1>{t('app.hello')}, {user.first_name}.</h1><p>{t('app.welcomeDescription')}</p></div>
@@ -1236,8 +1236,91 @@ function ThemeToggle({ theme, onChange }: { theme: ThemeId; onChange: (theme: Th
   return <button type="button" className="theme-toggle" onClick={() => onChange(toggleMode(theme))} aria-label={t('common.themeToggle')} title={label} aria-pressed={isDark}><svg className="theme-toggle-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{isDark ? <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /> : <><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></>}</svg></button>;
 }
 
-function Header({ language, onLanguageChange, theme, onThemeChange }: { language: Language; onLanguageChange: (language: Language) => void; theme: ThemeId; onThemeChange: (theme: ThemeId) => void }) {
-  return <header><Brand language={language} /><div className="header-tools"><ThemeToggle theme={theme} onChange={onThemeChange} /><LanguageSwitch language={language} onChange={onLanguageChange} /><span className="sandbox"><i /> {translate(language, 'common.sandbox')}</span></div></header>;
+function NotificationBell({ userId, unreadCount, onUnreadChange, onViewAll }: { userId: string; unreadCount: number; onUnreadChange: (n: number) => void; onViewAll: () => void }) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<AppNotification[]>([]);
+  const [loading, setLoading] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const data = await api.notifications(userId, 8);
+      setItems(data.items || []);
+      onUnreadChange(data.unread_count || 0);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    void load();
+  }, [open, userId]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey); };
+  }, [open]);
+
+  const markRead = async (id: string) => {
+    try {
+      await api.markNotificationRead(userId, id);
+      await load();
+    } catch {
+      // ignore
+    }
+  };
+  const markAll = async () => {
+    try {
+      await api.markAllNotificationsRead(userId);
+      await load();
+    } catch {
+      // ignore
+    }
+  };
+
+  return <div className="notification-bell" ref={containerRef}>
+    <button type="button" className="notification-bell-button" aria-label={t('nav.notifications')} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+      <Icon name="bell" />
+      {unreadCount > 0 && <span className="notification-bell-badge" aria-hidden="true">{unreadCount > 99 ? '99+' : unreadCount}</span>}
+    </button>
+    {open && <div className="notification-dropdown" role="menu" aria-label={t('nav.notifications')}>
+      <div className="notification-dropdown-head">
+        <strong>{t('notifications.title')}</strong>
+        <div className="notification-dropdown-actions">
+          <button type="button" className="text-button" onClick={() => void markAll()} disabled={unreadCount === 0}>{t('notifications.markAllRead')}</button>
+        </div>
+      </div>
+      <div className="notification-dropdown-body">
+        {loading ? <p className="muted">{t('common.loading')}</p>
+          : items.length === 0 ? <p className="muted">{t('notifications.empty')}</p>
+          : items.map((item) => (
+            <button key={item.public_id} type="button" className={`notification-dropdown-item ${item.is_read ? 'is-read' : 'is-unread'}`} onClick={() => { if (!item.is_read) void markRead(item.public_id); }}>
+              <span className="notification-dropdown-title">{item.title}</span>
+              <span className="notification-dropdown-text">{item.body}</span>
+              <small>{new Date(item.created_at).toLocaleString()}</small>
+            </button>
+          ))}
+      </div>
+      <div className="notification-dropdown-foot">
+        <button type="button" className="text-button" onClick={() => { setOpen(false); onViewAll(); }}>{t('notifications.viewAll')}</button>
+      </div>
+    </div>}
+  </div>;
+}
+
+function Header({ language, onLanguageChange, theme, onThemeChange, notification }: { language: Language; onLanguageChange: (language: Language) => void; theme: ThemeId; onThemeChange: (theme: ThemeId) => void; notification?: { userId: string; unreadCount: number; onUnreadChange: (n: number) => void; onViewAll: () => void } }) {
+  return <header><Brand language={language} /><div className="header-tools">{notification && <NotificationBell userId={notification.userId} unreadCount={notification.unreadCount} onUnreadChange={notification.onUnreadChange} onViewAll={notification.onViewAll} />}<ThemeToggle theme={theme} onChange={onThemeChange} /><LanguageSwitch language={language} onChange={onLanguageChange} /><span className="sandbox"><i /> {translate(language, 'common.sandbox')}</span></div></header>;
 }
 function RateTicker() {
   const t = useT();
