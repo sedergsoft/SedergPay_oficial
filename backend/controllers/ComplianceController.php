@@ -91,6 +91,21 @@ final class ComplianceController extends Controller
             throw new UnprocessableEntityHttpException($exception->getMessage(), $exception);
         }
 
+        try {
+            $approved = $payload['decision'] === 'approved';
+            (new \app\Infrastructure\Notification\NotificationService(Yii::$app->db))->notifyUser(
+                $userId,
+                'remittance.compliance_reviewed',
+                $approved ? 'Cumplimiento aprobado' : 'Cumplimiento rechazado',
+                $approved
+                    ? 'La revisión de cumplimiento de tu remesa fue aprobada.'
+                    : 'La revisión de cumplimiento de tu remesa fue rechazada. Motivo: ' . $reason,
+                ['remittance_public_id' => $publicId, 'decision' => $payload['decision'], 'status' => $response['status']]
+            );
+        } catch (\Throwable $exception) {
+            Yii::warning('Compliance notification failed: ' . $exception->getMessage(), __METHOD__);
+        }
+
         return $response;
     }
 

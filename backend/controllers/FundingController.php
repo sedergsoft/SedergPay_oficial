@@ -392,6 +392,19 @@ final class FundingController extends Controller
             if ($tx->isActive) $tx->rollBack();
             throw $e;
         }
+
+        try {
+            (new \app\Infrastructure\Notification\NotificationService(Yii::$app->db))->notifyUser(
+                $userId,
+                'deposit.instruction_created',
+                'Instrucción de pago generada',
+                'Se generó la instrucción de pago para tu remesa. Referencia: ' . $reference . '.',
+                ['remittance_public_id' => $publicId, 'deposit_public_id' => $depositId, 'payment_reference' => $reference, 'status' => 'pending']
+            );
+        } catch (\Throwable $exception) {
+            Yii::warning('Deposit instruction notification failed: ' . $exception->getMessage(), __METHOD__);
+        }
+
         Yii::$app->response->statusCode = 201;
         return $response;
     }

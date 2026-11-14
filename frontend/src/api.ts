@@ -224,6 +224,17 @@ export type PlatformSetting = {
   updated_at: string | null;
 };
 
+export type AppNotification = {
+  public_id: string;
+  type: string;
+  title: string;
+  body: string;
+  data: Record<string, unknown> | null;
+  is_read: boolean;
+  read_at: string | null;
+  created_at: string;
+};
+
 export class ApiError extends Error {
   status: number;
   body: Record<string, unknown>;
@@ -407,6 +418,10 @@ export const api = {
     method: 'POST', headers: { ...authHeaders(userId), 'Idempotency-Key': `reconcile-${crypto.randomUUID()}` },
     body: JSON.stringify({ notes: 'Sandbox exact match verified' }),
   }),
+  notifications: (userId: string, limit = 50) => request<{ items: AppNotification[]; unread_count: number }>(`/api/v1/notifications?limit=${limit}`, { headers: authHeaders(userId) }),
+  notificationsUnreadCount: (userId: string) => request<{ unread_count: number }>('/api/v1/notifications/unread-count', { headers: authHeaders(userId) }),
+  markNotificationRead: (userId: string, publicId: string) => request<{ public_id: string; is_read: boolean }>(`/api/v1/notifications/${publicId}/read`, { method: 'POST', headers: authHeaders(userId), body: '{}' }),
+  markAllNotificationsRead: (userId: string) => request<{ ok: boolean }>('/api/v1/notifications/read-all', { method: 'POST', headers: authHeaders(userId), body: '{}' }),
   securityStatus: (userId: string) => request<SecurityStatus>('/api/v1/account/security', { headers: authHeaders(userId) }),
   changePassword: (userId: string, currentPassword: string, newPassword: string) => request<{ changed: boolean }>('/api/v1/account/security/change-password', {
     method: 'POST', headers: authHeaders(userId), body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),

@@ -118,6 +118,17 @@ final class PaymentController extends Controller
             }
             throw new UnprocessableEntityHttpException($exception->getMessage(), $exception);
         }
+        try {
+            (new \app\Infrastructure\Notification\NotificationService(Yii::$app->db))->notifyUser(
+                $userId,
+                'deposit.confirmed',
+                'Pago confirmado (simulación)',
+                'Tu pago fue confirmado y la remesa pasó a revisión de cumplimiento.',
+                ['deposit_public_id' => $publicId, 'status' => 'confirmed', 'remittance_status' => 'compliance_review']
+            );
+        } catch (\Throwable $exception) {
+            Yii::warning('Deposit confirmed notification failed: ' . $exception->getMessage(), __METHOD__);
+        }
         return ['public_id' => $publicId, 'status' => 'confirmed', 'remittance_status' => 'compliance_review'];
     }
 
