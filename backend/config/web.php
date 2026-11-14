@@ -67,6 +67,7 @@ return [
                 'POST api/v1/admin/exchange-rate' => 'admin/set-exchange-rate',
                 'PUT api/v1/admin/exchange-rate/source' => 'admin/set-exchange-rate-source',
                 'GET api/v1/exchange-rates/current' => 'exchange-rate/current',
+                'GET api/v1/exchange-rates/history' => 'exchange-rate/history',
                 'GET api/v1/platform/appearance' => 'appearance/index',
                 'GET api/v1/notifications' => 'notification/index',
                 'GET api/v1/notifications/unread-count' => 'notification/unread-count',

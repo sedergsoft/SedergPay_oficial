@@ -96,6 +96,13 @@ export type ExchangeRate = {
   previous_updated_at?: string | null;
 };
 
+export type ExchangeRateHistoryPoint = {
+  rate: string;
+  source: string;
+  effective_date: string;
+  valid_until: string | null;
+};
+
 export type Remittance = {
   public_id: string;
   reference: string;
@@ -373,6 +380,7 @@ export const api = {
     body: JSON.stringify({ settings }),
   }),
   currentExchangeRate: (base = 'RUB', quote = 'CUP') => request<ExchangeRate>(`/api/v1/exchange-rates/current?base=${base}&quote=${quote}`),
+  exchangeRateHistory: (base = 'RUB', quote = 'CUP', limit = 30) => request<{ base_currency: string; quote_currency: string; points: ExchangeRateHistoryPoint[] }>(`/api/v1/exchange-rates/history?base=${base}&quote=${quote}&limit=${limit}`),
   platformAppearance: () => request<{ theme: string }>('/api/v1/platform/appearance'),
   bothExchangeRates: () => Promise.all([
     request<ExchangeRate>('/api/v1/exchange-rates/current?base=RUB&quote=CUP'),

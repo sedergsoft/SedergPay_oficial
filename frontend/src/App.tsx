@@ -1,6 +1,6 @@
 import { ChangeEvent, FormEvent, ReactNode, createContext, useContext, useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
-import { api, AdminDashboard, AdminOperation, AdminRate, AdminUser, AppNotification, Beneficiary, ExchangeRate, FundingAccount, FundingMethod, PlatformSetting, Quote, Remittance, RemittanceDetail, User, isDevelopmentAuth, paymentMethods, isLoginChallenge, isEmailVerificationRequired, SecurityStatus, TwoFactorSetup } from './api';
+import { api, AdminDashboard, AdminOperation, AdminRate, AdminUser, AppNotification, Beneficiary, ExchangeRate, ExchangeRateHistoryPoint, FundingAccount, FundingMethod, PlatformSetting, Quote, Remittance, RemittanceDetail, User, isDevelopmentAuth, paymentMethods, isLoginChallenge, isEmailVerificationRequired, SecurityStatus, TwoFactorSetup } from './api';
 import { getInitialLanguage, Language, languageLabels, translate } from './i18n';
 import { Icon } from './icons';
 import { ToastHost } from './ToastHost';
@@ -204,11 +204,109 @@ function AppContent({ language, onLanguageChange, theme, onThemeChange }: { lang
   </main>;
 }
 
+
+function RateChart({ points, base, quote }: { points: ExchangeRateHistoryPoint[]; base: string; quote: string }) {
+  const t = useT();
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const [hover, setHover] = useState<number | null>(null);
+  const data = points
+    .map((p) => ({ ...p, value: Number(p.rate), time: new Date(p.effective_date).getTime() }))
+    .filter((p) => Number.isFinite(p.value) && Number.isFinite(p.time))
+    .sort((a, b) => a.time - b.time);
+
+  if (data.length < 2) {
+    return <div className="rate-chart-empty muted">{t('chart.notEnoughData')}</div>;
+  }
+
+  const width = 640;
+  const height = 220;
+  const pad = { l: 52, r: 16, t: 16, b: 28 };
+  const innerW = width - pad.l - pad.r;
+  const innerH = height - pad.t - pad.b;
+  const values = data.map((d) => d.value);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || Math.max(Math.abs(max) * 0.001, 0.000001);
+  const yMin = min - span * 0.08;
+  const yMax = max + span * 0.08;
+  const xMin = data[0].time;
+  const xMax = data[data.length - 1].time || xMin + 1;
+  const xSpan = xMax - xMin || 1;
+  const x = (time: number) => pad.l + ((time - xMin) / xSpan) * innerW;
+  const y = (v: number) => pad.t + (1 - (v - yMin) / (yMax - yMin || 1)) * innerH;
+  const coords = data.map((d) => ({ ...d, x: x(d.time), y: y(d.value) }));
+  const linePath = coords.map((c, i) => `${i === 0 ? 'M' : 'L'} ${c.x.toFixed(2)} ${c.y.toFixed(2)}`).join(' ');
+  const areaPath = `${linePath} L ${coords[coords.length - 1].x.toFixed(2)} ${(pad.t + innerH).toFixed(2)} L ${coords[0].x.toFixed(2)} ${(pad.t + innerH).toFixed(2)} Z`;
+  const up = coords[coords.length - 1].value >= coords[0].value;
+  const stroke = up ? '#16a34a' : '#ef4444';
+  const fillId = `rate-fill-${base}-${quote}`.replace(/[^a-zA-Z0-9_-]/g, '');
+  const yTicks = 4;
+  const xTicks = Math.min(4, data.length - 1);
+  const formatY = (v: number) => v.toLocaleString(undefined, { maximumFractionDigits: v >= 100 ? 2 : v >= 1 ? 4 : 6 });
+  const formatX = (tms: number) => new Date(tms).toLocaleDateString(undefined, { month: 'short', day: '2-digit' });
+
+  const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    const relX = ((e.clientX - rect.left) / rect.width) * width;
+    let best = 0;
+    let bestD = Infinity;
+    for (let i = 0; i < coords.length; i++) {
+      const d = Math.abs(coords[i].x - relX);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    setHover(best);
+  };
+
+  const hi = hover !== null ? coords[hover] : null;
+  const change = ((coords[coords.length - 1].value - coords[0].value) / coords[0].value) * 100;
+
+  return <div className="rate-chart">
+    <div className="rate-chart-header">
+      <span className="rate-chart-pair">{base}/{quote}</span>
+      <span className={`rate-chart-change ${up ? 'up' : 'down'}`}>{up ? '▲' : '▼'} {change >= 0 ? '+' : ''}{change.toFixed(2)}%</span>
+      {hi && <span className="rate-chart-hover">{formatY(hi.value)} · {new Date(hi.time).toLocaleDateString()}</span>}
+    </div>
+    <svg ref={svgRef} className="rate-chart-svg" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
+      <defs>
+        <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={stroke} stopOpacity="0.28" />
+          <stop offset="100%" stopColor={stroke} stopOpacity="0.02" />
+        </linearGradient>
+      </defs>
+      {Array.from({ length: yTicks + 1 }, (_, i) => {
+        const v = yMin + (i / yTicks) * (yMax - yMin);
+        const yy = y(v);
+        return <g key={i}>
+          <line x1={pad.l} x2={width - pad.r} y1={yy} y2={yy} className="rate-chart-grid" />
+          <text x={pad.l - 6} y={yy + 4} textAnchor="end" className="rate-chart-axis">{formatY(v)}</text>
+        </g>;
+      })}
+      {Array.from({ length: xTicks + 1 }, (_, i) => {
+        const tms = xMin + (i / xTicks) * xSpan;
+        const xx = x(tms);
+        return <text key={i} x={xx} y={height - 8} textAnchor="middle" className="rate-chart-axis">{formatX(tms)}</text>;
+      })}
+      <path d={areaPath} fill={`url(#${fillId})`} />
+      <path d={linePath} fill="none" stroke={stroke} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" />
+      {coords.map((c, i) => <circle key={i} cx={c.x} cy={c.y} r={hover === i ? 4 : 0} fill={stroke} />)}
+      {hi && <>
+        <line x1={hi.x} x2={hi.x} y1={pad.t} y2={pad.t + innerH} className="rate-chart-cross" />
+        <line x1={pad.l} x2={width - pad.r} y1={hi.y} y2={hi.y} className="rate-chart-cross" />
+        <circle cx={hi.x} cy={hi.y} r={4.5} fill={stroke} stroke="#fff" strokeWidth="1.5" />
+      </>}
+    </svg>
+  </div>;
+}
+
 function LandingRateCard({ language }: { language: Language }) {
   const text = (key: string) => translate(language, key);
   const locale = localeFor(language);
   const cacheKey = 'sederg_rate_both_last_valid';
   const [rates, setRates] = useState<{ rubToCup: ExchangeRate; cupToRub: ExchangeRate } | null>(null);
+  const [history, setHistory] = useState<{ rubToCup: ExchangeRateHistoryPoint[]; cupToRub: ExchangeRateHistoryPoint[] }>({ rubToCup: [], cupToRub: [] });
+  const [historyPair, setHistoryPair] = useState<'RUB_CUP' | 'CUP_RUB'>('RUB_CUP');
   const [staleReason, setStaleReason] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -251,10 +349,23 @@ function LandingRateCard({ language }: { language: Language }) {
     }
   };
 
+  const loadHistory = async () => {
+    try {
+      const [rubCup, cupRub] = await Promise.all([
+        api.exchangeRateHistory('RUB', 'CUP', 60),
+        api.exchangeRateHistory('CUP', 'RUB', 60),
+      ]);
+      setHistory({ rubToCup: rubCup.points || [], cupToRub: cupRub.points || [] });
+    } catch {
+      // keep empty history on failure
+    }
+  };
+
   useEffect(() => {
     void load(false);
-    const id = window.setInterval(() => { void load(true); }, 60000);
-    const onUpdate = () => { try { localStorage.removeItem(cacheKey); } catch {} void load(true); };
+    void loadHistory();
+    const id = window.setInterval(() => { void load(true); void loadHistory(); }, 60000);
+    const onUpdate = () => { try { localStorage.removeItem(cacheKey); } catch {} void load(true); void loadHistory(); };
     window.addEventListener('sederg:rates-updated', onUpdate);
     return () => { window.clearInterval(id); window.removeEventListener('sederg:rates-updated', onUpdate); };
   }, []);
@@ -294,6 +405,10 @@ function LandingRateCard({ language }: { language: Language }) {
     );
   };
 
+  const chartPoints = historyPair === 'RUB_CUP' ? history.rubToCup : history.cupToRub;
+  const chartBase = historyPair === 'RUB_CUP' ? 'RUB' : 'CUP';
+  const chartQuote = historyPair === 'RUB_CUP' ? 'CUP' : 'RUB';
+
   return <section className="landing-rate-card-wrap" aria-live="polite">
     <article className={`exchange-rate-card${isStale ? ' is-stale' : ''}`}>
       <header className="exchange-rate-header"><span className="exchange-rate-capsule">{text('landing.rate')}</span><span className={`exchange-rate-source-badge ${sourceType}`}>{sourceTypeLabel}</span></header>
@@ -302,6 +417,16 @@ function LandingRateCard({ language }: { language: Language }) {
       <div className="exchange-rate-pairs">
         {renderPair(rubToCup, 'russia.svg', 'cuba.svg', 'Rusia', 'Cuba')}
         {renderPair(cupToRub, 'cuba.svg', 'russia.svg', 'Cuba', 'Rusia')}
+      </div>
+      <div className="rate-chart-section">
+        <div className="rate-chart-section-head">
+          <h3>{text('chart.title')}</h3>
+          <div className="rate-chart-tabs" role="tablist" aria-label={text('chart.title')}>
+            <button type="button" role="tab" aria-selected={historyPair === 'RUB_CUP'} className={historyPair === 'RUB_CUP' ? 'rate-chart-tab active' : 'rate-chart-tab'} onClick={() => setHistoryPair('RUB_CUP')}>RUB → CUP</button>
+            <button type="button" role="tab" aria-selected={historyPair === 'CUP_RUB'} className={historyPair === 'CUP_RUB' ? 'rate-chart-tab active' : 'rate-chart-tab'} onClick={() => setHistoryPair('CUP_RUB')}>CUP → RUB</button>
+          </div>
+        </div>
+        <RateChart points={chartPoints} base={chartBase} quote={chartQuote} />
       </div>
       <footer className="exchange-rate-meta">
         <span><strong>{text('landing.rateUpdatedAt')}:</strong> {updatedText}</span>

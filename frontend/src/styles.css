@@ -2134,3 +2134,26 @@ td,th { border-bottom:1px solid #E5EDF5; }
   .app-header.has-menu-toggle .header-appearance { display: none; }
   .menu-preferences-mobile-only { display: flex; }
 }
+
+/* Rate history chart (trading style) */
+.rate-chart-section { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border, rgba(148,163,184,.2)); }
+.rate-chart-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.rate-chart-section-head h3 { margin: 0; font-size: 1rem; }
+.rate-chart-tabs { display: inline-flex; gap: 6px; background: color-mix(in srgb, var(--surface, #fff) 70%, transparent); border: 1px solid var(--border, rgba(148,163,184,.25)); border-radius: 999px; padding: 4px; }
+.rate-chart-tab { border: none; background: transparent; color: inherit; padding: 6px 12px; border-radius: 999px; cursor: pointer; font: inherit; font-size: .85rem; }
+.rate-chart-tab.active { background: var(--accent, #2563eb); color: #fff; }
+.rate-chart { width: 100%; }
+.rate-chart-header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; font-size: .85rem; }
+.rate-chart-pair { font-weight: 700; }
+.rate-chart-change.up { color: #16a34a; font-weight: 600; }
+.rate-chart-change.down { color: #ef4444; font-weight: 600; }
+.rate-chart-hover { color: var(--muted, #64748b); margin-left: auto; }
+.rate-chart-svg { width: 100%; height: 220px; display: block; overflow: visible; }
+.rate-chart-grid { stroke: var(--border, rgba(148,163,184,.25)); stroke-width: 1; stroke-dasharray: 3 4; }
+.rate-chart-axis { fill: var(--muted, #64748b); font-size: 10px; }
+.rate-chart-cross { stroke: var(--muted, #64748b); stroke-width: 1; stroke-dasharray: 4 4; opacity: .7; }
+.rate-chart-empty { padding: 20px 0; text-align: center; }
+@media (max-width: 640px) {
+  .rate-chart-svg { height: 180px; }
+  .rate-chart-hover { width: 100%; margin-left: 0; }
+}
