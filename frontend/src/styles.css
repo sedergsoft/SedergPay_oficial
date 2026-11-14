@@ -2118,3 +2118,11 @@ td,th { border-bottom:1px solid #E5EDF5; }
   .app-header .brand img, .app-header .logo img { max-height: 26px; }
   .header-tools { gap: 4px; }
 }
+
+/* Menu preferences section (theme/language inside app menu) */
+.menu-preferences { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 10px 12px; margin: 0 0 8px; border-bottom: 1px solid var(--border, rgba(148,163,184,.2)); }
+.menu-preferences .language-switch { margin: 0; }
+.menu-preferences .theme-toggle { flex-shrink: 0; }
+@media (max-width: 900px) {
+  .menu-preferences { padding: 10px 8px 12px; }
+}
