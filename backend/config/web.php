@@ -92,6 +92,8 @@ return [
                 'GET api/v1/remittances' => 'remittance/index',
                 'GET api/v1/remittances/<publicId:[0-9a-fA-F-]{36}>' => 'remittance/view',
                 'POST api/v1/remittances/<publicId:[0-9a-fA-F-]{36}>/deposit' => 'funding/create-deposit',
+                // Cualquier otro método responde 405 (JSON) en vez de 404.
+                'api/v1/remittances/<publicId:[0-9a-fA-F-]{36}>/deposit' => 'funding/deposit-method-not-allowed',
                 'POST api/v1/deposits/<publicId:[0-9a-fA-F-]{36}>/simulate-confirmation' => 'payment/simulate-confirm',
                 'POST api/v1/remittances/<publicId:[0-9a-fA-F-]{36}>/compliance-review' => 'compliance/review',
                 'POST api/v1/remittances/<publicId:[0-9a-fA-F-]{36}>/payout' => 'payout/create',

@@ -47,6 +47,25 @@ $config['components']['response']['on beforeSend'] = static function (yii\base\E
 try {
     (new yii\web\Application($config))->run();
 } catch (Throwable $exception) {
+    // Registro permanente de errores no controlados para diagnóstico en
+    // producción (el handler de Yii puede devolver 500 sin dejar traza).
+    $logDir = dirname(__DIR__) . '/runtime/logs';
+    if (!is_dir($logDir)) {
+        @mkdir($logDir, 0775, true);
+    }
+    @file_put_contents(
+        $logDir . '/php-error.log',
+        sprintf(
+            "[%s] %s: %s en %s:%d\n%s\n",
+            date(DATE_ATOM),
+            $exception::class,
+            $exception->getMessage(),
+            $exception->getFile(),
+            $exception->getLine(),
+            $exception->getTraceAsString()
+        ),
+        FILE_APPEND
+    );
     if (getenv('SEDERG_DEBUG') === '1' && getenv('SEDERG_AUTH_MODE') === 'development') {
         @file_put_contents(
             dirname(__DIR__) . '/runtime/fatal.log',

@@ -11,11 +11,13 @@ use yii\filters\ContentNegotiator;
 use yii\web\BadRequestHttpException;
 use yii\web\ConflictHttpException;
 use yii\web\Controller;
+use yii\web\MethodNotAllowedHttpException;
 use yii\web\NotFoundHttpException;
 use yii\web\Response;
 use yii\web\ServiceUnavailableHttpException;
 use yii\web\TooManyRequestsHttpException;
 use yii\web\UnprocessableEntityHttpException;
+use yii\db\IntegrityException;
 use yii\db\JsonExpression;
 
 final class FundingController extends Controller
@@ -257,6 +259,17 @@ final class FundingController extends Controller
         return ['public_id' => $publicId, 'status' => $status];
     }
 
+    /**
+     * Responde 405 en lugar de 404 cuando se abre la URL de depósito con un
+     * método distinto de POST (por ejemplo, al navegar a ella en el navegador).
+     */
+    public function actionDepositMethodNotAllowed(): array
+    {
+        throw new MethodNotAllowedHttpException(
+            'Este endpoint solo admite POST con JSON {"method_code":"..."} y la cabecera Idempotency-Key.'
+        );
+    }
+
     public function actionCreateDeposit(string $publicId): array
     {
         $this->throttle('deposit-create', 30, 600);
@@ -276,8 +289,17 @@ final class FundingController extends Controller
         if ($remittance['status'] !== 'awaiting_payment') throw new UnprocessableEntityHttpException('Remittance is not awaiting payment');
         $scope = "funding:deposit:user:{$userId}";
         $hash = hash('sha256', $publicId . '|' . $methodCode);
-        $existing = $db->createCommand('SELECT request_hash,response_body FROM {{%idempotency_keys}} WHERE scope=:scope AND idempotency_key=:key AND (expires_at IS NULL OR expires_at>CURRENT_TIMESTAMP)', [':scope' => $scope, ':key' => $key])->queryOne();
-        if ($existing) {
+        // Se busca la clave sin filtrar por vigencia: si la clave existe pero
+        // expiró, se reutiliza la fila (update) en lugar de insertar, porque la
+        // restricción única (scope, idempotency_key) sigue vigente y el INSERT
+        // provocaría un error 500 de integridad.
+        $existing = $db->createCommand(
+            'SELECT request_hash,response_body,
+                    CASE WHEN expires_at IS NULL OR expires_at>CURRENT_TIMESTAMP THEN 1 ELSE 0 END AS is_live
+             FROM {{%idempotency_keys}} WHERE scope=:scope AND idempotency_key=:key LIMIT 1',
+            [':scope' => $scope, ':key' => $key]
+        )->queryOne();
+        if ($existing && (int) $existing['is_live'] === 1) {
             if (!hash_equals($existing['request_hash'], $hash)) throw new ConflictHttpException('Idempotency-Key was already used with another request');
             return json_decode($existing['response_body'], true, 512, JSON_THROW_ON_ERROR);
         }
@@ -381,12 +403,31 @@ final class FundingController extends Controller
                 'expected_amount' => $remittance['total_debit_amount'], 'currency_code' => $remittance['send_currency'],
                 'payment_reference' => $reference, 'status' => 'pending', 'expires_at' => $expires,
             ])->execute();
-            $db->createCommand()->insert('{{%idempotency_keys}}', [
-                'scope' => $scope, 'idempotency_key' => $key, 'request_hash' => $hash,
-                'response_status' => 201, 'response_body' => new JsonExpression($response),
+            $idempotency = [
+                'request_hash' => $hash, 'response_status' => 201,
+                'response_body' => new JsonExpression($response),
                 'resource_type' => 'deposit_request', 'resource_id' => $depositId,
                 'expires_at' => $expires,
-            ])->execute();
+            ];
+            try {
+                if ($existing) {
+                    // Clave reutilizada tras expirar: actualizar en sitio.
+                    $db->createCommand()->update(
+                        '{{%idempotency_keys}}',
+                        $idempotency,
+                        ['scope' => $scope, 'idempotency_key' => $key]
+                    )->execute();
+                } else {
+                    $db->createCommand()->insert(
+                        '{{%idempotency_keys}}',
+                        ['scope' => $scope, 'idempotency_key' => $key] + $idempotency
+                    )->execute();
+                }
+            } catch (IntegrityException $exception) {
+                throw new ConflictHttpException(
+                    'La clave de idempotencia ya está en uso. Actualiza la remesa e inténtalo de nuevo.'
+                );
+            }
             $tx->commit();
         } catch (\Throwable $e) {
             if ($tx->isActive) $tx->rollBack();
