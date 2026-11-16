@@ -222,6 +222,64 @@ HTML;
     $this->deliver($email, $subject, $body, $html, $config);
 }
 
+/**
+ * Envia un correo de notificacion generica al usuario involucrado en una
+ * accion del sistema (cancelacion de remesa, cambio de estado, etc.).
+ */
+public function sendNotification(string $email, string $firstName, string $title, string $body, string $type = ''): void
+{
+    $transport = $this->transport();
+    $config = $this->mailConfig();
+    $canSend = ($transport === 'smtp' && !$config['smtp_incomplete'])
+        || ($transport === 'api' && !$config['api_incomplete']);
+    if (!$canSend) {
+        if ($transport === 'log' || $transport === 'file' || $this->isDevelopmentMode()) {
+            $this->logGeneric($email, 'notification', $title);
+            return;
+        }
+        throw new \RuntimeException($transport === 'api'
+            ? 'MAIL API configuration is incomplete'
+            : 'SMTP email configuration is incomplete');
+    }
+
+    $esc = static fn(mixed $v): string => htmlspecialchars((string) $v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    $safeFirstName = $esc($firstName);
+    $safeTitle = $esc($title);
+    $safeBody = $esc($body);
+    $safeAppUrl = $esc($this->appUrl());
+    $logoSrc = $this->logoSource();
+    $subject = 'SEDERG_PAY — ' . $title;
+
+    $lines = ["Hola {$firstName}", '', $body, '', 'Puedes consultar los detalles en tu cuenta de SEDERG_PAY.'];
+    $textBody = implode("\n", $lines);
+
+    $html = <<<HTML
+<!doctype html><html lang="es"><body style="margin:0;background:#eef3fa;color:#0f1f3d;font-family:'Inter',Arial,Helvetica,sans-serif;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:36px 12px;background:#eef3fa;"><tr><td align="center">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border-radius:24px;overflow:hidden;border:1px solid #dde6f2;box-shadow:0 24px 60px rgba(15,31,61,.12);">
+<tr><td style="padding:26px 40px;background:linear-gradient(135deg,#0a2b6b 0%,#0b4f9c 52%,#00aeef 100%);">
+  <img src="{$logoSrc}" alt="SEDERG_PAY" style="height:42px;width:auto;display:block;filter:drop-shadow(0 4px 12px rgba(0,0,0,.25));" />
+  <p style="margin:10px 0 0;color:rgba(255,255,255,.82);font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;">Notificacion</p>
+</td></tr>
+<tr><td style="padding:34px 40px;">
+<p style="margin:0 0 10px;color:#0b4f9c;font-size:12px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;">Aviso importante</p>
+<h1 style="margin:0 0 16px;font-size:26px;color:#10264d;">{$safeTitle}</h1>
+<p style="margin:0 0 22px;font-size:15px;color:#42536b;line-height:1.6;">Hola {$safeFirstName}, {$safeBody}</p>
+<p style="margin:0;font-size:14px;color:#42536b;"><a href="{$safeAppUrl}" style="color:#0b4f9c;font-weight:600;">Ir a SEDERG_PAY</a></p>
+</td></tr>
+<tr><td style="padding:20px 40px;background:#f4f7fc;color:#71809d;font-size:12px;border-top:1px solid #e1e7f3;">SEDERG_PAY — Remesas Rusia &nbsp; Cuba</td></tr>
+</table></td></tr></table></body></html>
+HTML;
+
+    $fallback = $this->deliver($email, $subject, $textBody, $html, $config);
+    $this->writeDevLog("[SEDERG_PAY][DEV][notification] email={$email} type={$type} enviado=" . ($fallback ? 'no' : 'si') . " subject={$subject}");
+}
+
+private function appUrl(): string
+{
+    return rtrim((string) (getenv('SEDERG_APP_URL') ?: 'http://localhost:5173'), '/');
+}
+
 private function smtpConfig(): array
 {
     return $this->mailConfig();
