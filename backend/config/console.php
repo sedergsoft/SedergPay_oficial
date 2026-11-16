@@ -27,4 +27,6 @@ return [
         ],
     ],
     'controllerNamespace' => 'app\\commands',
+    // Los comandos se mantienen junto al resto del código en src/commands.
+    'controllerPath' => dirname(__DIR__) . '/src/commands',
 ];
