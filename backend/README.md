@@ -109,6 +109,14 @@ El esquema no fuerza un límite fijo de importe por fila porque los límites dep
 - Las tasas aplicadas a cotizaciones/remesas ya creadas no se reescriben; el cambio afecta a nuevas cotizaciones.
 
 
+## Ventana de pago y cancelación automática
+
+- Las remesas en `awaiting_payment` se cancelan automáticamente cuando superan `operations.payment_window_hours` (6 horas por defecto; configurable entre 1 y 168, con respaldo `SEDERG_PAYMENT_WINDOW_HOURS`).
+- La cancelación marca `failure_reason_code='payment_window_expired'`, registra el evento de estado, cancela las órdenes de pago pendientes y notifica al usuario.
+- Se aplica con el job `php yii remittances/expire` (cada 10 minutos; ejemplo en `backend/deploy/sederg-remittances.cron`) y también de forma perezosa al listar/ver remesas o al intentar generar una orden de pago.
+- Una remesa admite una sola orden de pago: si ya existe una, `POST /api/v1/remittances/{public_id}/deposit` responde `409` con la referencia existente, aunque la orden haya expirado.
+
+
 ## Perfil de usuario y KYC (rama feature/user-profile-beneficiaries-kyc)
 
 - Los usuarios pueden editar sus beneficiarios mediante `PUT /api/v1/beneficiaries/{public_id}`; la API limita cada consulta y actualización al propietario autenticado.
