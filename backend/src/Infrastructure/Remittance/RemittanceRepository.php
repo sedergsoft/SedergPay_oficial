@@ -259,8 +259,18 @@ final class RemittanceRepository
         return $this->db->createCommand(
             'SELECT r.public_id, r.reference, r.direction, r.send_amount, r.send_currency,
                     r.receive_amount, r.receive_currency, r.total_debit_amount, r.status, r.compliance_status,
-                    r.created_at, r.updated_at
+                    r.created_at, r.updated_at,
+                    d.public_id AS deposit_public_id,
+                    d.status AS deposit_status,
+                    d.payment_reference
              FROM {{%remittances}} r
+             LEFT JOIN LATERAL (
+                 SELECT public_id, status, payment_reference
+                 FROM {{%deposit_requests}}
+                 WHERE remittance_id = r.id
+                 ORDER BY created_at DESC
+                 LIMIT 1
+             ) d ON TRUE
              WHERE r.sender_user_id = :user_id
              ORDER BY r.created_at DESC',
             [':user_id' => $userId]
