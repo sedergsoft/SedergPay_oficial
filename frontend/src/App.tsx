@@ -1,6 +1,6 @@
 import { ChangeEvent, FormEvent, ReactNode, createContext, useContext, useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
-import { api, AdminDashboard, AdminOperation, AdminRate, AdminUser, AppNotification, Beneficiary, ExchangeRate, ExchangeRateHistoryPoint, FundingAccount, FundingMethod, PlatformSetting, Quote, Remittance, RemittanceDetail, User, isDevelopmentAuth, paymentMethods, isLoginChallenge, isEmailVerificationRequired, SecurityStatus, TwoFactorSetup } from './api';
+import { api, AdminDashboard, AdminOperation, AdminRate, AdminUser, AppNotification, ApiError, Beneficiary, ExchangeRate, ExchangeRateHistoryPoint, FundingAccount, FundingMethod, PlatformSetting, Quote, Remittance, RemittanceDetail, User, isDevelopmentAuth, paymentMethods, isLoginChallenge, isEmailVerificationRequired, SecurityStatus, TwoFactorSetup } from './api';
 import { getInitialLanguage, Language, languageLabels, translate } from './i18n';
 import { Icon } from './icons';
 import { ToastHost } from './ToastHost';
@@ -1079,7 +1079,21 @@ function Remittances({ userId, run }: { userId: string; run: (action: () => Prom
   const executeDeposit = async (method:FundingMethod, options?: { payeePhoneE164?: string; purpose?: string }) => {
     const target = payingFor;
     if(!target) return;
-    await api.deposit(userId,target.public_id,method.code,options);
+    try {
+      await api.deposit(userId,target.public_id,method.code,options);
+    } catch (error) {
+      // 409: la remesa ya tiene una orden de pago generada. No se permite
+      // emitir otra; se abre el detalle con la instrucción existente.
+      if (error instanceof ApiError && error.status === 409) {
+        notify('Esta remesa ya tiene una orden de pago. Se muestra la instrucción existente.', 'info');
+        const detail=await api.remittance(userId,target.public_id);
+        setSelected(detail);
+        setPayingFor(null);
+        setItems(await api.remittances(userId));
+        return;
+      }
+      throw error;
+    }
     const detail=await api.remittance(userId,target.public_id);
     setSelected(detail);
     setPayingFor(null);
@@ -1095,7 +1109,7 @@ function Remittances({ userId, run }: { userId: string; run: (action: () => Prom
   <section className="card remittances-card"><div className="filter-tabs" role="group" aria-label={t('remittances.filter')}>{[['all',t('common.all')],['active',t('common.inProgress')],['completed',t('common.completed')]].map(([value,label])=><button key={value} className={filter===value?'filter-tab active':'filter-tab'} onClick={()=>setFilter(value)}>{label}</button>)}</div>
   {visible.length===0?<div className="empty-state"><span className="empty-icon"><Icon name="history"/></span><strong>{t('remittances.empty')}</strong><p>{t('remittances.emptyDescription')}</p></div>:<div className="remittance-list">{visible.map(item=><article className="remittance-item" key={item.public_id}><span className="remittance-icon"><Icon name="transfer"/></span><div className="remittance-main"><strong>{item.reference}</strong><small>{item.created_at?new Date(item.created_at).toLocaleString(locale):'Fecha no disponible'}</small><span>{item.send_amount} {item.send_currency} <b>→</b> {item.receive_amount} {item.receive_currency}</span></div><div className="remittance-status"><StatusBadge status={item.status}/><button className="text-button" onClick={() => void run(async () => setSelected(await api.remittance(userId, item.public_id)))}>{t('common.viewDetails')} <span>→</span></button></div>
   <div className="remittance-operations">{item.status === 'awaiting_payment' && <button className="secondary compact-button" onClick={() => startPayment(item)}>{t('remittances.registerDeposit')}</button>}{item.status === 'compliance_review' && <button onClick={() => void run(async () => { await api.review(userId, item.public_id, 'approved'); refresh(); })}>{t('common.approve')} (sandbox)</button>}{item.status === 'approved' && <button onClick={() => void run(async () => { const payout = await api.payout(userId, item.public_id); await api.completePayout(userId, payout.public_id); refresh(); })}>{t('remittances.executePayout')} (sandbox)</button>}{item.status === 'reconciliation_pending' && <button className="secondary compact-button" onClick={() => void run(async () => { await api.reconcile(userId, item.public_id); refresh(); })}>{t('remittances.reconcile')}</button>}</div></article>)}</div>}</section>
-  {payingFor && <div className="details-modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setPayingFor(null);}}><section className="details-modal card" role="dialog" aria-modal="true" aria-labelledby="funding-method-title"><div className="section-heading details-modal-heading"><div><span className="eyebrow">Segundo paso · Pago</span><h2 id="funding-method-title">Selecciona cómo pagar</h2><p className="muted">{payingFor.total_debit_amount ?? payingFor.send_amount} {payingFor.send_currency}</p></div><button className="secondary compact-button" onClick={()=>setPayingFor(null)}>Cerrar</button></div>{loadingMethods?<p className="muted">Cargando métodos disponibles…</p>:fundingMethods.length===0?<div className="alert">No hay métodos de pago habilitados para esta moneda. El administrador debe configurar una cuenta receptora SEDERG_PAY y activar el método correspondiente.</div>:<div className="payment-method-options">{fundingMethods.map(method=><button key={method.code} className="payment-method-option" type="button" onClick={()=>chooseMethod(method)}><strong>{method.name}</strong><small>{method.code==='ru_sbp_qr'?'SBP C2B · QR dinámico de sandbox':method.code==='ru_sbp_c2p'?'SBP C2P · QR persona a persona (sandbox)':method.method_type==='instant_qr'?'QR dinámico de sandbox':'Transferencia bancaria'} · {method.provider_code||'Canal manual'}</small><span>Seleccionar →</span></button>)}</div>}<p className="muted">El QR de sandbox sirve para probar la experiencia; no inicia una transferencia bancaria real ni confirma el ingreso.</p></section></div>}
+  {payingFor && <div className="details-modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setPayingFor(null);}}><section className="details-modal card" role="dialog" aria-modal="true" aria-labelledby="funding-method-title"><div className="section-heading details-modal-heading"><div><span className="eyebrow">Segundo paso · Pago</span><h2 id="funding-method-title">Selecciona cómo pagar</h2><p className="muted">{payingFor.total_debit_amount ?? payingFor.send_amount} {payingFor.send_currency}</p></div><button className="secondary compact-button" onClick={()=>setPayingFor(null)}>Cerrar</button></div>{loadingMethods?<p className="muted">Cargando métodos disponibles…</p>:fundingMethods.length===0?<div className="alert">No hay métodos de pago habilitados para esta moneda. El administrador debe configurar una cuenta receptora SEDERG_PAY y activar el método correspondiente.</div>:<div className="payment-method-options">{fundingMethods.map(method=><button key={method.code} className="payment-method-option" type="button" onClick={()=>chooseMethod(method)}><strong>{method.name}</strong><small>{method.code==='ru_sbp_qr'?'SBP C2B · QR dinámico de sandbox':method.code==='ru_sbp_c2p'?'SBP C2P · QR persona a persona (sandbox)':method.method_type==='instant_qr'?'QR dinámico de sandbox':'Transferencia bancaria'} · {method.provider_code||'Canal manual'}</small><span>Seleccionar →</span></button>)}</div>}<p className="muted">El QR de sandbox sirve para probar la experiencia; no inicia una transferencia bancaria real ni confirma el ingreso. Solo se genera una orden de pago por remesa; si el depósito no se recibe en 6 horas, la remesa se cancelará automáticamente.</p></section></div>}
   {selected && <RemittanceDetails detail={selected} onClose={() => setSelected(null)} />}
   </div>;
 }
@@ -1149,6 +1163,7 @@ function RemittanceDetails({ detail, onClose }: { detail: RemittanceDetail; onCl
         <div><span className="eyebrow">{t('details.receipt')}</span><h2 id="remittance-details-title">{detail.reference}</h2><StatusBadge status={detail.status}/></div>
         <button className="secondary compact-button" type="button" autoFocus onClick={onClose}>{t('common.close')}</button>
       </div>
+      {detail.status === 'cancelled' && detail.failure_reason_code === 'payment_window_expired' && <div className="alert" role="status">Esta remesa se canceló automáticamente porque no se recibió el depósito dentro de las 6 horas de la ventana de pago. Ya no es posible generar una nueva orden de pago para esta transferencia.</div>}
       <div className="remittance-direction" aria-label={`${countryName(originCountry)} → ${countryName(destinationCountry)}`}>
         <div className="remittance-country"><span className="remittance-country-flag" role="img" aria-label={countryName(originCountry)}><CountryFlag country={countryFlag(originCountry)} /></span><div><small>{t('details.senderSends')}</small><strong>{countryName(originCountry)}</strong></div></div>
         <span className="remittance-direction-arrow" aria-hidden="true">→</span>
@@ -1658,26 +1673,26 @@ function FundingMethodConfiguration({ userId, method, run, onSaved }: { userId: 
 type BankInfo = { code: string; name: string; routing?: string; legalName?: string; source?: string; short?: string; color?: string; logoUrl?: string };
 const BANKS_BY_COUNTRY: Record<'RU'|'CU', BankInfo[]> = {
   RU: [
-    { code: 'sberbank', name: 'Sberbank (Сбербанк)', routing: '044525225 / SABRRUMM', legalName: 'Публичное акционерное общество «Сбербанк России» (ПАО Сбербанк)', source: 'CBR/SWIFT', short: 'Sber', color: '#21A038' },
+    { code: 'sberbank', name: 'Sberbank (Сбербанк)', routing: '044525225 / SABRRUMM', legalName: 'Публичное акционерное общество «Сбербанк России» (ПАО Сбербанк)', source: 'CBR/SWIFT', short: 'Sber', color: '#21A038', logoUrl: `${import.meta.env.BASE_URL}assets/sederg-pay/banks/sberbank.png` },
     { code: 'vtb', name: 'VTB (ВТБ)', routing: '044525187 / VTBRRUMM', legalName: 'Банк ВТБ (публичное акционерное общество)', source: 'CBR/SWIFT', short: 'VTB', color: '#009FDF', logoUrl: `${import.meta.env.BASE_URL}assets/sederg-pay/banks/vtb.svg` },
     { code: 'gazprombank', name: 'Gazprombank (Газпромбанк)', routing: '044525823 / GAZPRUMM', legalName: 'Банк ГПБ (АО)', source: 'CBR/SWIFT', short: 'GPB', color: '#0057B8', logoUrl: `${import.meta.env.BASE_URL}assets/sederg-pay/banks/gazprombank.svg` },
     { code: 'alfa', name: 'Alfa-Bank (Альфа-Банк)', routing: '044525593 / ALFARUMM', legalName: 'АО «Альфа-Банк»', source: 'CBR/SWIFT', short: 'A', color: '#EF3124', logoUrl: `${import.meta.env.BASE_URL}assets/sederg-pay/banks/alfa.svg` },
     { code: 'tbank', name: 'T-Bank (Т-Банк, ex Tinkoff)', routing: '044525974 / TICSRUMM', legalName: 'АО «ТБанк»', source: 'CBR/SWIFT', short: 'T', color: '#FFDD2D', logoUrl: `${import.meta.env.BASE_URL}assets/sederg-pay/banks/tbank.svg` },
     { code: 'rosselkhozbank', name: 'Rosselkhozbank (Россельхозбанк)', routing: '044525219 / RUAGRUMM', legalName: 'АО «Россельхозбанк»', source: 'CBR/SWIFT', short: 'РСХБ', color: '#2E7D32', logoUrl: `${import.meta.env.BASE_URL}assets/sederg-pay/banks/rshb.svg` },
     { code: 'sovcombank', name: 'Sovcombank (Совкомбанк)', routing: '044525297 / SOMRRUMM', legalName: 'ПАО «Совкомбанк»', source: 'CBR/SWIFT', short: 'Сов', color: '#0033A0', logoUrl: `${import.meta.env.BASE_URL}assets/sederg-pay/banks/sovcombank.svg` },
-    { code: 'promsvyazbank', name: 'Promsvyazbank (Промсвязьбанк)', routing: '044525555 / PRMSRUMM', legalName: 'ПАО «Промсвязьбанк»', source: 'CBR/SWIFT', short: 'ПСБ', color: '#F36F21' },
-    { code: 'raiffeisen', name: 'Raiffeisen Bank (Райффайзен Банк)', routing: '044525700 / RZBMRUMM', legalName: 'АО «Райффайзенбанк»', source: 'CBR/SWIFT', short: 'R', color: '#FFED00' },
-    { code: 'rosbank', name: 'Rosbank (Росбанк)', routing: '044525256 / RSBNRUMM', legalName: 'ПАО РОСБАНК', source: 'CBR/SWIFT', short: 'RB', color: '#E31E24' },
-    { code: 'unicredit', name: 'UniCredit Bank (ЮниКредит Банк)', routing: '044525545 / IMBKRUMM', legalName: 'АО ЮниКредит Банк', source: 'CBR/SWIFT', short: 'UC', color: '#E2001A' },
-    { code: 'mkb', name: 'Credit Bank of Moscow (МКБ)', routing: '044525659 / MCRBRUMM', legalName: 'ПАО «Московский кредитный банк»', source: 'CBR/SWIFT', short: 'МКБ', color: '#D4002A' },
-    { code: 'domrf', name: 'DOM.RF Bank (Банк ДОМ.РФ)', routing: '044525154 / JMBRRUMM', legalName: 'АО «Банк ДОМ.РФ»', source: 'CBR/SWIFT', short: 'ДОМ', color: '#1C3F94' },
+    { code: 'promsvyazbank', name: 'Promsvyazbank (Промсвязьбанк)', routing: '044525555 / PRMSRUMM', legalName: 'ПАО «Промсвязьбанк»', source: 'CBR/SWIFT', short: 'ПСБ', color: '#F36F21', logoUrl: `${import.meta.env.BASE_URL}assets/sederg-pay/banks/psb.png` },
+    { code: 'raiffeisen', name: 'Raiffeisen Bank (Райффайзен Банк)', routing: '044525700 / RZBMRUMM', legalName: 'АО «Райффайзенбанк»', source: 'CBR/SWIFT', short: 'R', color: '#FFED00', logoUrl: `${import.meta.env.BASE_URL}assets/sederg-pay/banks/raiffeisen.svg` },
+    { code: 'rosbank', name: 'Rosbank (Росбанк)', routing: '044525256 / RSBNRUMM', legalName: 'ПАО РОСБАНК', source: 'CBR/SWIFT', short: 'RB', color: '#E31E24', logoUrl: `${import.meta.env.BASE_URL}assets/sederg-pay/banks/rosbank.svg` },
+    { code: 'unicredit', name: 'UniCredit Bank (ЮниКредит Банк)', routing: '044525545 / IMBKRUMM', legalName: 'АО ЮниКредит Банк', source: 'CBR/SWIFT', short: 'UC', color: '#E2001A', logoUrl: `${import.meta.env.BASE_URL}assets/sederg-pay/banks/unicredit.svg` },
+    { code: 'mkb', name: 'Credit Bank of Moscow (МКБ)', routing: '044525659 / MCRBRUMM', legalName: 'ПАО «Московский кредитный банк»', source: 'CBR/SWIFT', short: 'МКБ', color: '#D4002A', logoUrl: `${import.meta.env.BASE_URL}assets/sederg-pay/banks/mkb.png` },
+    { code: 'domrf', name: 'DOM.RF Bank (Банк ДОМ.РФ)', routing: '044525154 / JMBRRUMM', legalName: 'АО «Банк ДОМ.РФ»', source: 'CBR/SWIFT', short: 'ДОМ', color: '#1C3F94', logoUrl: `${import.meta.env.BASE_URL}assets/sederg-pay/banks/domrf.png` },
   ],
   CU: [
     { code: 'bpa', name: 'Banco Popular de Ahorro (BPA)', routing: 'BPAHCUHH', legalName: 'Banco Popular de Ahorro', source: 'BCC/SWIFT', short: 'BPA', color: '#006747' },
     { code: 'bandec', name: 'Banco de Crédito y Comercio (BANDEC)', routing: 'BDCRCUHH', legalName: 'Banco de Crédito y Comercio', source: 'BCC/SWIFT', short: 'BANDEC', color: '#005BAA' },
     { code: 'banmet', name: 'Banco Metropolitano (BANMET)', routing: 'BMNBCUHH', legalName: 'Banco Metropolitano S.A.', source: 'BCC/SWIFT', short: 'BM', color: '#8B1E3F' },
     { code: 'bfi', name: 'Banco Financiero Internacional (BFI)', routing: 'BFICCUHH', legalName: 'Banco Financiero Internacional S.A.', source: 'BCC/SWIFT', short: 'BFI', color: '#003366', logoUrl: `${import.meta.env.BASE_URL}assets/sederg-pay/banks/bfi.png` },
-    { code: 'bnc', name: 'Banco Nacional de Cuba (BNC)', routing: 'BNACCUHH', legalName: 'Banco Nacional de Cuba', source: 'BCC/SWIFT', short: 'BNC', color: '#002A8F' },
+    { code: 'bnc', name: 'Banco Nacional de Cuba (BNC)', routing: 'BNACCUHH', legalName: 'Banco Nacional de Cuba', source: 'BCC/SWIFT', short: 'BNC', color: '#002A8F', logoUrl: `${import.meta.env.BASE_URL}assets/sederg-pay/banks/bnc.png` },
     { code: 'bec', name: 'Banco Exterior de Cuba (BEC)', routing: 'BEACCUHH', legalName: 'Banco Exterior de Cuba', source: 'BCC/SWIFT', short: 'BEC', color: '#0F766E' },
     { code: 'bi', name: 'Banco de Inversiones (BI)', routing: 'BICVCUHH', legalName: 'Banco de Inversiones S.A.', source: 'BCC/SWIFT', short: 'BI', color: '#B45309' },
   ],

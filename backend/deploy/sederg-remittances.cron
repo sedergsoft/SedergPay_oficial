@@ -1,0 +1,6 @@
+# Install with: crontab backend/deploy/sederg-remittances.cron
+# Cancela automáticamente las remesas que siguen esperando el depósito fuera
+# de la ventana de pago configurada (6 horas por defecto).
+# Se ejecuta cada 10 minutos; la propia aplicación también valida la ventana de
+# forma perezosa al listar/ver la remesa o al intentar generar otra orden de pago.
+*/10 * * * * cd /home/deploy/sederg-pay && docker compose -f docker-compose.yml -f docker-compose.production.yml exec -T backend php yii remittances/expire >> /home/deploy/sederg-pay/backend/runtime/logs/remittances-cron.log 2>&1

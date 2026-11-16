@@ -51,6 +51,13 @@ final class PlatformSettings
                 'type' => 'integer', 'default' => '20', 'min' => '1', 'max' => '100',
                 'label' => 'Máximo de beneficiarios por usuario', 'category' => 'operations',
             ],
+            'operations.payment_window_hours' => [
+                'type' => 'integer',
+                'default' => getenv('SEDERG_PAYMENT_WINDOW_HOURS') ?: '6',
+                'min' => '1', 'max' => '168',
+                'label' => 'Ventana para recibir el depósito antes de cancelar la remesa (horas)',
+                'category' => 'operations',
+            ],
             'security.verification_token_ttl_minutes' => [
                 'type' => 'integer', 'default' => '30', 'min' => '5', 'max' => '1440',
                 'label' => 'Expiración del enlace de verificación (minutos)', 'category' => 'security',

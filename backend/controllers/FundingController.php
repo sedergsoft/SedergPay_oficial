@@ -6,6 +6,7 @@ namespace app\controllers;
 
 use app\Infrastructure\Auth\UserAuthenticator;
 use app\Infrastructure\Payment\FundingPaymentProviderFactory;
+use app\Infrastructure\Remittance\RemittanceExpiryService;
 use Yii;
 use yii\filters\ContentNegotiator;
 use yii\web\BadRequestHttpException;
@@ -281,12 +282,20 @@ final class FundingController extends Controller
         if (!preg_match('/^[A-Za-z0-9._:-]{16,100}$/', $key)) throw new BadRequestHttpException('A valid Idempotency-Key is required');
         $db = Yii::$app->db;
         $remittance = $db->createCommand(
-            'SELECT r.id,r.reference,r.total_debit_amount,r.send_currency,r.status
+            'SELECT r.id,r.reference,r.total_debit_amount,r.send_currency,r.status,r.created_at
              FROM {{%remittances}} r WHERE r.public_id=:public_id AND r.sender_user_id=:user_id LIMIT 1',
             [':public_id' => $publicId, ':user_id' => $userId]
         )->queryOne();
         if (!$remittance) throw new NotFoundHttpException('Remittance not found');
         if ($remittance['status'] !== 'awaiting_payment') throw new UnprocessableEntityHttpException('Remittance is not awaiting payment');
+        $expiry = new RemittanceExpiryService($db);
+        if ($expiry->isOverdue((string) $remittance['created_at'])) {
+            $expiry->cancelIfOverdue((int) $remittance['id']);
+            throw new UnprocessableEntityHttpException(sprintf(
+                'La remesa fue cancelada automáticamente porque no se recibió el depósito dentro de las %d horas de la ventana de pago.',
+                $expiry->windowHours()
+            ));
+        }
         $scope = "funding:deposit:user:{$userId}";
         $hash = hash('sha256', $publicId . '|' . $methodCode);
         // Se busca la clave sin filtrar por vigencia: si la clave existe pero
@@ -302,6 +311,20 @@ final class FundingController extends Controller
         if ($existing && (int) $existing['is_live'] === 1) {
             if (!hash_equals($existing['request_hash'], $hash)) throw new ConflictHttpException('Idempotency-Key was already used with another request');
             return json_decode($existing['response_body'], true, 512, JSON_THROW_ON_ERROR);
+        }
+        // Una remesa solo admite una orden de pago: si ya se generó una (aunque
+        // haya expirado), no se permite emitir otra para la misma transferencia.
+        $existingDeposit = $db->createCommand(
+            'SELECT public_id,payment_reference,status FROM {{%deposit_requests}}
+             WHERE remittance_id=:id ORDER BY created_at ASC LIMIT 1',
+            [':id' => $remittance['id']]
+        )->queryOne();
+        if ($existingDeposit) {
+            throw new ConflictHttpException(
+                'Ya se generó una orden de pago para esta remesa (referencia '
+                . $existingDeposit['payment_reference']
+                . '). No es posible generar una nueva; si no se recibe el depósito dentro de la ventana de pago, la remesa se cancelará automáticamente.'
+            );
         }
         $account = $db->createCommand(
             'SELECT a.id,a.public_id,a.bank_code,a.bank_name,a.account_holder_name,a.account_mask,a.routing_mask,a.currency_code,a.environment,

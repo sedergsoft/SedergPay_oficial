@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace app\controllers;
 
 use app\Infrastructure\Remittance\RemittanceRepository;
+use app\Infrastructure\Remittance\RemittanceExpiryService;
 use app\Infrastructure\Auth\UserAuthenticator;
 use app\Infrastructure\Configuration\PlatformSettings;
 use app\Infrastructure\Compliance\KycDailyLimit;
@@ -196,7 +197,10 @@ final class RemittanceController extends Controller
 
     public function actionIndex(): array
     {
-        return (new RemittanceRepository(Yii::$app->db))->listForUser($this->authenticatedUserId());
+        $userId = $this->authenticatedUserId();
+        (new RemittanceExpiryService(Yii::$app->db))->expireOverdue($userId);
+
+        return (new RemittanceRepository(Yii::$app->db))->listForUser($userId);
     }
 
     public function actionView(string $publicId): array
@@ -204,8 +208,10 @@ final class RemittanceController extends Controller
         if (!$this->isUuid($publicId)) {
             throw new NotFoundHttpException('Remittance not found');
         }
+        $userId = $this->authenticatedUserId();
+        (new RemittanceExpiryService(Yii::$app->db))->expireOverdue($userId);
         $remittance = (new RemittanceRepository(Yii::$app->db))
-            ->findForUser($publicId, $this->authenticatedUserId());
+            ->findForUser($publicId, $userId);
         if ($remittance === null) {
             throw new NotFoundHttpException('Remittance not found');
         }
