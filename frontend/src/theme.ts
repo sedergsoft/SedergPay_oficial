@@ -179,7 +179,11 @@ export function toggleMode(current: ThemeId): ThemeId {
 /** Tema global publicado por el módulo de administración. */
 export async function fetchPlatformTheme(): Promise<ThemeId | null> {
   try {
-    const response = await fetch('/api/v1/platform/appearance', { headers: { Accept: 'application/json' } });
+    // La web se publica en GitHub Pages y la API vive en otro dominio: una ruta
+    // relativa acabaria pidiendo /api/... a Pages (404). En desarrollo la base
+    // esta vacia y la resuelve el proxy de Vite.
+    const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '');
+    const response = await fetch(`${apiBaseUrl}/api/v1/platform/appearance`, { headers: { Accept: 'application/json' } });
     if (!response.ok) return null;
     const body = await response.json() as { theme?: string };
     return normalizeTheme(body?.theme);
