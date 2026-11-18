@@ -289,7 +289,11 @@ footer { padding-top: 18px; text-align: center; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ---------- Configuración (admin) ---------- */
-.settings-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 24px; }
+.admin-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; padding: 4px; border: 1px solid var(--line, #e7e4dc); border-radius: 12px; background: color-mix(in srgb, var(--surface-0, #fff) 80%, transparent); }
+.admin-tab { border: none; background: transparent; color: var(--ink-600, #4a5568); padding: 8px 14px; border-radius: 8px; cursor: pointer; font: inherit; font-size: .85rem; font-weight: 600; }
+.admin-tab.active { background: var(--indigo-500, #2e5bff); color: #fff; box-shadow: 0 4px 12px rgba(46,91,255,.25); }
+.admin-tab:hover:not(.active) { background: color-mix(in srgb, var(--ink-400, #8a93a3) 14%, transparent); }
+@media (max-width: 640px) { .admin-tabs { gap: 4px; } .admin-tab { padding: 6px 10px; font-size: .8rem; } }
 .settings-group { padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-m); background: var(--surface-1); }
 .settings-group h3 { margin: 0 0 16px; color: var(--ink-900); font-size: .9rem; }
 .settings-group label { margin-top: 16px; }
@@ -2157,12 +2161,12 @@ td,th { border-bottom:1px solid #E5EDF5; }
 .rate-chart-swatch.official { background: var(--indigo-500, #2e5bff); }
 .rate-chart-swatch.admin { background: var(--amber-500, #f2a93b); }
 .rate-chart-hover { color: var(--ink-400, #8a93a3); margin-left: auto; font-variant-numeric: tabular-nums; }
-.rate-chart-canvas { position: relative; height: 220px; }
+.rate-chart-canvas { position: relative; height: var(--rate-chart-height, 220px); }
 .rate-chart-canvas.is-empty .rate-chart-host { visibility: hidden; }
 .rate-chart-host { position: absolute; inset: 0; }
 .rate-chart-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 0 18px; text-align: center; }
 @media (max-width: 640px) {
-  .rate-chart-canvas { height: 180px; }
+  .rate-chart-canvas { height: var(--rate-chart-height, 180px); }
   .rate-chart-hover { width: 100%; margin-left: 0; }
 }
 
