@@ -76,7 +76,7 @@
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
-  min-width: 320px;
+  min-width: 300px;
   color: var(--ink-900);
   background: radial-gradient(circle at 8% 0%, var(--indigo-100) 0, transparent 34rem), var(--surface-1);
   font-family: var(--font-ui);
@@ -273,6 +273,16 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .pager span { color: var(--ink-600); font-size: .82rem; font-variant-numeric: tabular-nums; }
 .pager button { min-height: 34px; padding: 6px 12px; font-size: .78rem; }
 :root[data-theme='dark'] .pager span { color: #A7B0C3; }
+/* Las tablas del panel son anchas por naturaleza (muchas columnas con
+   `white-space: nowrap`). El contenedor scrollea en horizontal y la página
+   nunca supera el ancho del dispositivo. */
+.table-wrap {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+.table-wrap:focus-visible { outline: 2px solid var(--indigo-500); outline-offset: 2px; }
 table { width: 100%; border-collapse: collapse; font-size: .82rem; }
 th { padding: 10px 8px; color: var(--ink-400); border-bottom: 1px solid var(--line); font-size: .7rem; letter-spacing: .05em; text-align: left; text-transform: uppercase; }
 td { padding: 13px 8px; border-bottom: 1px solid var(--line); color: var(--ink-600); white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -289,11 +299,121 @@ footer { padding-top: 18px; text-align: center; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ---------- Configuración (admin) ---------- */
-.admin-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; padding: 4px; border: 1px solid var(--line, #e7e4dc); border-radius: 12px; background: color-mix(in srgb, var(--surface-0, #fff) 80%, transparent); }
-.admin-tab { border: none; background: transparent; color: var(--ink-600, #4a5568); padding: 8px 14px; border-radius: 8px; cursor: pointer; font: inherit; font-size: .85rem; font-weight: 600; }
-.admin-tab.active { background: var(--indigo-500, #2e5bff); color: #fff; box-shadow: 0 4px 12px rgba(46,91,255,.25); }
-.admin-tab:hover:not(.active) { background: color-mix(in srgb, var(--ink-400, #8a93a3) 14%, transparent); }
-@media (max-width: 640px) { .admin-tabs { gap: 4px; } .admin-tab { padding: 6px 10px; font-size: .8rem; } }
+/* ---------- Administración · barra de pestañas ----------
+   Patrón ARIA "tabs" con activación automática. En escritorio la barra se
+   mantiene visible (sticky) sobre el contenido; en móvil y tableta es una
+   tira desplazable con ajuste por pestaña, sin barra de scroll visible. */
+.admin-tabs-bar {
+  position: relative;
+  margin: 0 0 18px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  background: color-mix(in srgb, var(--surface-0) 88%, transparent);
+  box-shadow: 0 1px 2px rgba(13, 27, 51, .05), 0 10px 26px -18px rgba(13, 27, 51, .45);
+  scroll-margin-top: 16px;
+}
+.admin-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.admin-tabs::-webkit-scrollbar { display: none; }
+
+.admin-tab {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-s) - 4px);
+  background: transparent;
+  color: var(--ink-600);
+  font-family: var(--font-ui);
+  font-size: .875rem;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  white-space: nowrap;
+  scroll-snap-align: center;
+  scroll-margin-inline: 6px;
+  transition: background-color .18s var(--ease), color .18s var(--ease), box-shadow .18s var(--ease), transform .12s var(--ease);
+}
+.admin-tab svg { width: 18px; height: 18px; flex: none; opacity: .8; }
+.admin-tab:hover:not([aria-selected="true"]) { background: color-mix(in srgb, var(--ink-400) 13%, transparent); color: var(--ink-900); }
+.admin-tab:active { transform: scale(.985); }
+.admin-tab[aria-selected="true"] {
+  color: #fff;
+  background: linear-gradient(135deg, var(--indigo-600), var(--indigo-500));
+  box-shadow: 0 6px 16px -8px color-mix(in srgb, var(--indigo-600) 85%, transparent), inset 0 1px 0 rgba(255, 255, 255, .18);
+}
+.admin-tab[aria-selected="true"] svg { opacity: 1; }
+.admin-tab:focus-visible { outline: 2px solid var(--indigo-500); outline-offset: 2px; }
+.admin-tab-label { line-height: 1; }
+.admin-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--ink-400) 18%, transparent);
+  color: var(--ink-600);
+  font-size: .7rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  transition: background-color .18s var(--ease), color .18s var(--ease);
+}
+.admin-tab[aria-selected="true"] .admin-tab-count { background: rgba(255, 255, 255, .24); color: #fff; }
+
+.admin-tab-panel[hidden] { display: none !important; }
+/* Entrada suave de cada panel al activarse (respeta preferencia de movimiento reducido). */
+.admin-tab-panel { animation: admin-tab-panel-in 0.26s var(--ease) both; }
+@keyframes admin-tab-panel-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .admin-tab-panel { animation: none; } }
+
+@media (min-width: 901px) {
+  .admin-tabs-bar {
+    position: sticky;
+    top: 12px;
+    z-index: 20;
+    backdrop-filter: blur(14px) saturate(150%);
+    -webkit-backdrop-filter: blur(14px) saturate(150%);
+  }
+}
+@media (max-width: 900px) {
+  .admin-tabs-bar { scroll-margin-top: 76px; }
+}
+@media (max-width: 640px) {
+  .admin-tabs-bar { padding: 4px; margin-bottom: 14px; }
+  .admin-tab { min-height: 44px; gap: 6px; padding: 0 12px; font-size: .82rem; }
+  .admin-tab svg { width: 16px; height: 16px; }
+  .admin-tab-count { min-width: 18px; height: 18px; padding: 0 5px; font-size: .66rem; }
+}
+:root[data-theme$='dark'] .admin-tab[aria-selected="true"] {
+  background: linear-gradient(135deg, #3453d6, #2e5bff);
+  box-shadow: 0 6px 18px -8px rgba(46, 91, 255, .85), inset 0 1px 0 rgba(255, 255, 255, .16);
+}
+:root[data-theme$='dark'] .admin-tab:hover:not([aria-selected="true"]) { background: rgba(148, 163, 184, .16); }
+:root[data-theme$='dark'] .admin-tabs-bar { border-color: rgba(148, 163, 184, .22); background: color-mix(in srgb, #131c2e 86%, transparent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-tab, .admin-tab-count { transition: none; }
+  .admin-tab:active { transform: none; }
+}
+@media (prefers-contrast: more) {
+  .admin-tab[aria-selected="true"] { background: var(--indigo-700); }
+  .admin-tab-count { background: transparent; border: 1px solid currentColor; }
+}
 .settings-group { padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-m); background: var(--surface-1); }
 .settings-group h3 { margin: 0 0 16px; color: var(--ink-900); font-size: .9rem; }
 .settings-group label { margin-top: 16px; }
