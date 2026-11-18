@@ -49,6 +49,18 @@ type RateChartProps = {
   labels: RateChartLabels;
   /** Fuente que gobierna las cotizaciones ahora mismo. */
   activeSource?: string | null;
+  /** Mostrar la serie del administrador. */
+  showAdmin?: boolean;
+  /** Mostrar la leyenda. */
+  showLegend?: boolean;
+  /** Mostrar el valor al pasar el cursor. */
+  showHover?: boolean;
+  /** Mostrar la linea guia (crosshair). */
+  showCrosshair?: boolean;
+  /** Mostrar marcadores en los ajustes manuales. */
+  showAdminMarkers?: boolean;
+  /** Altura del lienzo en px. */
+  height?: number;
   loading?: boolean;
 };
 
@@ -140,7 +152,7 @@ function priceFormatFor(series: RateSeries): { precision: number; minMove: numbe
   return { precision, minMove: Number(`1e-${precision}`) };
 }
 
-export default function RateChart({ points, base, quote, locale, labels, activeSource, loading = false }: RateChartProps) {
+export default function RateChart({ points, base, quote, locale, labels, activeSource, showAdmin = true, showLegend = true, showHover = true, showCrosshair = true, showAdminMarkers = true, height = 220, loading = false }: RateChartProps) {
   const data = useMemo(() => buildRateSeries(points), [points]);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -185,7 +197,7 @@ export default function RateChart({ points, base, quote, locale, labels, activeS
         tickMarkFormatter: (time: Time) => formatDay(isoDay(time), locale),
       },
       crosshair: {
-        mode: CrosshairMode.Magnet,
+        mode: showCrosshair ? CrosshairMode.Magnet : CrosshairMode.Hidden,
         vertLine: { color: palette.axis, width: 1, style: LineStyle.Dashed, labelVisible: false },
         horzLine: { color: palette.axis, width: 1, style: LineStyle.Dashed, labelVisible: true },
       },
@@ -306,21 +318,21 @@ export default function RateChart({ points, base, quote, locale, labels, activeS
     <div className="rate-chart-header">
       <span className="rate-chart-pair">{base}/{quote}</span>
       {primary.length >= 2 && <span className={`rate-chart-change ${direction}`}>{direction === 'up' ? '▲' : direction === 'down' ? '▼' : '•'} {change >= 0 ? '+' : ''}{change.toFixed(2)}% <small>{sourceLabel(primarySource)}</small></span>}
-      {hover && <span className="rate-chart-hover">{formatRate(hover.value, locale)} · {sourceLabel(hover.source)} · {formatDay(hover.time, locale, true)}</span>}
+      {showHover && hover && <span className="rate-chart-hover">{formatRate(hover.value, locale)} · {sourceLabel(hover.source)} · {formatDay(hover.time, locale, true)}</span>}
     </div>
-    {(lastOfficial || lastAdmin) && <div className="rate-chart-legend">
+    {showLegend && (lastOfficial || (showAdmin && lastAdmin)) && <div className="rate-chart-legend">
       {lastOfficial && <span className="rate-chart-legend-item">
         <i className="rate-chart-swatch official" aria-hidden="true" />
         {labels.official} <b>{formatRate(lastOfficial.value, locale)}</b>
         {!adminIsActive && <em>{labels.active}</em>}
       </span>}
-      {lastAdmin && <span className="rate-chart-legend-item">
+      {showAdmin && lastAdmin && <span className="rate-chart-legend-item">
         <i className="rate-chart-swatch admin" aria-hidden="true" />
         {labels.admin} <b>{formatRate(lastAdmin.value, locale)}</b>
         {adminIsActive && <em>{labels.active}</em>}
       </span>}
     </div>}
-    <div className={`rate-chart-canvas${hasData ? '' : ' is-empty'}`}>
+    <div className={`rate-chart-canvas${hasData ? '' : ' is-empty'}`} style={{ ['--rate-chart-height' as any]: height + 'px' }}>
       <div
         className="rate-chart-host"
         ref={hostRef}

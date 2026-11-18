@@ -227,7 +227,7 @@ export type PlatformSetting = {
   type: 'decimal' | 'integer' | 'boolean' | 'enum';
   options?: string[] | null;
   label: string;
-  category: 'pricing' | 'operations' | 'security' | 'appearance';
+  category: 'pricing' | 'operations' | 'security' | 'appearance' | 'chart';
   updated_at: string | null;
 };
 
@@ -382,6 +382,16 @@ export const api = {
   currentExchangeRate: (base = 'RUB', quote = 'CUP') => request<ExchangeRate>(`/api/v1/exchange-rates/current?base=${base}&quote=${quote}`),
   exchangeRateHistory: (base = 'RUB', quote = 'CUP', limit = 30) => request<{ base_currency: string; quote_currency: string; points: ExchangeRateHistoryPoint[] }>(`/api/v1/exchange-rates/history?base=${base}&quote=${quote}&limit=${limit}`),
   platformAppearance: () => request<{ theme: string }>('/api/v1/platform/appearance'),
+  platformChartSettings: () => request<{
+    show_admin_rates: boolean;
+    show_legend: boolean;
+    show_hover: boolean;
+    show_crosshair: boolean;
+    show_admin_markers: boolean;
+    history_days: number;
+    default_pair: 'RUB_CUP' | 'CUP_RUB';
+    height: number;
+  }>('/api/v1/platform/chart'),
   bothExchangeRates: () => Promise.all([
     request<ExchangeRate>('/api/v1/exchange-rates/current?base=RUB&quote=CUP'),
     request<ExchangeRate>('/api/v1/exchange-rates/current?base=CUP&quote=RUB'),
