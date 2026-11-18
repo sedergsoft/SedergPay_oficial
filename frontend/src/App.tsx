@@ -1826,4 +1826,3 @@ function NotificationsPanel({ userId, run, onUnreadChange }: { userId: string; r
     </section>
   </div>;
 }
-
