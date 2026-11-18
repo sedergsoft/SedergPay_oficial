@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AreaSeries, ColorType, CrosshairMode, LineSeries, LineStyle, LineType, createChart } from 'lightweight-charts';
-import type { IChartApi, ISeriesApi, Time } from 'lightweight-charts';
+import { AreaSeries, ColorType, CrosshairMode, LineSeries, LineStyle, LineType, createChart, createSeriesMarkers } from 'lightweight-charts';
+import type { IChartApi, ISeriesApi, ISeriesMarkersPluginApi, Time } from 'lightweight-charts';
 import type { ExchangeRateHistoryPoint } from './api';
 import { THEME_EVENT } from './theme';
 
@@ -146,6 +146,7 @@ export default function RateChart({ points, base, quote, locale, labels, activeS
   const chartRef = useRef<IChartApi | null>(null);
   const officialRef = useRef<ISeriesApi<'Area'> | null>(null);
   const adminRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const [hover, setHover] = useState<{ time: string; value: number; source: RateSource } | null>(null);
   const [theme, setTheme] = useState(() => document.documentElement.dataset.theme ?? '');
 
@@ -218,6 +219,8 @@ export default function RateChart({ points, base, quote, locale, labels, activeS
     chartRef.current = chart;
     officialRef.current = official;
     adminRef.current = admin;
+    // Un ajuste manual de un solo dia no dibuja linea: el marcador lo hace visible.
+    markersRef.current = createSeriesMarkers(admin, []);
     chart.subscribeCrosshairMove((param) => {
       if (!param.time) { setHover(null); return; }
       const adminEntry = param.seriesData.get(admin) as { value?: number } | undefined;
@@ -231,6 +234,8 @@ export default function RateChart({ points, base, quote, locale, labels, activeS
       }
     });
     return () => {
+      markersRef.current?.detach();
+      markersRef.current = null;
       chart.remove();
       chartRef.current = null;
       officialRef.current = null;
@@ -274,6 +279,7 @@ export default function RateChart({ points, base, quote, locale, labels, activeS
     admin.applyOptions({ color: palette.admin, priceFormat });
     official.setData(data.official);
     admin.setData(data.admin);
+    markersRef.current?.setMarkers(data.admin.map((point) => ({ time: point.time, position: 'inBar', shape: 'circle', color: palette.admin, size: 1 })));
     chart.timeScale().fitContent();
   }, [data, theme, locale]);
 
