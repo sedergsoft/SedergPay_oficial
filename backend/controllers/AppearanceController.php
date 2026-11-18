@@ -39,4 +39,26 @@ final class AppearanceController extends Controller
             'theme' => in_array($theme, $allowed, true) ? $theme : 'light',
         ];
     }
+
+    /**
+     * Configuracion publica del grafico de tasas. Solo expone opciones de
+     * presentacion: nunca secretos ni parametros de negocio sensibles.
+     */
+    public function actionChart(): array
+    {
+        $db = Yii::$app->db;
+
+        Yii::$app->response->headers->set('Cache-Control', 'public, max-age=60');
+
+        return [
+            'show_admin_rates' => PlatformSettings::getBool($db, 'chart.show_admin_rates'),
+            'show_legend' => PlatformSettings::getBool($db, 'chart.show_legend'),
+            'show_hover' => PlatformSettings::getBool($db, 'chart.show_hover'),
+            'show_crosshair' => PlatformSettings::getBool($db, 'chart.show_crosshair'),
+            'show_admin_markers' => PlatformSettings::getBool($db, 'chart.show_admin_markers'),
+            'history_days' => (int) PlatformSettings::get($db, 'chart.history_days'),
+            'default_pair' => PlatformSettings::get($db, 'chart.default_pair'),
+            'height' => (int) PlatformSettings::get($db, 'chart.height'),
+        ];
+    }
 }

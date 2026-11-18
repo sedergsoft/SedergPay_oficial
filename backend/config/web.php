@@ -69,6 +69,7 @@ return [
                 'GET api/v1/exchange-rates/current' => 'exchange-rate/current',
                 'GET api/v1/exchange-rates/history' => 'exchange-rate/history',
                 'GET api/v1/platform/appearance' => 'appearance/index',
+                'GET api/v1/platform/chart' => 'appearance/chart',
                 'GET api/v1/notifications' => 'notification/index',
                 'GET api/v1/notifications/unread-count' => 'notification/unread-count',
                 'POST api/v1/notifications/read-all' => 'notification/read-all',

@@ -67,6 +67,39 @@ final class PlatformSettings
                 'options' => ['light', 'dark', 'aurora', 'aurora-dark'],
                 'label' => 'Tema visual de la plataforma', 'category' => 'appearance',
             ],
+            'chart.show_admin_rates' => [
+                'type' => 'boolean', 'default' => 'true',
+                'label' => 'Mostrar tasas definidas por el administrador', 'category' => 'chart',
+            ],
+            'chart.show_legend' => [
+                'type' => 'boolean', 'default' => 'true',
+                'label' => 'Mostrar leyenda (oficial / administrador)', 'category' => 'chart',
+            ],
+            'chart.show_hover' => [
+                'type' => 'boolean', 'default' => 'true',
+                'label' => 'Mostrar valor al pasar el cursor', 'category' => 'chart',
+            ],
+            'chart.show_crosshair' => [
+                'type' => 'boolean', 'default' => 'true',
+                'label' => 'Mostrar línea guía (crosshair)', 'category' => 'chart',
+            ],
+            'chart.show_admin_markers' => [
+                'type' => 'boolean', 'default' => 'true',
+                'label' => 'Mostrar marcadores de ajustes manuales', 'category' => 'chart',
+            ],
+            'chart.history_days' => [
+                'type' => 'integer', 'default' => '60', 'min' => '7', 'max' => '365',
+                'label' => 'Días de historial del gráfico', 'category' => 'chart',
+            ],
+            'chart.default_pair' => [
+                'type' => 'enum', 'default' => 'RUB_CUP',
+                'options' => ['RUB_CUP', 'CUP_RUB'],
+                'label' => 'Par de monedas por defecto', 'category' => 'chart',
+            ],
+            'chart.height' => [
+                'type' => 'integer', 'default' => '220', 'min' => '120', 'max' => '480',
+                'label' => 'Altura del gráfico (px)', 'category' => 'chart',
+            ],
         ];
     }
 
