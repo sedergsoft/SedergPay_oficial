@@ -1,12 +1,24 @@
+var _a;
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 export default defineConfig({
     base: process.env.GITHUB_ACTIONS ? '/SedergPay_oficial/' : '/',
     plugins: [react()],
+    build: {
+        rollupOptions: {
+            output: {
+                // Lightweight Charts cambia muy rara vez: en su propio chunk se mantiene
+                // en la cache del navegador entre despliegues de la aplicacion.
+                manualChunks: {
+                    'lightweight-charts': ['lightweight-charts'],
+                },
+            },
+        },
+    },
     server: {
         port: 5173,
         proxy: {
-            '/api': 'http://127.0.0.1:8081',
+            '/api': (_a = process.env.VITE_DEV_API_PROXY) !== null && _a !== void 0 ? _a : 'http://127.0.0.1:8081',
         },
     },
 });

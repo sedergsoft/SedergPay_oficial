@@ -4,6 +4,17 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   base: process.env.GITHUB_ACTIONS ? '/SedergPay_oficial/' : '/',
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        // Lightweight Charts cambia muy rara vez: en su propio chunk se mantiene
+        // en la cache del navegador entre despliegues de la aplicacion.
+        manualChunks: {
+          'lightweight-charts': ['lightweight-charts'],
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {
