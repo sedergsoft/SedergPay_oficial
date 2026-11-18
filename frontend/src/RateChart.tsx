@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AreaSeries, ColorType, CrosshairMode, LineStyle, createChart } from 'lightweight-charts';
+import { AreaSeries, ColorType, CrosshairMode, LineSeries, LineStyle, LineType, createChart } from 'lightweight-charts';
 import type { IChartApi, ISeriesApi, Time } from 'lightweight-charts';
 import type { ExchangeRateHistoryPoint } from './api';
 import { THEME_EVENT } from './theme';
@@ -10,13 +10,20 @@ import { THEME_EVENT } from './theme';
 // Modulo aparte (y cargado con `React.lazy`): la libreria pesa ~171 kB y solo
 // debe descargarla quien ve el historial, no toda la aplicacion.
 //
-// Correcciones respecto al grafico SVG anterior:
+// Hay DOS tasas y se dibujan por separado, porque mezclarlas inventa saltos:
+//  - Oficial  (`bcc_official` / `cbr_official`): area azul, la que publica la
+//    fuente oficial.
+//  - Administrador (`admin_override`): linea escalonada ambar, el valor fijado
+//    a mano y vigente hasta que se reemplaza.
+// El porcentaje de la cabecera se calcula sobre la serie que esta gobernando
+// las cotizaciones (`activeSource`), nunca sobre una mezcla de ambas.
+//
+// Otras correcciones respecto al grafico SVG anterior:
 //  - `effective_date` llega como 'YYYY-MM-DD'. Se parsea a mediodia LOCAL:
 //    `new Date('2026-11-16')` es medianoche UTC y en La Habana (UTC-5) restaba
 //    un dia al eje.
 //  - Lightweight Charts exige tiempos unicos y ascendentes: se conserva la
-//    ultima tasa de cada dia. Antes se apilaban varios puntos en la misma X y
-//    aparecian segmentos verticales.
+//    ultima lectura de cada dia para cada fuente.
 //  - La tipografia y la escala las resuelve el canvas: desaparece el
 //    `preserveAspectRatio="none"` que deformaba las etiquetas.
 //  - Los colores se leen de los tokens del tema activo (el canvas no entiende
@@ -28,6 +35,9 @@ export type RateChartLabels = {
   title: string;
   loading: string;
   empty: string;
+  official: string;
+  admin: string;
+  active: string;
 };
 
 type RateChartProps = {
@@ -37,8 +47,14 @@ type RateChartProps = {
   /** Idioma ya resuelto ('es-ES' | 'ru-RU'); evita depender del locale del navegador. */
   locale: string;
   labels: RateChartLabels;
+  /** Fuente que gobierna las cotizaciones ahora mismo. */
+  activeSource?: string | null;
   loading?: boolean;
 };
+
+type RateSource = 'official' | 'admin';
+type RateSeriesPoint = { time: string; value: number };
+type RateSeries = { official: RateSeriesPoint[]; admin: RateSeriesPoint[] };
 
 function chartPalette() {
   const probe = getComputedStyle(document.documentElement);
@@ -47,8 +63,8 @@ function chartPalette() {
     surface: read('--surface-0', '#ffffff'),
     grid: read('--line', '#e7e4dc'),
     axis: read('--ink-400', '#8a93a3'),
-    up: read('--jade-600', '#0b8a63'),
-    down: read('--coral-600', '#e8503a'),
+    official: read('--indigo-500', '#2e5bff'),
+    admin: read('--amber-500', '#f2a93b'),
     font: read('--font-ui', 'system-ui, sans-serif'),
   };
 }
@@ -98,27 +114,39 @@ function formatDay(iso: string, locale: string, withYear = false): string {
   );
 }
 
-type RateSeriesPoint = { time: string; value: number };
+const sourceOf = (point: ExchangeRateHistoryPoint): RateSource =>
+  point.source === 'admin_override' ? 'admin' : 'official';
 
-function buildRateSeries(points: ExchangeRateHistoryPoint[]): RateSeriesPoint[] {
-  const byDay = new Map<string, number>();
+/** Separa las dos tasas: cada fuente conserva la ultima lectura de cada dia. */
+function buildRateSeries(points: ExchangeRateHistoryPoint[]): RateSeries {
+  const official = new Map<string, number>();
+  const admin = new Map<string, number>();
   for (const point of points) {
     const day = isoDay(String(point.effective_date ?? ''));
     const value = Number(point.rate);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !Number.isFinite(value) || value <= 0) continue;
-    byDay.set(day, value); // la ultima lectura del dia es la vigente
+    (sourceOf(point) === 'admin' ? admin : official).set(day, value);
   }
-  return [...byDay.entries()]
+  const sort = (series: Map<string, number>) => [...series.entries()]
     .sort((left, right) => (left[0] < right[0] ? -1 : left[0] > right[0] ? 1 : 0))
     .map(([time, value]) => ({ time, value }));
+  return { official: sort(official), admin: sort(admin) };
 }
 
-export default function RateChart({ points, base, quote, locale, labels, loading = false }: RateChartProps) {
+function priceFormatFor(series: RateSeries): { precision: number; minMove: number } {
+  const values = [...series.official, ...series.admin].map((point) => point.value);
+  const smallest = values.length > 0 ? Math.min(...values) : 1;
+  const precision = rateDecimals(smallest);
+  return { precision, minMove: Number(`1e-${precision}`) };
+}
+
+export default function RateChart({ points, base, quote, locale, labels, activeSource, loading = false }: RateChartProps) {
   const data = useMemo(() => buildRateSeries(points), [points]);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const seriesRef = useRef<ISeriesApi<'Area'> | null>(null);
-  const [hover, setHover] = useState<RateSeriesPoint | null>(null);
+  const officialRef = useRef<ISeriesApi<'Area'> | null>(null);
+  const adminRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const [hover, setHover] = useState<{ time: string; value: number; source: RateSource } | null>(null);
   const [theme, setTheme] = useState(() => document.documentElement.dataset.theme ?? '');
 
   useEffect(() => {
@@ -127,7 +155,10 @@ export default function RateChart({ points, base, quote, locale, labels, loading
     return () => window.removeEventListener(THEME_EVENT, sync);
   }, []);
 
-  const hasData = data.length >= 2;
+  const lastOfficial = data.official[data.official.length - 1];
+  const lastAdmin = data.admin[data.admin.length - 1];
+  const hasData = data.official.length >= 2 || data.admin.length >= 2;
+  const adminIsActive = activeSource === 'admin_override';
 
   // El chart se crea una sola vez. El idioma forma parte de las opciones, asi
   // que cambiarlo recrea la instancia (operacion infrecuente y barata).
@@ -164,7 +195,7 @@ export default function RateChart({ points, base, quote, locale, labels, loading
         priceFormatter: (price: number) => formatRate(price, locale),
       },
     });
-    const series = chart.addSeries(AreaSeries, {
+    const official = chart.addSeries(AreaSeries, {
       lineWidth: 2,
       priceLineVisible: false,
       lastValueVisible: false,
@@ -173,17 +204,41 @@ export default function RateChart({ points, base, quote, locale, labels, loading
       crosshairMarkerBorderWidth: 2,
       crosshairMarkerBorderColor: palette.surface,
     });
-    chartRef.current = chart;
-    seriesRef.current = series;
-    chart.subscribeCrosshairMove((param) => {
-      const entry = param.seriesData.get(series) as { value?: number } | undefined;
-      if (!param.time || !entry || typeof entry.value !== 'number') { setHover(null); return; }
-      setHover({ time: isoDay(param.time), value: entry.value });
+    const admin = chart.addSeries(LineSeries, {
+      lineWidth: 2,
+      lineStyle: LineStyle.Dashed,
+      lineType: LineType.WithSteps,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: true,
+      crosshairMarkerRadius: 4,
+      crosshairMarkerBorderWidth: 2,
+      crosshairMarkerBorderColor: palette.surface,
     });
-    return () => { chart.remove(); chartRef.current = null; seriesRef.current = null; };
+    chartRef.current = chart;
+    officialRef.current = official;
+    adminRef.current = admin;
+    chart.subscribeCrosshairMove((param) => {
+      if (!param.time) { setHover(null); return; }
+      const adminEntry = param.seriesData.get(admin) as { value?: number } | undefined;
+      const officialEntry = param.seriesData.get(official) as { value?: number } | undefined;
+      if (typeof adminEntry?.value === 'number') {
+        setHover({ time: isoDay(param.time), value: adminEntry.value, source: 'admin' });
+      } else if (typeof officialEntry?.value === 'number') {
+        setHover({ time: isoDay(param.time), value: officialEntry.value, source: 'official' });
+      } else {
+        setHover(null);
+      }
+    });
+    return () => {
+      chart.remove();
+      chartRef.current = null;
+      officialRef.current = null;
+      adminRef.current = null;
+    };
   }, [locale]);
 
-  // Cambio de tema: solo paleta y tipografia, sin recrear el chart.
+  // Cambio de tema: la paleta del canvas se lee de los tokens CSS.
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
@@ -193,44 +248,72 @@ export default function RateChart({ points, base, quote, locale, labels, loading
       grid: { horzLines: { color: palette.grid, style: LineStyle.Dotted } },
       crosshair: { vertLine: { color: palette.axis }, horzLine: { color: palette.axis } },
     });
-    seriesRef.current?.applyOptions({ crosshairMarkerBorderColor: palette.surface });
+    officialRef.current?.applyOptions({
+      lineColor: palette.official,
+      topColor: withAlpha(palette.official, 0.22),
+      bottomColor: withAlpha(palette.official, 0.02),
+      crosshairMarkerBorderColor: palette.surface,
+    });
+    adminRef.current?.applyOptions({ color: palette.admin, crosshairMarkerBorderColor: palette.surface });
   }, [theme]);
 
-  // Datos: se reemplaza la serie completa (<= 60 puntos, coste despreciable).
+  // Datos: se reemplazan ambas series (<= 60 puntos cada una, coste despreciable).
   useEffect(() => {
-    const series = seriesRef.current;
     const chart = chartRef.current;
-    if (!series || !chart) return;
-    if (data.length < 2) { series.setData([]); return; }
+    const official = officialRef.current;
+    const admin = adminRef.current;
+    if (!chart || !official || !admin) return;
     const palette = chartPalette();
-    const rising = data[data.length - 1].value >= data[0].value;
-    const color = rising ? palette.up : palette.down;
-    const decimals = rateDecimals(data[data.length - 1].value);
-    series.applyOptions({
-      lineColor: color,
-      topColor: withAlpha(color, 0.26),
-      bottomColor: withAlpha(color, 0.02),
-      priceFormat: { type: 'price', precision: decimals, minMove: Number(`1e-${decimals}`) },
+    const priceFormat = { type: 'price' as const, ...priceFormatFor(data) };
+    official.applyOptions({
+      lineColor: palette.official,
+      topColor: withAlpha(palette.official, 0.22),
+      bottomColor: withAlpha(palette.official, 0.02),
+      priceFormat,
     });
-    series.setData(data);
+    admin.applyOptions({ color: palette.admin, priceFormat });
+    official.setData(data.official);
+    admin.setData(data.admin);
     chart.timeScale().fitContent();
   }, [data, theme, locale]);
 
-  const first = data[0];
-  const last = data[data.length - 1];
-  const delta = hasData ? last.value - first.value : 0;
-  const change = hasData && first.value !== 0 ? (delta / first.value) * 100 : 0;
+  // Variacion de la serie que gobierna; si aun no tiene dos puntos, la otra.
+  const primary = adminIsActive
+    ? (data.admin.length >= 2 ? data.admin : data.official)
+    : (data.official.length >= 2 ? data.official : data.admin);
+  const primarySource: RateSource = primary === data.admin ? 'admin' : 'official';
+  const first = primary[0];
+  const last = primary[primary.length - 1];
+  const delta = primary.length >= 2 ? last.value - first.value : 0;
+  const change = primary.length >= 2 && first.value !== 0 ? (delta / first.value) * 100 : 0;
   const direction = delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat';
-  const summary = hasData
-    ? `${base}/${quote} · ${formatRate(first.value, locale)} → ${formatRate(last.value, locale)} · ${change >= 0 ? '+' : ''}${change.toFixed(2)}%`
-    : '';
+  const sourceLabel = (source: RateSource) => (source === 'admin' ? labels.admin : labels.official);
+
+  const summary = [
+    `${base}/${quote}`,
+    lastOfficial && `${labels.official} ${formatRate(lastOfficial.value, locale)}`,
+    lastAdmin && `${labels.admin} ${formatRate(lastAdmin.value, locale)}`,
+    primary.length >= 2 && `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`,
+  ].filter(Boolean).join(' · ');
 
   return <div className="rate-chart">
     <div className="rate-chart-header">
       <span className="rate-chart-pair">{base}/{quote}</span>
-      {hasData && <span className={`rate-chart-change ${direction}`}>{direction === 'up' ? '▲' : direction === 'down' ? '▼' : '•'} {change >= 0 ? '+' : ''}{change.toFixed(2)}%</span>}
-      {hover && <span className="rate-chart-hover">{formatRate(hover.value, locale)} · {formatDay(hover.time, locale, true)}</span>}
+      {primary.length >= 2 && <span className={`rate-chart-change ${direction}`}>{direction === 'up' ? '▲' : direction === 'down' ? '▼' : '•'} {change >= 0 ? '+' : ''}{change.toFixed(2)}% <small>{sourceLabel(primarySource)}</small></span>}
+      {hover && <span className="rate-chart-hover">{formatRate(hover.value, locale)} · {sourceLabel(hover.source)} · {formatDay(hover.time, locale, true)}</span>}
     </div>
+    {(lastOfficial || lastAdmin) && <div className="rate-chart-legend">
+      {lastOfficial && <span className="rate-chart-legend-item">
+        <i className="rate-chart-swatch official" aria-hidden="true" />
+        {labels.official} <b>{formatRate(lastOfficial.value, locale)}</b>
+        {!adminIsActive && <em>{labels.active}</em>}
+      </span>}
+      {lastAdmin && <span className="rate-chart-legend-item">
+        <i className="rate-chart-swatch admin" aria-hidden="true" />
+        {labels.admin} <b>{formatRate(lastAdmin.value, locale)}</b>
+        {adminIsActive && <em>{labels.active}</em>}
+      </span>}
+    </div>}
     <div className={`rate-chart-canvas${hasData ? '' : ' is-empty'}`}>
       <div
         className="rate-chart-host"

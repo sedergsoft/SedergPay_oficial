@@ -345,7 +345,15 @@ function LandingRateCard({ language }: { language: Language }) {
             quote={chartQuote}
             loading={historyLoading}
             locale={locale}
-            labels={{ title: text('chart.title'), loading: text('chart.loading'), empty: text('chart.notEnoughData') }}
+            activeSource={historyPair === 'RUB_CUP' ? rates?.rubToCup.active_source : rates?.cupToRub.active_source}
+            labels={{
+              title: text('chart.title'),
+              loading: text('chart.loading'),
+              empty: text('chart.notEnoughData'),
+              official: text('chart.sourceOfficial'),
+              admin: text('chart.sourceAdmin'),
+              active: text('chart.sourceActive'),
+            }}
           />
         </Suspense>
       </div>

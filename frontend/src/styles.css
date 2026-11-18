@@ -2148,6 +2148,14 @@ td,th { border-bottom:1px solid #E5EDF5; }
 .rate-chart-change.up { color: var(--jade-600, #0b8a63); font-weight: 600; }
 .rate-chart-change.down { color: var(--coral-600, #e8503a); font-weight: 600; }
 .rate-chart-change.flat { color: var(--ink-400, #8a93a3); font-weight: 600; }
+.rate-chart-change small { font-size: .72em; font-weight: 500; opacity: .8; margin-left: 4px; }
+.rate-chart-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 8px; font-size: .82rem; color: var(--ink-600, #4a5568); }
+.rate-chart-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.rate-chart-legend-item b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.rate-chart-legend-item em { font-style: normal; font-size: .66rem; text-transform: uppercase; letter-spacing: .04em; padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, var(--ink-400, #8a93a3) 20%, transparent); }
+.rate-chart-swatch { width: 10px; height: 10px; border-radius: 3px; }
+.rate-chart-swatch.official { background: var(--indigo-500, #2e5bff); }
+.rate-chart-swatch.admin { background: var(--amber-500, #f2a93b); }
 .rate-chart-hover { color: var(--ink-400, #8a93a3); margin-left: auto; font-variant-numeric: tabular-nums; }
 .rate-chart-canvas { position: relative; height: 220px; }
 .rate-chart-canvas.is-empty .rate-chart-host { visibility: hidden; }
