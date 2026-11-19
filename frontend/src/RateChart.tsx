@@ -170,8 +170,10 @@ export default function RateChart({ points, base, quote, locale, labels, activeS
 
   const lastOfficial = data.official[data.official.length - 1];
   const lastAdmin = data.admin[data.admin.length - 1];
-  const hasData = data.official.length >= 2 || data.admin.length >= 2;
-  const adminIsActive = activeSource === 'admin_override';
+  const adminEnabled = showAdmin ?? true;
+  const adminSeries = adminEnabled ? data.admin : [];
+  const hasData = data.official.length >= 2 || adminSeries.length >= 2;
+  const adminIsActive = adminEnabled && activeSource === 'admin_override';
 
   // El chart se crea una sola vez. El idioma forma parte de las opciones, asi
   // que cambiarlo recrea la instancia (operacion infrecuente y barata).
@@ -237,7 +239,7 @@ export default function RateChart({ points, base, quote, locale, labels, activeS
       if (!param.time) { setHover(null); return; }
       const adminEntry = param.seriesData.get(admin) as { value?: number } | undefined;
       const officialEntry = param.seriesData.get(official) as { value?: number } | undefined;
-      if (typeof adminEntry?.value === 'number') {
+      if (adminEnabled && typeof adminEntry?.value === 'number') {
         setHover({ time: isoDay(param.time), value: adminEntry.value, source: 'admin' });
       } else if (typeof officialEntry?.value === 'number') {
         setHover({ time: isoDay(param.time), value: officialEntry.value, source: 'official' });
@@ -290,16 +292,18 @@ export default function RateChart({ points, base, quote, locale, labels, activeS
     });
     admin.applyOptions({ color: palette.admin, priceFormat });
     official.setData(data.official);
-    admin.setData(data.admin);
-    markersRef.current?.setMarkers(data.admin.map((point) => ({ time: point.time, position: 'inBar', shape: 'circle', color: palette.admin, size: 1 })));
+    // `chart.show_admin_rates = false` => la serie del administrador desaparece
+    // del grafico: sin datos, sin marcadores y sin fuente principal.
+    admin.setData(adminSeries);
+    markersRef.current?.setMarkers(adminEnabled && showAdminMarkers ? adminSeries.map((point) => ({ time: point.time, position: 'inBar', shape: 'circle', color: palette.admin, size: 1 })) : []);
     chart.timeScale().fitContent();
-  }, [data, theme, locale]);
+  }, [data, theme, locale, adminEnabled, showAdminMarkers]);
 
   // Variacion de la serie que gobierna; si aun no tiene dos puntos, la otra.
   const primary = adminIsActive
-    ? (data.admin.length >= 2 ? data.admin : data.official)
-    : (data.official.length >= 2 ? data.official : data.admin);
-  const primarySource: RateSource = primary === data.admin ? 'admin' : 'official';
+    ? (adminSeries.length >= 2 ? adminSeries : data.official)
+    : (data.official.length >= 2 ? data.official : adminSeries);
+  const primarySource: RateSource = adminIsActive && adminSeries.length >= 2 ? 'admin' : 'official';
   const first = primary[0];
   const last = primary[primary.length - 1];
   const delta = primary.length >= 2 ? last.value - first.value : 0;
@@ -310,7 +314,7 @@ export default function RateChart({ points, base, quote, locale, labels, activeS
   const summary = [
     `${base}/${quote}`,
     lastOfficial && `${labels.official} ${formatRate(lastOfficial.value, locale)}`,
-    lastAdmin && `${labels.admin} ${formatRate(lastAdmin.value, locale)}`,
+    adminEnabled && lastAdmin && `${labels.admin} ${formatRate(lastAdmin.value, locale)}`,
     primary.length >= 2 && `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`,
   ].filter(Boolean).join(' · ');
 
